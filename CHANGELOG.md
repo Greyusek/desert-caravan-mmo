@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.4 — Checkpoint 04
+
+- Added GitHub Actions CI for clean installation, TypeScript compilation, and tests.
+- Added the root `TODO.md` for short-term, pull-request-sized work.
+- Added LF line-ending normalization across Windows and Linux.
+- Added `WORLD-001`: dependency-free deterministic seeded generation of ten cities.
+- Added six automated WORLD-001 tests and a reproducible demo scenario.
+
 ## 0.0.1 — 2026-08-14
 
 ### Added

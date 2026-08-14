@@ -3,6 +3,7 @@ import {
   createRoutePlan,
   createWorldCoordinate,
   greatCircleDistance,
+  generateSeededWorld,
   kilometers,
   positionAtTime,
   projectSupplies,
@@ -80,3 +81,11 @@ const idleAtTenHours = projectSupplies(supplies, consumption, "idle", 10 * 3_600
 console.log(
   `If idle for 10h instead: food=${idleAtTenHours.foodRemaining.toFixed(3)}, water=${idleAtTenHours.waterRemaining.toFixed(3)}`,
 );
+
+const world = generateSeededWorld("checkpoint-04");
+console.log(`\nWORLD-001 seed=${world.seed}: ${world.cities.length} cities`);
+for (const city of world.cities) {
+  console.log(
+    `  ${city.id} ${city.name}: ${city.position.latitudeDeg.toFixed(6)}, ${city.position.longitudeDeg.toFixed(6)}`,
+  );
+}
