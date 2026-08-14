@@ -1,0 +1,14 @@
+{
+  "name": "desert-caravan-mmo",
+  "version": "0.0.3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p packages/sim-core/tsconfig.json",
+    "test": "npm run build && node --test packages/sim-core/tests/*.test.mjs",
+    "demo": "npm run build && node packages/sim-core/dist/src/demo.js"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}
