@@ -4,9 +4,9 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 03 — SIM-006: implemented, awaiting local verification.**
+**Checkpoint 04 — WORLD-001: implemented and covered by automated tests.**
 
-Already implemented and verified on the user's Windows machine:
+Implemented and covered by the automated test suite:
 
 - SIM-001 — world coordinate types and unit conventions;
 - SIM-002 — destination point from `start + bearing + distance`;
@@ -14,7 +14,7 @@ Already implemented and verified on the user's Windows machine:
 - SIM-004 — multi-segment route and ETA;
 - SIM-005 — caravan position at arbitrary simulation time `T`.
 
-Implemented in Checkpoint 03:
+Also implemented:
 
 - SIM-006 — food/water stocks;
 - separate moving/idle consumption rates;
@@ -22,8 +22,9 @@ Implemented in Checkpoint 03:
 - `food`, `water` or simultaneous depletion cause;
 - quick survival check for a given duration;
 - demo linking supply depletion with caravan position on the route.
+- WORLD-001 — deterministic seeded generation of ten initial cities.
 
-Not implemented yet (intentionally): seeded world, cities, hidden objects, discovery, monsters, UI/server/database.
+Not implemented yet (intentionally): hidden objects, discovery, monsters, UI/server/database.
 
 ## Requirements
 
@@ -36,20 +37,20 @@ Because Windows PowerShell may block `npm.ps1`, use `npm.cmd`:
 
 ```powershell
 cd D:\dev\newWorld
-npm.cmd install
+npm.cmd ci
 npm.cmd test
 npm.cmd run demo
 ```
 
-Expected for Checkpoint 03:
+Expected for Checkpoint 04:
 
 ```text
-# tests 32
-# pass 32
+# tests 38
+# pass 38
 # fail 0
 ```
 
-See `docs/CHECKPOINT_03.md` for the expected demo output.
+GitHub Actions runs installation, TypeScript compilation, and tests for every pull request to `main`. See `docs/CHECKPOINT_04.md` for WORLD-001 details.
 
 ## Project structure
 
@@ -63,4 +64,4 @@ See `docs/CHECKPOINT_03.md` for the expected demo output.
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next checkpoint after local verification is `WORLD-001`: deterministic seeded world generation with the first cities.
+The next functional checkpoint is `WORLD-002`: deterministic hidden static world objects.
