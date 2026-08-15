@@ -12,6 +12,7 @@
 - `CHECKPOINT_05.md` — детерминированные скрытые статичные объекты мира.
 - `CHECKPOINT_06.md` — первый точный вход маршрута в радиус скрытого объекта.
 - `CHECKPOINT_07.md` — детерминированный блуждающий монстр и замкнутый patrol-loop.
+- `CHECKPOINT_08.md` — time-aware встреча двух движущихся сущностей.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-007` и `WORLD-001..WORLD-004` покрыты 68 simulation-тестами; вместе с 3 tooling-регрессиями GitHub Actions запускает 71 тест в pull request.
+Текущий статус: `SIM-001..SIM-008` и `WORLD-001..WORLD-004` покрыты 78 simulation-тестами; вместе с 3 tooling-регрессиями GitHub Actions запускает 81 тест в pull request.

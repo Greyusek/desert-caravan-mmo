@@ -13,10 +13,11 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `WORLD-003` / `SIM-007`: detect hidden static objects on the caravan's real route.
 - [x] `DEVX-002`: make local acceptance launch npm reliably on Windows.
 - [x] `WORLD-004`: add deterministic wandering monsters with cyclic patrol routes.
+- [x] `SIM-008`: detect encounters between two moving entities in overlapping time windows.
 
 ## Next
 
-- [ ] `SIM-008`: detect encounters between two moving entities in overlapping time windows.
+- [ ] `UI-001`: choose the minimal browser shell and add a north-up debug map.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Maintenance rules

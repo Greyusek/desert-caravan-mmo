@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.8 — Checkpoint 08
+
+- Added `SIM-008`: first moving encounter across overlapping absolute-time windows.
+- Added finite and cyclic route motions, caller-bounded searches, and the existing 500 m interaction radius as the default.
+- Added deterministic continuous-time search across route and patrol-cycle boundaries without fixed-tick sampling.
+- Added ten tests for synchronized and delayed crossings, time clipping, later patrol cycles, antimeridian continuity, tangent contact, symmetry, inactive routes, and validation; repository verification now runs 81 tests.
+- Designated `UI-001`, the first north-up debug map, as the next checkpoint.
+
 ## 0.0.7 — Checkpoint 07
 
 - Added `WORLD-004`: deterministic wandering monsters with stable IDs and isolated PRNG streams.
