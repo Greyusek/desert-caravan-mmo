@@ -7,6 +7,8 @@ import {
   createDebugMapSnapshot,
   createExpeditionEventLogSnapshot,
   createFourSegmentRouteSnapshot,
+  createRumorSearchSnapshot,
+  projectCoordinate,
 } from "./map-model.js";
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
@@ -65,9 +67,20 @@ const idleWaterRate = requireElement("idle-water-rate", HTMLInputElement);
 const eventLogCount = requireElement("event-log-count", HTMLOutputElement);
 const eventLogNext = requireElement("event-log-next", HTMLParagraphElement);
 const eventLogList = requireElement("event-log-list", HTMLOListElement);
+const rumorPanel = requireElement("rumor-panel", HTMLElement);
+const rumorState = requireElement("rumor-state", HTMLParagraphElement);
+const rumorText = requireElement("rumor-text", HTMLElement);
+const rumorOrigin = requireElement("rumor-origin", HTMLElement);
+const rumorSector = requireElement("rumor-sector", HTMLElement);
+const rumorRange = requireElement("rumor-range", HTMLElement);
+const rumorResult = requireElement("rumor-result", HTMLParagraphElement);
+const rumorDevRoute = requireElement("rumor-dev-route", HTMLButtonElement);
+const rumorMap = requireElement("rumor-map", SVGSVGElement);
 
 let elapsedSeconds = 0;
 let supplySettings = readSupplySettings();
+/** @type {ReturnType<typeof createRumorSearchSnapshot> | null} */
+let activeRumorSearch = null;
 
 seedForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -91,6 +104,22 @@ routeForm.addEventListener("submit", (event) => {
 supplyForm.addEventListener("submit", (event) => {
   event.preventDefault();
   supplySettings = readSupplySettings();
+  elapsedSeconds = 0;
+  timeSlider.value = "0";
+  render();
+});
+
+rumorDevRoute.addEventListener("click", () => {
+  if (!activeRumorSearch) return;
+
+  const { exactBearingDeg, exactDistanceKilometers } =
+    activeRumorSearch.serverTruth;
+  routeBearingInputs.forEach((input, index) => {
+    input.value = index === 0 ? exactBearingDeg.toFixed(6) : "0";
+  });
+  routeDistanceInputs.forEach((input, index) => {
+    input.value = index === 0 ? exactDistanceKilometers.toFixed(6) : "0";
+  });
   elapsedSeconds = 0;
   timeSlider.value = "0";
   render();
@@ -131,10 +160,17 @@ function render() {
       supplySettings.initial,
       supplySettings.profile,
     );
+    const rumorSearch = createRumorSearchSnapshot(
+      snapshot.seed,
+      startCity,
+      route,
+    );
+    activeRumorSearch = rumorSearch;
     const eventLog = createExpeditionEventLogSnapshot(
       route,
       supplySettings.initial,
       supplySettings.profile,
+      rumorSearch,
     );
     const firstMonster = snapshot.monsters[0];
     const maximumElapsedSeconds = Math.max(
@@ -152,18 +188,20 @@ function render() {
     errorMessage.hidden = true;
     mapTitle.textContent = `Seed: ${snapshot.seed}`;
     cityCount.textContent = String(snapshot.cities.length);
-    objectCount.textContent = String(snapshot.staticObjects.length);
+    objectCount.textContent = String(snapshot.staticObjects.length + 1);
     monsterCount.textContent = String(snapshot.monsters.length);
     timeOutput.textContent = formatElapsed(elapsedSeconds);
     routeSummary.textContent = formatRouteSummary(route);
+    renderRumorSearch(rumorSearch);
     renderCaravanStatus(caravanStatus);
     renderEventLog(eventLog, route);
 
     timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
     timeSlider.value = String(elapsedSeconds);
 
-    drawSnapshot(snapshot, route);
+    drawSnapshot(snapshot, route, rumorSearch);
   } catch (error) {
+    activeRumorSearch = null;
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
   }
@@ -232,6 +270,12 @@ function eventTitle(event) {
   if (event.kind === "supplies-depleted") {
     return "Критические запасы исчерпаны";
   }
+  if (event.kind === "target-discovered") {
+    return `Обнаружен ${staticKindLabel(event.objectKind).toLocaleLowerCase("ru-RU")}`;
+  }
+  if (event.kind === "search-missed") {
+    return "Поиск завершён без находки";
+  }
   return "Маршрут достиг финиша";
 }
 
@@ -252,7 +296,159 @@ function eventDetail(event, route) {
   if (event.kind === "supplies-depleted") {
     return `${formatDepletionCause(event.cause)} · последствия появятся в GAME-003`;
   }
+  if (event.kind === "target-discovered") {
+    return `Сегмент ${(event.segmentIndex ?? 0) + 1} · ${formatNumber(event.distanceKilometers ?? 0, 1)} км пути`;
+  }
+  if (event.kind === "search-missed") {
+    return `Караван не вошёл в радиус 150 м от цели слуха`;
+  }
   return `${formatNumber(event.distanceKilometers ?? 0, 1)} км · ETA ${formatDuration(route.totalDurationSeconds)}`;
+}
+
+/**
+ * @param {ReturnType<typeof createRumorSearchSnapshot>} search
+ */
+function renderRumorSearch(search) {
+  rumorPanel.dataset.state = search.status;
+  rumorState.textContent =
+    search.status === "found"
+      ? "Цель найдена"
+      : search.status === "missed"
+        ? "Не найдено"
+        : "Идёт поиск";
+  rumorOrigin.textContent = `${search.originCity.name} · ${search.originCity.id}`;
+  rumorSector.textContent = `СЗ · ${formatNumber(search.rumor.bearingSector.minimumBearingDeg, 1)}°–${formatNumber(search.rumor.bearingSector.maximumBearingDeg, 1)}°`;
+  rumorRange.textContent = `${formatNumber(search.rumor.distanceRange.minimumMeters / 1_000, 0)}–${formatNumber(search.rumor.distanceRange.maximumMeters / 1_000, 0)} км`;
+  rumorText.textContent = `«К северо-западу от ${search.originCity.name} видели старый рудник — примерно в ${formatNumber(search.rumor.distanceRange.minimumMeters / 1_000, 0)}–${formatNumber(search.rumor.distanceRange.maximumMeters / 1_000, 0)} км»`;
+
+  if (search.status === "found" && search.discovery) {
+    rumorResult.textContent = `Рудник обнаружен на ${formatElapsed(search.discovery.atSeconds)} · сегмент ${search.discovery.segmentIndex + 1} · ${formatNumber(search.discovery.routeDistanceKilometers, 1)} км пути.`;
+  } else if (search.status === "missed") {
+    rumorResult.textContent = `Маршрут завершён: караван не вошёл в радиус ${formatNumber(search.discoveryRadiusMeters, 0)} м от скрытой цели.`;
+  } else {
+    rumorResult.textContent = `Проведите маршрут через отмеченный сектор. Обнаружение сработает в радиусе ${formatNumber(search.discoveryRadiusMeters, 0)} м.`;
+  }
+
+  drawRumorMap(search);
+}
+
+/**
+ * @param {ReturnType<typeof createRumorSearchSnapshot>} search
+ */
+function drawRumorMap(search) {
+  const map = search.localMap;
+  rumorMap.replaceChildren();
+
+  for (const offset of [40, 80, 120, 160, 200, 240, 280, 320, 360]) {
+    rumorMap.append(
+      svgElement("line", {
+        class: "rumor-map-grid",
+        x1: offset,
+        x2: offset,
+        y1: 0,
+        y2: map.height,
+      }),
+    );
+  }
+  for (const offset of [40, 80, 120, 160, 200]) {
+    rumorMap.append(
+      svgElement("line", {
+        class: "rumor-map-grid",
+        x1: 0,
+        x2: map.width,
+        y1: offset,
+        y2: offset,
+      }),
+    );
+  }
+
+  rumorMap.append(
+    svgElement("circle", {
+      class: "rumor-ring",
+      cx: map.originPoint.x,
+      cy: map.originPoint.y,
+      r: map.minimumRangePixels,
+    }),
+    svgElement("circle", {
+      class: "rumor-ring",
+      cx: map.originPoint.x,
+      cy: map.originPoint.y,
+      r: map.maximumRangePixels,
+    }),
+    svgElement("polygon", {
+      class: "rumor-clue-area",
+      points: map.clueAreaPoints.map((point) => `${point.x},${point.y}`).join(" "),
+    }),
+    svgElement("polyline", {
+      class: "rumor-local-route",
+      points: map.routePoints.map((point) => `${point.x},${point.y}`).join(" "),
+    }),
+  );
+
+  const minimumLabel = svgElement("text", {
+    class: "rumor-range-label",
+    x: map.originPoint.x + map.minimumRangePixels + 3,
+    y: map.originPoint.y - 3,
+  });
+  minimumLabel.textContent = `${formatNumber(search.rumor.distanceRange.minimumMeters / 1_000, 0)} км`;
+  const maximumLabel = svgElement("text", {
+    class: "rumor-range-label",
+    x: map.originPoint.x + map.maximumRangePixels + 3,
+    y: map.originPoint.y - 3,
+  });
+  maximumLabel.textContent = `${formatNumber(search.rumor.distanceRange.maximumMeters / 1_000, 0)} км`;
+
+  const clue = svgElement("circle", {
+    class: "rumor-clue-marker",
+    cx: map.cluePoint.x,
+    cy: map.cluePoint.y,
+    r: 10,
+  });
+  const clueLabel = svgElement("text", {
+    class: "rumor-map-label",
+    x: map.cluePoint.x,
+    y: map.cluePoint.y + 3,
+    "text-anchor": "middle",
+  });
+  clueLabel.textContent = "?";
+
+  const target = svgElement("polygon", {
+    class: "rumor-target-marker",
+    points: `${map.targetPoint.x},${map.targetPoint.y - 7} ${map.targetPoint.x + 7},${map.targetPoint.y} ${map.targetPoint.x},${map.targetPoint.y + 7} ${map.targetPoint.x - 7},${map.targetPoint.y}`,
+  });
+  target.append(svgTitle("Точная цель — только DEV"));
+
+  const origin = svgElement("circle", {
+    class: "rumor-origin-marker",
+    cx: map.originPoint.x,
+    cy: map.originPoint.y,
+    r: 6,
+  });
+  const originLabel = svgElement("text", {
+    class: "rumor-map-label",
+    x: map.originPoint.x + 9,
+    y: map.originPoint.y + 3,
+  });
+  originLabel.textContent = search.originCity.name;
+
+  const caravan = svgElement("circle", {
+    class: "rumor-caravan-marker",
+    cx: map.caravanPoint.x,
+    cy: map.caravanPoint.y,
+    r: 7,
+  });
+  caravan.append(svgTitle("Караван"));
+
+  rumorMap.append(
+    minimumLabel,
+    maximumLabel,
+    clue,
+    clueLabel,
+    target,
+    origin,
+    originLabel,
+    caravan,
+  );
 }
 
 /**
@@ -363,8 +559,9 @@ function readSupplySettings() {
 /**
  * @param {ReturnType<typeof createDebugMapSnapshot>} snapshot
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createRumorSearchSnapshot>} rumorSearch
  */
-function drawSnapshot(snapshot, route) {
+function drawSnapshot(snapshot, route, rumorSearch) {
   worldMap.replaceChildren();
   drawGrid();
 
@@ -464,6 +661,32 @@ function drawSnapshot(snapshot, route) {
     marker.append(svgTitle(`${label} (${object.id})`));
     worldMap.append(marker);
   }
+
+  const rumorTarget = rumorSearch.serverTruth.target;
+  const rumorTargetPoint = projectCoordinate(rumorTarget.position);
+  const rumorTargetMarker = svgElement("circle", {
+    class: "rumor-world-target",
+    cx: rumorTargetPoint.x,
+    cy: rumorTargetPoint.y,
+    r: 8,
+    "data-detail-title": `Цель слуха · ${rumorTarget.id}`,
+    "data-detail-rows": JSON.stringify([
+      ["Тип", staticKindLabel(rumorTarget.kind)],
+      ["Статус", "Точная server truth · DEV"],
+      ["Азимут", `${rumorSearch.serverTruth.exactBearingDeg.toFixed(6)}°`],
+      ["Дистанция", `${rumorSearch.serverTruth.exactDistanceKilometers.toFixed(6)} км`],
+      ["Широта", rumorTarget.position.latitudeDeg.toFixed(6)],
+      ["Долгота", rumorTarget.position.longitudeDeg.toFixed(6)],
+    ]),
+  });
+  rumorTargetMarker.append(svgTitle("Точная цель слуха — только DEV"));
+  const rumorTargetLabel = svgElement("text", {
+    class: "rumor-world-target-label",
+    x: rumorTargetPoint.x + 11,
+    y: rumorTargetPoint.y - 9,
+  });
+  rumorTargetLabel.textContent = "RUMOR TARGET";
+  worldMap.append(rumorTargetMarker, rumorTargetLabel);
 
   for (const monster of snapshot.monsters) {
     const marker = svgElement("polygon", {
@@ -674,6 +897,11 @@ function formatDepletionCause(cause) {
   if (cause === "water") return "Вода";
   if (cause === "both") return "Еда и вода";
   return "Запасы";
+}
+
+/** @param {keyof typeof STATIC_KIND_LABELS | null} kind */
+function staticKindLabel(kind) {
+  return kind ? STATIC_KIND_LABELS[kind] : "Скрытый объект";
 }
 
 /** @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route */

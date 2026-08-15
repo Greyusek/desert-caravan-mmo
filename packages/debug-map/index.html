@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 12 · UI-004</p>
+          <p class="eyebrow">Checkpoint 13 · GAME-001</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -47,6 +47,63 @@
 
       <p id="error-message" class="error-message" role="alert" hidden></p>
 
+      <section
+        id="rumor-panel"
+        class="rumor-panel"
+        data-state="searching"
+        aria-labelledby="rumor-title"
+      >
+        <div class="rumor-copy">
+          <div class="rumor-heading">
+            <div>
+              <p class="section-kicker">GAME-001 · Rumor search</p>
+              <h2 id="rumor-title">Слух о руднике</h2>
+            </div>
+            <p id="rumor-state" class="rumor-state">Идёт поиск</p>
+          </div>
+          <blockquote id="rumor-text" class="rumor-text">
+            «К северо-западу от города видели старый рудник»
+          </blockquote>
+          <div class="rumor-facts" aria-label="Сведения из слуха">
+            <span>Источник <strong id="rumor-origin">—</strong></span>
+            <span>Сектор <strong id="rumor-sector">СЗ</strong></span>
+            <span>Дальность <strong id="rumor-range">30–50 км</strong></span>
+            <span>Качество <strong>грубое</strong></span>
+          </div>
+          <p id="rumor-result" class="rumor-result">
+            Постройте маршрут через отмеченный сектор.
+          </p>
+          <div class="rumor-actions">
+            <button id="rumor-dev-route" type="button">DEV: маршрут к цели</button>
+            <p>
+              Тестовая кнопка использует server truth. Игрок получает только сектор
+              и диапазон расстояния.
+            </p>
+          </div>
+        </div>
+
+        <article class="rumor-map-card" aria-labelledby="rumor-map-title">
+          <div class="rumor-map-heading">
+            <div>
+              <p class="section-kicker">Local north-up map</p>
+              <h3 id="rumor-map-title">Район поиска</h3>
+            </div>
+            <p class="rumor-north" aria-label="Север сверху">↑ N</p>
+          </div>
+          <div class="rumor-map-frame">
+            <svg
+              id="rumor-map"
+              viewBox="0 0 400 220"
+              role="img"
+              aria-label="Локальная карта сектора слуха без абсолютных координат"
+            ></svg>
+          </div>
+          <p class="rumor-map-note">
+            Координаты скрыты. Красная отметка цели существует только в DEV overlay.
+          </p>
+        </article>
+      </section>
+
       <section class="route-editor" aria-labelledby="route-editor-title">
         <div class="route-editor__heading">
           <div>
@@ -80,33 +137,33 @@
           <fieldset class="route-segment">
             <legend>Сегмент 1</legend>
             <label for="route-bearing-1">Азимут, °</label>
-            <input id="route-bearing-1" type="number" step="1" value="315" required />
+            <input id="route-bearing-1" type="number" step="0.1" value="315" required />
             <label for="route-distance-1">Дистанция, км</label>
-            <input id="route-distance-1" type="number" min="0" step="1" value="2000" required />
+            <input id="route-distance-1" type="number" min="0" step="0.1" value="30" required />
           </fieldset>
 
           <fieldset class="route-segment">
             <legend>Сегмент 2</legend>
             <label for="route-bearing-2">Азимут, °</label>
-            <input id="route-bearing-2" type="number" step="1" value="270" required />
+            <input id="route-bearing-2" type="number" step="0.1" value="337.5" required />
             <label for="route-distance-2">Дистанция, км</label>
-            <input id="route-distance-2" type="number" min="0" step="1" value="1200" required />
+            <input id="route-distance-2" type="number" min="0" step="0.1" value="20" required />
           </fieldset>
 
           <fieldset class="route-segment">
             <legend>Сегмент 3</legend>
             <label for="route-bearing-3">Азимут, °</label>
-            <input id="route-bearing-3" type="number" step="1" value="225" required />
+            <input id="route-bearing-3" type="number" step="0.1" value="247.5" required />
             <label for="route-distance-3">Дистанция, км</label>
-            <input id="route-distance-3" type="number" min="0" step="1" value="2000" required />
+            <input id="route-distance-3" type="number" min="0" step="0.1" value="25" required />
           </fieldset>
 
           <fieldset class="route-segment">
             <legend>Сегмент 4</legend>
             <label for="route-bearing-4">Азимут, °</label>
-            <input id="route-bearing-4" type="number" step="1" value="90" required />
+            <input id="route-bearing-4" type="number" step="0.1" value="315" required />
             <label for="route-distance-4">Дистанция, км</label>
-            <input id="route-distance-4" type="number" min="0" step="1" value="3500" required />
+            <input id="route-distance-4" type="number" min="0" step="0.1" value="20" required />
           </fieldset>
 
           <button class="route-submit" type="submit">Обновить маршрут</button>
@@ -235,6 +292,7 @@
               <li><span class="legend-dot legend-dot--cave"></span>Пещера</li>
               <li><span class="legend-dot legend-dot--monster"></span>Монстр и patrol-loop</li>
               <li><span class="legend-dot legend-dot--caravan"></span>Караван и маршрут</li>
+              <li><span class="legend-dot legend-dot--rumor-target"></span>Цель слуха (DEV)</li>
             </ul>
           </section>
 

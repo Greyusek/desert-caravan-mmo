@@ -7,6 +7,7 @@ import {
   createDebugMapSnapshot,
   createExpeditionEventLogSnapshot,
   createFourSegmentRouteSnapshot,
+  createRumorSearchSnapshot,
   projectCoordinate,
   splitPathAtAntimeridian,
 } from "../map-model.js";
@@ -451,4 +452,245 @@ test("UI-004: invalid supply inputs are still rejected by SIM-006", () => {
       }),
     /moving.waterUnitsPerHour must be a non-negative finite number/,
   );
+});
+
+const searchSupplies = { foodUnits: 1_000, waterUnits: 2_000 };
+const searchConsumption = {
+  moving: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+  idle: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+};
+
+function rumorOrigin() {
+  const origin = createDebugMapSnapshot("checkpoint-04").cities[0];
+  assert.ok(origin);
+  return origin;
+}
+
+function directRumorCommands() {
+  const origin = rumorOrigin();
+  const probeRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    [
+      { bearingDeg: 315, distanceKilometers: 30 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+    5,
+  );
+  const probe = createRumorSearchSnapshot("checkpoint-04", origin, probeRoute);
+  return [
+    {
+      bearingDeg: probe.serverTruth.exactBearingDeg,
+      distanceKilometers: probe.serverTruth.exactDistanceKilometers,
+    },
+    { bearingDeg: 0, distanceKilometers: 0 },
+    { bearingDeg: 0, distanceKilometers: 0 },
+    { bearingDeg: 0, distanceKilometers: 0 },
+  ];
+}
+
+test("GAME-001: local rumor map is deterministic and keeps the target inside the clue rings", () => {
+  const origin = rumorOrigin();
+  const route = createFourSegmentRouteSnapshot(
+    origin.position,
+    directRumorCommands(),
+    5,
+  );
+  const first = createRumorSearchSnapshot("checkpoint-04", origin, route);
+  const second = createRumorSearchSnapshot("checkpoint-04", origin, route);
+
+  assert.deepEqual(first, second);
+  assert.equal(first.localMap.width, 400);
+  assert.equal(first.localMap.height, 220);
+  assert.ok(first.localMap.routePoints.length > 4);
+  const targetRadius = Math.hypot(
+    first.localMap.targetPoint.x - first.localMap.originPoint.x,
+    first.localMap.targetPoint.y - first.localMap.originPoint.y,
+  );
+  assert.ok(targetRadius >= first.localMap.minimumRangePixels);
+  assert.ok(targetRadius <= first.localMap.maximumRangePixels);
+});
+
+test("GAME-001: a search in progress exposes neither discovery nor miss in the timeline", () => {
+  const origin = rumorOrigin();
+  const route = createFourSegmentRouteSnapshot(
+    origin.position,
+    directRumorCommands(),
+    5,
+    0,
+  );
+  const search = createRumorSearchSnapshot("checkpoint-04", origin, route);
+  const log = createExpeditionEventLogSnapshot(
+    route,
+    searchSupplies,
+    searchConsumption,
+    search,
+  );
+
+  assert.equal(search.status, "searching");
+  assert.equal(search.discovery, null);
+  assert.equal(
+    log.events.some(
+      (event) =>
+        event.kind === "target-discovered" || event.kind === "search-missed",
+    ),
+    false,
+  );
+});
+
+test("GAME-001: the exact route discovers the mine at the authoritative 150 m radius", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plannedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    0,
+  );
+  const planned = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    plannedRoute,
+  );
+  const discoveryAtSeconds = planned.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+
+  const beforeRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    discoveryAtSeconds - 1,
+  );
+  const atRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    discoveryAtSeconds,
+  );
+  const before = createRumorSearchSnapshot("checkpoint-04", origin, beforeRoute);
+  const found = createRumorSearchSnapshot("checkpoint-04", origin, atRoute);
+
+  assert.equal(before.status, "searching");
+  assert.equal(found.status, "found");
+  assert.ok(found.discovery);
+  approx(
+    found.discovery.routeDistanceKilometers,
+    found.serverTruth.exactDistanceKilometers - 0.15,
+    1e-6,
+  );
+});
+
+test("GAME-001: a route outside the clue target becomes missed only at arrival", () => {
+  const origin = rumorOrigin();
+  const direct = directRumorCommands();
+  const awayCommands = [
+    {
+      bearingDeg: (direct[0].bearingDeg + 90) % 360,
+      distanceKilometers: direct[0].distanceKilometers,
+    },
+    ...direct.slice(1),
+  ];
+  const plannedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    awayCommands,
+    5,
+  );
+  const beforeRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    awayCommands,
+    5,
+    plannedRoute.totalDurationSeconds - 1,
+  );
+  const arrivedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    awayCommands,
+    5,
+    plannedRoute.totalDurationSeconds,
+  );
+
+  assert.equal(
+    createRumorSearchSnapshot("checkpoint-04", origin, beforeRoute).status,
+    "searching",
+  );
+  assert.equal(
+    createRumorSearchSnapshot("checkpoint-04", origin, arrivedRoute).status,
+    "missed",
+  );
+});
+
+test("GAME-001: revealed discovery and miss events keep deterministic timeline order", () => {
+  const origin = rumorOrigin();
+  const direct = directRumorCommands();
+  const plannedDirectRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    direct,
+    5,
+  );
+  const plannedDirectSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    plannedDirectRoute,
+  );
+  const discoveryAtSeconds = plannedDirectSearch.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+  const foundRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    direct,
+    5,
+    discoveryAtSeconds,
+  );
+  const foundSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    foundRoute,
+  );
+  const foundLog = createExpeditionEventLogSnapshot(
+    foundRoute,
+    searchSupplies,
+    searchConsumption,
+    foundSearch,
+  );
+  const foundEvent = foundLog.events.find(
+    (event) => event.kind === "target-discovered",
+  );
+  assert.equal(foundEvent?.active, true);
+  assert.equal(foundEvent?.objectKind, "mine");
+
+  const away = [
+    {
+      bearingDeg: (direct[0].bearingDeg + 90) % 360,
+      distanceKilometers: direct[0].distanceKilometers,
+    },
+    ...direct.slice(1),
+  ];
+  const awayPlan = createFourSegmentRouteSnapshot(origin.position, away, 5);
+  const missedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    away,
+    5,
+    awayPlan.totalDurationSeconds,
+  );
+  const missedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    missedRoute,
+  );
+  const missedLog = createExpeditionEventLogSnapshot(
+    missedRoute,
+    searchSupplies,
+    searchConsumption,
+    missedSearch,
+  );
+  const missedIndex = missedLog.events.findIndex(
+    (event) => event.kind === "search-missed",
+  );
+  const arrivalIndex = missedLog.events.findIndex(
+    (event) => event.kind === "arrival",
+  );
+
+  assert.ok(missedIndex >= 0);
+  assert.ok(missedIndex < arrivalIndex);
+  assert.equal(missedLog.events[missedIndex]?.atSeconds, awayPlan.totalDurationSeconds);
+  assert.equal(missedLog.events[arrivalIndex]?.active, true);
 });

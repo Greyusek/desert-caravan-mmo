@@ -1,9 +1,12 @@
 // @ts-check
 
 import {
+  DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
   createRoutePlan,
+  createRumorSearchScenario,
   destinationPoint,
+  discoverStaticObjectsAlongRoute,
   generateSeededWorld,
   kilometers,
   positionAtTime,
@@ -26,11 +29,18 @@ export const DEBUG_MAP_WIDTH = 1_000;
 export const DEBUG_MAP_HEIGHT = 500;
 const ROUTE_SAMPLE_TARGET_METERS = 100_000;
 const MAX_ROUTE_SAMPLES_PER_SEGMENT = 64;
+const LOCAL_ROUTE_SAMPLE_TARGET_METERS = 1_000;
+const MAX_LOCAL_ROUTE_SAMPLES_PER_SEGMENT = 128;
 const LOW_SUPPLY_FRACTION = 0.25;
 const EVENT_TIME_EPSILON_SECONDS = 1e-9;
+export const RUMOR_MAP_WIDTH = 400;
+export const RUMOR_MAP_HEIGHT = 220;
+const RUMOR_MAP_ORIGIN = { x: 260, y: 160 };
+const RUMOR_MAP_PIXELS_PER_METER = 0.0022;
+const RUMOR_SECTOR_SAMPLE_COUNT = 16;
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "search-missed" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -42,6 +52,7 @@ const EVENT_TIME_EPSILON_SECONDS = 1e-9;
  * @property {"food" | "water" | "both" | null} cause
  * @property {number | null} distanceKilometers
  * @property {number} order
+ * @property {import("../sim-core/dist/src/index.js").StaticWorldObjectKind} [objectKind]
  */
 
 /**
@@ -219,6 +230,104 @@ export function createFourSegmentRouteSnapshot(
       ...evaluated,
       point: projectCoordinate(evaluated.coordinate),
     },
+    authoritativeRoute: route,
+  };
+}
+
+/**
+ * GAME-001 joins one coarse rumor to an authoritative hidden target and the
+ * existing route-aware discovery API. Search truth is revealed only when the
+ * selected simulation time reaches discovery or route completion.
+ * @param {string} seed
+ * @param {import("../sim-core/dist/src/index.js").City} originCity
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ */
+export function createRumorSearchSnapshot(seed, originCity, route) {
+  const scenario = createRumorSearchScenario(seed, originCity);
+  const plannedDiscovery = discoverStaticObjectsAlongRoute(
+    route.authoritativeRoute,
+    [scenario.serverTruth.target],
+    DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
+  )[0] ?? null;
+  const evaluatedAtSeconds = Math.min(
+    route.position.elapsedSeconds,
+    route.totalDurationSeconds,
+  );
+  const found =
+    plannedDiscovery !== null &&
+    plannedDiscovery.elapsedSeconds <=
+      evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS;
+  const status = found
+    ? "found"
+    : evaluatedAtSeconds >=
+        route.totalDurationSeconds - EVENT_TIME_EPSILON_SECONDS
+      ? "missed"
+      : "searching";
+  const localRouteCoordinates = sampleRouteCoordinates(
+    route.authoritativeRoute,
+    LOCAL_ROUTE_SAMPLE_TARGET_METERS,
+    MAX_LOCAL_ROUTE_SAMPLES_PER_SEGMENT,
+  );
+
+  return {
+    rumor: scenario.rumor,
+    originCity: {
+      id: originCity.id,
+      name: originCity.name,
+    },
+    status,
+    evaluatedAtSeconds,
+    discoveryRadiusMeters: DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
+    discovery:
+      found && plannedDiscovery
+        ? {
+            atSeconds: plannedDiscovery.elapsedSeconds,
+            segmentIndex: plannedDiscovery.segmentIndex,
+            routeDistanceKilometers:
+              plannedDiscovery.routeDistanceMeters / 1_000,
+          }
+        : null,
+    localMap: {
+      width: RUMOR_MAP_WIDTH,
+      height: RUMOR_MAP_HEIGHT,
+      originPoint: RUMOR_MAP_ORIGIN,
+      minimumRangePixels:
+        scenario.rumor.distanceRange.minimumMeters *
+        RUMOR_MAP_PIXELS_PER_METER,
+      maximumRangePixels:
+        scenario.rumor.distanceRange.maximumMeters *
+        RUMOR_MAP_PIXELS_PER_METER,
+      clueAreaPoints: rumorClueAreaPoints(scenario.rumor),
+      cluePoint: localPointFromBearingDistance(
+        scenario.rumor.bearingSector.centerBearingDeg,
+        (scenario.rumor.distanceRange.minimumMeters +
+          scenario.rumor.distanceRange.maximumMeters) /
+          2,
+      ),
+      targetPoint: localPointFromBearingDistance(
+        scenario.serverTruth.exactBearingDeg,
+        scenario.serverTruth.exactDistanceMeters,
+      ),
+      routePoints: localRouteCoordinates.map((coordinate) =>
+        projectLocalCoordinate(
+          originCity.position,
+          coordinate,
+          route.authoritativeRoute.planetRadiusMeters,
+        ),
+      ),
+      caravanPoint: projectLocalCoordinate(
+        originCity.position,
+        route.position.coordinate,
+        route.authoritativeRoute.planetRadiusMeters,
+      ),
+    },
+    serverTruth: {
+      target: scenario.serverTruth.target,
+      exactBearingDeg: scenario.serverTruth.exactBearingDeg,
+      exactDistanceKilometers:
+        scenario.serverTruth.exactDistanceMeters / 1_000,
+      plannedDiscoveryAtSeconds: plannedDiscovery?.elapsedSeconds ?? null,
+    },
   };
 }
 
@@ -319,11 +428,13 @@ export function createCaravanStatusSnapshot(
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
+ * @param {ReturnType<typeof createRumorSearchSnapshot> | null} [rumorSearch]
  */
 export function createExpeditionEventLogSnapshot(
   route,
   initialSupplies,
   consumptionProfile,
+  rumorSearch = null,
 ) {
   const firstDepletion = timeToFirstDepletion(
     initialSupplies,
@@ -364,6 +475,8 @@ export function createExpeditionEventLogSnapshot(
     firstDepletion.atSeconds,
     route.totalDurationSeconds,
   );
+
+  addRumorSearchEvent(events, rumorSearch, route.totalDurationSeconds);
 
   if (
     firstDepletion.atSeconds !== null &&
@@ -418,6 +531,7 @@ export function createExpeditionEventLogSnapshot(
     atSeconds: event.atSeconds,
     segmentIndex: event.segmentIndex,
     cause: event.cause,
+    objectKind: event.objectKind ?? null,
     distanceKilometers: event.distanceKilometers,
     occurred: index <= activeEventIndex,
     active: index === activeEventIndex,
@@ -430,6 +544,42 @@ export function createExpeditionEventLogSnapshot(
     nextEventId: presentedEvents[activeEventIndex + 1]?.id ?? null,
     events: presentedEvents,
   };
+}
+
+/**
+ * @param {PlannedExpeditionEvent[]} events
+ * @param {ReturnType<typeof createRumorSearchSnapshot> | null} rumorSearch
+ * @param {number} routeDurationSeconds
+ */
+function addRumorSearchEvent(events, rumorSearch, routeDurationSeconds) {
+  if (!rumorSearch) return;
+
+  if (rumorSearch.status === "found" && rumorSearch.discovery) {
+    events.push({
+      id: "rumor-target-discovered",
+      kind: "target-discovered",
+      atSeconds: rumorSearch.discovery.atSeconds,
+      segmentIndex: rumorSearch.discovery.segmentIndex,
+      cause: null,
+      distanceKilometers: rumorSearch.discovery.routeDistanceKilometers,
+      objectKind: rumorSearch.rumor.targetKind,
+      order: 15,
+    });
+    return;
+  }
+
+  if (rumorSearch.status === "missed") {
+    events.push({
+      id: "rumor-search-missed",
+      kind: "search-missed",
+      atSeconds: routeDurationSeconds,
+      segmentIndex: null,
+      cause: null,
+      distanceKilometers: null,
+      objectKind: rumorSearch.rumor.targetKind,
+      order: 35,
+    });
+  }
 }
 
 /**
@@ -515,14 +665,18 @@ function lowSupplyAtSeconds(stock, ratePerHour) {
  * @param {ReturnType<typeof createRoutePlan>} route
  * @returns {WorldCoordinate[]}
  */
-function sampleRouteCoordinates(route) {
+function sampleRouteCoordinates(
+  route,
+  targetMeters = ROUTE_SAMPLE_TARGET_METERS,
+  maximumSamplesPerSegment = MAX_ROUTE_SAMPLES_PER_SEGMENT,
+) {
   /** @type {WorldCoordinate[]} */
   const coordinates = [route.start];
 
   for (const segment of route.segments) {
     const sampleCount = Math.min(
-      MAX_ROUTE_SAMPLES_PER_SEGMENT,
-      Math.max(1, Math.ceil(segment.distanceMeters / ROUTE_SAMPLE_TARGET_METERS)),
+      maximumSamplesPerSegment,
+      Math.max(1, Math.ceil(segment.distanceMeters / targetMeters)),
     );
     for (let sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex += 1) {
       const distanceMeters =
@@ -539,6 +693,74 @@ function sampleRouteCoordinates(route) {
   }
 
   return coordinates;
+}
+
+/** @param {import("../sim-core/dist/src/index.js").SearchRumor} rumor */
+function rumorClueAreaPoints(rumor) {
+  const outer = sampleBearingArc(
+    rumor.bearingSector.minimumBearingDeg,
+    rumor.bearingSector.maximumBearingDeg,
+    rumor.distanceRange.maximumMeters,
+  );
+  const inner = sampleBearingArc(
+    rumor.bearingSector.maximumBearingDeg,
+    rumor.bearingSector.minimumBearingDeg,
+    rumor.distanceRange.minimumMeters,
+  );
+  return [...outer, ...inner];
+}
+
+/**
+ * @param {number} startBearingDeg
+ * @param {number} endBearingDeg
+ * @param {number} distanceMeters
+ */
+function sampleBearingArc(startBearingDeg, endBearingDeg, distanceMeters) {
+  return Array.from({ length: RUMOR_SECTOR_SAMPLE_COUNT + 1 }, (_, index) => {
+    const progress = index / RUMOR_SECTOR_SAMPLE_COUNT;
+    return localPointFromBearingDistance(
+      startBearingDeg + (endBearingDeg - startBearingDeg) * progress,
+      distanceMeters,
+    );
+  });
+}
+
+/** @param {number} bearingDeg @param {number} distanceMeters */
+function localPointFromBearingDistance(bearingDeg, distanceMeters) {
+  const bearingRadians = (bearingDeg * Math.PI) / 180;
+  const radiusPixels = distanceMeters * RUMOR_MAP_PIXELS_PER_METER;
+  return {
+    x: RUMOR_MAP_ORIGIN.x + Math.sin(bearingRadians) * radiusPixels,
+    y: RUMOR_MAP_ORIGIN.y - Math.cos(bearingRadians) * radiusPixels,
+  };
+}
+
+/**
+ * Local north-up approximation around the rumor city. The 50 km clue is tiny
+ * relative to the planet, so an equirectangular tangent projection is stable
+ * and intentionally omits absolute coordinates.
+ * @param {WorldCoordinate} origin
+ * @param {WorldCoordinate} coordinate
+ * @param {number} planetRadiusMeters
+ */
+function projectLocalCoordinate(origin, coordinate, planetRadiusMeters) {
+  const degreesToRadians = Math.PI / 180;
+  let longitudeDelta = coordinate.longitudeDeg - origin.longitudeDeg;
+  if (longitudeDelta > 180) longitudeDelta -= 360;
+  if (longitudeDelta < -180) longitudeDelta += 360;
+  const eastMeters =
+    longitudeDelta *
+    degreesToRadians *
+    planetRadiusMeters *
+    Math.cos(origin.latitudeDeg * degreesToRadians);
+  const northMeters =
+    (coordinate.latitudeDeg - origin.latitudeDeg) *
+    degreesToRadians *
+    planetRadiusMeters;
+  return {
+    x: RUMOR_MAP_ORIGIN.x + eastMeters * RUMOR_MAP_PIXELS_PER_METER,
+    y: RUMOR_MAP_ORIGIN.y - northMeters * RUMOR_MAP_PIXELS_PER_METER,
+  };
 }
 
 /**
