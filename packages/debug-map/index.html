@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 10 · UI-002</p>
+          <p class="eyebrow">Checkpoint 11 · UI-003</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -114,6 +114,86 @@
         <p class="route-note">
           Старт привязан к авторитетной координате города. Четыре команды передаются
           в sim-core как азимут и расстояние.
+        </p>
+      </section>
+
+      <section
+        id="caravan-panel"
+        class="caravan-panel"
+        data-state="safe"
+        aria-labelledby="caravan-panel-title"
+      >
+        <div class="caravan-panel__heading">
+          <div>
+            <p class="section-kicker">UI-003 · Expedition status</p>
+            <h2 id="caravan-panel-title">Состояние каравана</h2>
+          </div>
+          <p id="caravan-state-label" class="expedition-state">Готов к пути</p>
+        </div>
+
+        <div class="expedition-grid">
+          <article class="expedition-card expedition-card--route">
+            <p class="expedition-card__label">Маршрут</p>
+            <strong id="caravan-route-status">В пути · сегмент 1/4</strong>
+            <p id="caravan-distance" class="expedition-card__value">0 / 0 км</p>
+            <progress id="route-progress" max="1" value="0">0%</progress>
+            <p id="route-progress-label" class="expedition-card__meta">0% · ETA не рассчитана</p>
+          </article>
+
+          <article id="food-card" class="expedition-card supply-card">
+            <p class="expedition-card__label">Еда</p>
+            <strong id="food-remaining">1 000</strong>
+            <p class="expedition-card__value">единиц</p>
+            <progress id="food-progress" max="1" value="1">100%</progress>
+            <p id="food-meta" class="expedition-card__meta">из 1 000 · расход 0.5/ч</p>
+          </article>
+
+          <article id="water-card" class="expedition-card supply-card">
+            <p class="expedition-card__label">Вода</p>
+            <strong id="water-remaining">2 000</strong>
+            <p class="expedition-card__value">единиц</p>
+            <progress id="water-progress" max="1" value="1">100%</progress>
+            <p id="water-meta" class="expedition-card__meta">из 2 000 · расход 1.0/ч</p>
+          </article>
+
+          <article class="expedition-card expedition-card--forecast">
+            <p class="expedition-card__label">Прогноз до финиша</p>
+            <strong id="forecast-title">Запасов хватит</strong>
+            <p id="forecast-detail" class="forecast-detail">Расчёт ожидает маршрут</p>
+          </article>
+        </div>
+
+        <details class="supply-settings">
+          <summary>Настроить провизию и расход</summary>
+          <form id="supply-form" class="supply-form">
+            <label for="initial-food">Еда на старте
+              <input id="initial-food" type="number" min="0" step="1" value="1000" required />
+            </label>
+            <label for="initial-water">Вода на старте
+              <input id="initial-water" type="number" min="0" step="1" value="2000" required />
+            </label>
+            <label for="moving-food-rate">Еда в пути / ч
+              <input id="moving-food-rate" type="number" min="0" step="0.01" value="0.5" required />
+            </label>
+            <label for="moving-water-rate">Вода в пути / ч
+              <input id="moving-water-rate" type="number" min="0" step="0.01" value="1" required />
+            </label>
+            <label for="idle-food-rate">Еда на стоянке / ч
+              <input id="idle-food-rate" type="number" min="0" step="0.01" value="0.25" required />
+            </label>
+            <label for="idle-water-rate">Вода на стоянке / ч
+              <input id="idle-water-rate" type="number" min="0" step="0.01" value="0.4" required />
+            </label>
+            <button type="submit">Применить запасы</button>
+          </form>
+          <p class="supply-settings__note">
+            В пути применяются moving-расходы SIM-006. Расход на стоянке сохранён
+            в профиле, но начнёт влиять на экспедицию в следующих checkpoint.
+          </p>
+        </details>
+        <p class="caravan-panel__scope-note">
+          Панель прогнозирует критическое истощение; игровые последствия будут
+          добавлены в GAME-003.
         </p>
       </section>
 

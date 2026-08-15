@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.11 — Checkpoint 11
+
+- Added `UI-003`: a persistent caravan status panel driven by the existing SIM-005 route position and SIM-006 supply APIs.
+- Added live route progress, segment and distance status, food/water meters, current depletion state, and a survival forecast through route ETA.
+- Added editable initial stocks and moving/idle consumption profiles without adding a production dependency or coupling `sim-core` to the browser.
+- Stopped supply projection at arrival so UI-003 does not invent post-route idle activity or expedition consequences.
+- Added six caravan-panel regressions; repository verification now runs 102 tests.
+- Designated `UI-004`, the deterministic expedition event log, as the next checkpoint; local patrol/time zoom remains a deferred UX improvement.
+
 ## 0.0.10 — Checkpoint 10
 
 - Added `UI-002`: a four-segment caravan route editor anchored to any generated city.

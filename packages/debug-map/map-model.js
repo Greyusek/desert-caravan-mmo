@@ -1,15 +1,20 @@
 // @ts-check
 
 import {
+  canSurviveDuration,
   createRoutePlan,
   destinationPoint,
   generateSeededWorld,
   kilometers,
   positionAtTime,
+  projectSupplies,
+  timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
 } from "../sim-core/dist/src/index.js";
 
 /** @typedef {import("../sim-core/dist/src/index.js").WorldCoordinate} WorldCoordinate */
+/** @typedef {import("../sim-core/dist/src/index.js").SupplyStock} SupplyStock */
+/** @typedef {import("../sim-core/dist/src/index.js").ConsumptionProfile} ConsumptionProfile */
 
 /**
  * @typedef {object} DebugRouteCommand
@@ -201,6 +206,96 @@ export function createFourSegmentRouteSnapshot(
 }
 
 /**
+ * UI-003 combines the authoritative route position and SIM-006 supply model
+ * into a presentation snapshot. Consumption stops at route arrival because
+ * post-arrival activity is outside this checkpoint's scope.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {SupplyStock} initialSupplies
+ * @param {ConsumptionProfile} consumptionProfile
+ */
+export function createCaravanStatusSnapshot(
+  route,
+  initialSupplies,
+  consumptionProfile,
+) {
+  const evaluatedAtSeconds = Math.min(
+    route.position.elapsedSeconds,
+    route.totalDurationSeconds,
+  );
+  const supplies = projectSupplies(
+    initialSupplies,
+    consumptionProfile,
+    "moving",
+    evaluatedAtSeconds,
+  );
+  const firstDepletion = timeToFirstDepletion(
+    initialSupplies,
+    consumptionProfile,
+    "moving",
+  );
+  const atArrival = projectSupplies(
+    initialSupplies,
+    consumptionProfile,
+    "moving",
+    route.totalDurationSeconds,
+  );
+  const totalDistanceMeters = route.totalDistanceKilometers * 1_000;
+  const routeProgress =
+    totalDistanceMeters === 0
+      ? 1
+      : route.position.traveledDistanceMeters / totalDistanceMeters;
+
+  return {
+    route: {
+      status: route.position.status,
+      segmentIndex: route.position.segmentIndex,
+      segmentProgress: route.position.segmentProgress,
+      progress: routeProgress,
+      elapsedSeconds: route.position.elapsedSeconds,
+      evaluatedAtSeconds,
+      totalDurationSeconds: route.totalDurationSeconds,
+      traveledDistanceKilometers:
+        route.position.traveledDistanceMeters / 1_000,
+      remainingDistanceKilometers:
+        route.position.remainingDistanceMeters / 1_000,
+    },
+    supplies: {
+      initialFoodUnits: initialSupplies.foodUnits,
+      initialWaterUnits: initialSupplies.waterUnits,
+      foodRemaining: supplies.foodRemaining,
+      waterRemaining: supplies.waterRemaining,
+      foodConsumed: supplies.foodConsumed,
+      waterConsumed: supplies.waterConsumed,
+      foodFraction: remainingFraction(
+        supplies.foodRemaining,
+        initialSupplies.foodUnits,
+      ),
+      waterFraction: remainingFraction(
+        supplies.waterRemaining,
+        initialSupplies.waterUnits,
+      ),
+      depleted: supplies.depleted,
+      depletionCause: supplies.depleted ? supplies.depletionCause : null,
+    },
+    forecast: {
+      canFinish: canSurviveDuration(
+        initialSupplies,
+        consumptionProfile,
+        "moving",
+        route.totalDurationSeconds,
+      ),
+      firstDepletionAtSeconds: firstDepletion.atSeconds,
+      depletionCause: firstDepletion.cause,
+      depletionBeforeOrAtArrival:
+        firstDepletion.atSeconds !== null &&
+        firstDepletion.atSeconds <= route.totalDurationSeconds,
+      foodAtArrival: atArrival.foodRemaining,
+      waterAtArrival: atArrival.waterRemaining,
+    },
+  };
+}
+
+/**
  * Equirectangular projection does not preserve great-circle legs as straight
  * lines. Sampling the authoritative destination-point function keeps long UI
  * routes visibly spherical while bounding the amount of SVG data.
@@ -268,4 +363,9 @@ function assertPositiveFinite(value, name) {
   if (!Number.isFinite(value) || value <= 0) {
     throw new RangeError(`${name} must be a positive finite number`);
   }
+}
+
+/** @param {number} remaining @param {number} initial */
+function remainingFraction(remaining, initial) {
+  return initial === 0 ? 0 : remaining / initial;
 }

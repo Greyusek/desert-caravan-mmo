@@ -3,6 +3,7 @@
 import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
+  createCaravanStatusSnapshot,
   createDebugMapSnapshot,
   createFourSegmentRouteSnapshot,
 } from "./map-model.js";
@@ -37,8 +38,32 @@ const routeBearingInputs = [1, 2, 3, 4].map((index) =>
 const routeDistanceInputs = [1, 2, 3, 4].map((index) =>
   requireElement(`route-distance-${index}`, HTMLInputElement),
 );
+const caravanPanel = requireElement("caravan-panel", HTMLElement);
+const caravanStateLabel = requireElement("caravan-state-label", HTMLParagraphElement);
+const caravanRouteStatus = requireElement("caravan-route-status", HTMLElement);
+const caravanDistance = requireElement("caravan-distance", HTMLParagraphElement);
+const routeProgress = requireElement("route-progress", HTMLProgressElement);
+const routeProgressLabel = requireElement("route-progress-label", HTMLParagraphElement);
+const foodCard = requireElement("food-card", HTMLElement);
+const foodRemaining = requireElement("food-remaining", HTMLElement);
+const foodProgress = requireElement("food-progress", HTMLProgressElement);
+const foodMeta = requireElement("food-meta", HTMLParagraphElement);
+const waterCard = requireElement("water-card", HTMLElement);
+const waterRemaining = requireElement("water-remaining", HTMLElement);
+const waterProgress = requireElement("water-progress", HTMLProgressElement);
+const waterMeta = requireElement("water-meta", HTMLParagraphElement);
+const forecastTitle = requireElement("forecast-title", HTMLElement);
+const forecastDetail = requireElement("forecast-detail", HTMLParagraphElement);
+const supplyForm = requireElement("supply-form", HTMLFormElement);
+const initialFood = requireElement("initial-food", HTMLInputElement);
+const initialWater = requireElement("initial-water", HTMLInputElement);
+const movingFoodRate = requireElement("moving-food-rate", HTMLInputElement);
+const movingWaterRate = requireElement("moving-water-rate", HTMLInputElement);
+const idleFoodRate = requireElement("idle-food-rate", HTMLInputElement);
+const idleWaterRate = requireElement("idle-water-rate", HTMLInputElement);
 
 let elapsedSeconds = 0;
+let supplySettings = readSupplySettings();
 
 seedForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -54,6 +79,14 @@ timeSlider.addEventListener("input", () => {
 
 routeForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  elapsedSeconds = 0;
+  timeSlider.value = "0";
+  render();
+});
+
+supplyForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  supplySettings = readSupplySettings();
   elapsedSeconds = 0;
   timeSlider.value = "0";
   render();
@@ -89,6 +122,11 @@ function render() {
       routeSpeed.valueAsNumber,
       elapsedSeconds,
     );
+    const caravanStatus = createCaravanStatusSnapshot(
+      route,
+      supplySettings.initial,
+      supplySettings.profile,
+    );
     const firstMonster = snapshot.monsters[0];
     const maximumElapsedSeconds = Math.max(
       route.totalDurationSeconds,
@@ -109,6 +147,7 @@ function render() {
     monsterCount.textContent = String(snapshot.monsters.length);
     timeOutput.textContent = formatElapsed(elapsedSeconds);
     routeSummary.textContent = formatRouteSummary(route);
+    renderCaravanStatus(caravanStatus);
 
     timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
     timeSlider.value = String(elapsedSeconds);
@@ -118,6 +157,111 @@ function render() {
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
   }
+}
+
+/**
+ * @param {ReturnType<typeof createCaravanStatusSnapshot>} status
+ */
+function renderCaravanStatus(status) {
+  const panelState = status.supplies.depleted
+    ? "depleted"
+    : status.forecast.canFinish
+      ? "safe"
+      : "risk";
+  caravanPanel.dataset.state = panelState;
+  caravanStateLabel.textContent =
+    panelState === "depleted"
+      ? "Критический запас"
+      : panelState === "risk"
+        ? "Риск истощения"
+        : "Готов к пути";
+
+  caravanRouteStatus.textContent =
+    status.route.status === "arrived"
+      ? "Прибыл · маршрут завершён"
+      : `В пути · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`;
+  caravanDistance.textContent = `${formatNumber(status.route.traveledDistanceKilometers, 1)} / ${formatNumber(status.route.traveledDistanceKilometers + status.route.remainingDistanceKilometers, 1)} км`;
+  routeProgress.value = status.route.progress;
+  routeProgress.textContent = `${Math.round(status.route.progress * 100)}%`;
+  routeProgressLabel.textContent = `${Math.round(status.route.progress * 100)}% · ETA ${formatDuration(status.route.totalDurationSeconds)}`;
+
+  renderSupply(
+    foodCard,
+    foodRemaining,
+    foodProgress,
+    foodMeta,
+    status.supplies.foodRemaining,
+    status.supplies.initialFoodUnits,
+    status.supplies.foodFraction,
+    supplySettings.profile.moving.foodUnitsPerHour,
+  );
+  renderSupply(
+    waterCard,
+    waterRemaining,
+    waterProgress,
+    waterMeta,
+    status.supplies.waterRemaining,
+    status.supplies.initialWaterUnits,
+    status.supplies.waterFraction,
+    supplySettings.profile.moving.waterUnitsPerHour,
+  );
+
+  if (status.supplies.depleted) {
+    forecastTitle.textContent = "Критические запасы исчерпаны";
+    forecastDetail.textContent = `${formatDepletionCause(status.supplies.depletionCause)} · ${formatElapsed(status.forecast.firstDepletionAtSeconds ?? 0)}`;
+  } else if (status.forecast.canFinish) {
+    forecastTitle.textContent = "Запасов хватит до финиша";
+    forecastDetail.textContent = `На финише: еда ${formatNumber(status.forecast.foodAtArrival, 1)} · вода ${formatNumber(status.forecast.waterAtArrival, 1)}`;
+  } else {
+    forecastTitle.textContent = "Запасов не хватит";
+    forecastDetail.textContent = `${formatDepletionCause(status.forecast.depletionCause)} закончатся на ${formatElapsed(status.forecast.firstDepletionAtSeconds ?? 0)}`;
+  }
+}
+
+/**
+ * @param {HTMLElement} card
+ * @param {HTMLElement} remainingOutput
+ * @param {HTMLProgressElement} progress
+ * @param {HTMLParagraphElement} meta
+ * @param {number} remaining
+ * @param {number} initial
+ * @param {number} fraction
+ * @param {number} rate
+ */
+function renderSupply(
+  card,
+  remainingOutput,
+  progress,
+  meta,
+  remaining,
+  initial,
+  fraction,
+  rate,
+) {
+  card.dataset.state = remaining === 0 ? "depleted" : fraction <= 0.25 ? "risk" : "safe";
+  remainingOutput.textContent = formatNumber(remaining, 1);
+  progress.value = fraction;
+  progress.textContent = `${Math.round(fraction * 100)}%`;
+  meta.textContent = `из ${formatNumber(initial, 1)} · расход ${formatNumber(rate, 2)}/ч`;
+}
+
+function readSupplySettings() {
+  return {
+    initial: {
+      foodUnits: initialFood.valueAsNumber,
+      waterUnits: initialWater.valueAsNumber,
+    },
+    profile: {
+      moving: {
+        foodUnitsPerHour: movingFoodRate.valueAsNumber,
+        waterUnitsPerHour: movingWaterRate.valueAsNumber,
+      },
+      idle: {
+        foodUnitsPerHour: idleFoodRate.valueAsNumber,
+        waterUnitsPerHour: idleWaterRate.valueAsNumber,
+      },
+    },
+  };
 }
 
 /**
@@ -421,6 +565,19 @@ function formatElapsed(seconds) {
 function formatDuration(seconds) {
   const hours = seconds / 3_600;
   return hours >= 48 ? `${(hours / 24).toFixed(1)} дн` : `${hours.toFixed(1)} ч`;
+}
+
+/** @param {number} value @param {number} [maximumFractionDigits] */
+function formatNumber(value, maximumFractionDigits = 1) {
+  return value.toLocaleString("ru-RU", { maximumFractionDigits });
+}
+
+/** @param {"food" | "water" | "both" | null} cause */
+function formatDepletionCause(cause) {
+  if (cause === "food") return "Еда";
+  if (cause === "water") return "Вода";
+  if (cause === "both") return "Еда и вода";
+  return "Запасы";
 }
 
 /** @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route */

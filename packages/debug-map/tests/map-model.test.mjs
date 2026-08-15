@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
+  createCaravanStatusSnapshot,
   createDebugMapSnapshot,
   createFourSegmentRouteSnapshot,
   projectCoordinate,
@@ -219,5 +220,99 @@ test("UI-002: editor values are validated before route rendering", () => {
         5,
       ),
     /distanceKilometers must be a non-negative finite number/,
+  );
+});
+
+const supplies = { foodUnits: 100, waterUnits: 200 };
+const consumption = {
+  moving: { foodUnitsPerHour: 10, waterUnitsPerHour: 20 },
+  idle: { foodUnitsPerHour: 2, waterUnitsPerHour: 4 },
+};
+
+function caravanStatusAt(elapsedSeconds, initial = supplies, profile = consumption) {
+  const route = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    fourSegments,
+    5,
+    elapsedSeconds,
+  );
+  return createCaravanStatusSnapshot(route, initial, profile);
+}
+
+test("UI-003: expedition starts with full supplies and zero route progress", () => {
+  const status = caravanStatusAt(0);
+
+  assert.equal(status.route.status, "moving");
+  assert.equal(status.route.progress, 0);
+  assert.equal(status.supplies.foodRemaining, 100);
+  assert.equal(status.supplies.waterRemaining, 200);
+  assert.equal(status.supplies.foodFraction, 1);
+  assert.equal(status.supplies.waterFraction, 1);
+  assert.equal(status.supplies.depleted, false);
+});
+
+test("UI-003: moving consumption follows SIM-006 at the selected time", () => {
+  const status = caravanStatusAt(5 * 3_600);
+
+  assert.equal(status.route.segmentIndex, 0);
+  assert.equal(status.route.traveledDistanceKilometers, 25);
+  assert.equal(status.supplies.foodConsumed, 50);
+  assert.equal(status.supplies.waterConsumed, 100);
+  assert.equal(status.supplies.foodRemaining, 50);
+  assert.equal(status.supplies.waterRemaining, 100);
+});
+
+test("UI-003: forecast reports whether supplies last through route ETA", () => {
+  const unsafe = caravanStatusAt(0);
+  const safe = caravanStatusAt(
+    0,
+    { foodUnits: 2_000, waterUnits: 4_000 },
+  );
+
+  assert.equal(unsafe.forecast.canFinish, false);
+  assert.equal(unsafe.forecast.depletionBeforeOrAtArrival, true);
+  assert.equal(unsafe.forecast.firstDepletionAtSeconds, 10 * 3_600);
+  assert.equal(unsafe.forecast.depletionCause, "both");
+  assert.equal(safe.forecast.canFinish, true);
+  assert.equal(safe.forecast.depletionBeforeOrAtArrival, false);
+  assert.equal(safe.forecast.foodAtArrival, 260);
+  assert.equal(safe.forecast.waterAtArrival, 520);
+});
+
+test("UI-003: exact depletion is critical and preserves its cause", () => {
+  const status = caravanStatusAt(10 * 3_600);
+
+  assert.equal(status.supplies.depleted, true);
+  assert.equal(status.supplies.depletionCause, "both");
+  assert.equal(status.supplies.foodRemaining, 0);
+  assert.equal(status.supplies.waterRemaining, 0);
+});
+
+test("UI-003: supply projection stops at arrival instead of inventing idle time", () => {
+  const initial = { foodUnits: 1_000, waterUnits: 2_000 };
+  const profile = {
+    moving: { foodUnitsPerHour: 1, waterUnitsPerHour: 2 },
+    idle: { foodUnitsPerHour: 100, waterUnitsPerHour: 200 },
+  };
+  const status = caravanStatusAt(200 * 3_600, initial, profile);
+
+  assert.equal(status.route.status, "arrived");
+  assert.equal(status.route.evaluatedAtSeconds, 174 * 3_600);
+  assert.equal(status.supplies.foodRemaining, 826);
+  assert.equal(status.supplies.waterRemaining, 1_652);
+});
+
+test("UI-003: invalid stock and consumption values are rejected by SIM-006", () => {
+  assert.throws(
+    () => caravanStatusAt(0, { foodUnits: -1, waterUnits: 1 }),
+    /foodUnits must be a non-negative finite number/,
+  );
+  assert.throws(
+    () =>
+      caravanStatusAt(0, supplies, {
+        moving: { foodUnitsPerHour: -1, waterUnitsPerHour: 1 },
+        idle: consumption.idle,
+      }),
+    /moving.foodUnitsPerHour must be a non-negative finite number/,
   );
 });

@@ -16,10 +16,12 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `SIM-008`: detect encounters between two moving entities in overlapping time windows.
 - [x] `UI-001`: add a dependency-free north-up developer debug map.
 - [x] `UI-002`: add a four-segment caravan route editor to the debug map.
+- [x] `UI-003`: add a persistent caravan status and supplies panel.
 
 ## Next
 
-- [ ] `UI-003`: add a persistent caravan status and supplies panel.
+- [ ] `UI-004`: add a compact deterministic expedition event log.
+- [ ] UX (deferred): add local map/time zoom so short monster patrol loops remain readable beside long caravan routes.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Maintenance rules
