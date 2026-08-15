@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.14 — Checkpoint 14
+
+- Added `GAME-002`: a pure deterministic `STOP | MARK_AND_CONTINUE` decision over the authoritative static-object discovery event.
+- Made `STOP` freeze SIM-005 route movement at the exact first-entry coordinate and end executable route milestones at the decision.
+- Made `MARK_AND_CONTINUE` record the target while preserving the original movement, ETA and arrival.
+- Added a two-option discovery-doctrine control, live decision state, stopped caravan presentation and doctrine-specific timeline entries to the debug map.
+- Kept future decisions hidden until discovery and preserved miss behavior without inventing a doctrine action.
+- Added ten GAME-002 regressions; repository verification now runs 132 tests.
+- Designated `GAME-003`, explicit expedition completion and fatal depletion outcomes, as the next checkpoint.
+
 ## 0.0.13 — Checkpoint 13
 
 - Added `GAME-001`: a deterministic rumor about a hidden mine 30–50 km northwest of the selected origin city.

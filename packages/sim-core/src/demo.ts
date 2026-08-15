@@ -6,6 +6,7 @@ import {
   createWorldCoordinate,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
+  evaluateStaticObjectDiscoveryDoctrine,
   findFirstMovingEncounter,
   greatCircleDistance,
   generateSeededWorld,
@@ -30,7 +31,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 13 demo");
+console.log("Desert Caravan MMO — Checkpoint 14 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -131,6 +132,20 @@ if (rumorOrigin) {
   console.log(
     `  direct route: ${rumorDiscovery ? `found at ${(rumorDiscovery.routeDistanceMeters / 1_000).toFixed(6)} km / T=${(rumorDiscovery.elapsedSeconds / 3_600).toFixed(6)} h` : "missed"}`,
   );
+
+  if (rumorDiscovery) {
+    console.log("GAME-002 discovery doctrine:");
+    for (const doctrine of ["STOP", "MARK_AND_CONTINUE"] as const) {
+      const evaluation = evaluateStaticObjectDiscoveryDoctrine(
+        rumorDiscovery,
+        doctrine,
+        rumorDiscovery.elapsedSeconds + 3_600,
+      );
+      console.log(
+        `  ${doctrine}: status=${evaluation.status}, route-time=${(evaluation.movementElapsedSeconds / 3_600).toFixed(6)} h, continues=${evaluation.decision?.continuesRoute ?? false}`,
+      );
+    }
+  }
 }
 
 const discoveryTarget = world.staticObjects[0];
@@ -206,4 +221,4 @@ console.log(
   `  same paths with 100 s delay: ${delayedEncounter === null ? "no encounter" : "encounter"}`,
 );
 
-console.log("\nGAME-001 rumor search UI: npm run debug-map -> http://127.0.0.1:4173");
+console.log("\nGAME-002 doctrine UI: npm run debug-map -> http://127.0.0.1:4173");
