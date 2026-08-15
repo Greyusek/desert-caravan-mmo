@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Development workflow
+
+- Added persistent repository instructions for Codex in `AGENTS.md`.
+- Added one-command Windows acceptance with concise summaries and full failure logs outside the repository.
+- Removed the duplicate TypeScript build from GitHub Actions while preserving existing `npm test` and `npm run demo` behavior.
+- Documented the CI-gated pre-MVP merge and revert process without advancing the product version or checkpoint.
+
 ## 0.0.5 — Checkpoint 05
 
 - Added `WORLD-002`: deterministic hidden static oasis, mine, ruins, and cave objects.
