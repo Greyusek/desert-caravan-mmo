@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased — Development workflow
+## 0.0.6 — Checkpoint 06
+
+- Added `WORLD-003` / `SIM-007`: exact first-entry discovery of static objects along spherical route segments.
+- Added the 150 m concealed-object default, custom-radius validation, travel-ordered discovery events, and antimeridian-safe geometry.
+- Added ten discovery tests and a deterministic demo scenario; the complete suite now contains 58 tests.
+- Designated `WORLD-004`, a deterministic wandering monster with a cyclic route, as the next checkpoint.
+
+### Development workflow included since 0.0.5
 
 - Added persistent repository instructions for Codex in `AGENTS.md`.
 - Added one-command Windows acceptance with concise summaries and full failure logs outside the repository.

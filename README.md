@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 05 — WORLD-002: implemented and covered by automated tests.**
+**Checkpoint 06 — WORLD-003 / SIM-007: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -24,8 +24,9 @@ Also implemented:
 - demo linking supply depletion with caravan position on the route.
 - WORLD-001 — deterministic seeded generation of ten initial cities;
 - WORLD-002 — deterministic hidden oasis, mine, ruins, and cave objects, isolated by PRNG namespace.
+- WORLD-003 / SIM-007 — exact first discovery when a real spherical route enters a hidden object's radius.
 
-Not implemented yet (intentionally): object discovery, monsters, UI/server/database.
+Not implemented yet (intentionally): wandering monsters, player discovery state, UI/server/database.
 
 ## Requirements
 
@@ -60,15 +61,15 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 05:
+Expected for Checkpoint 06:
 
 ```text
-# tests 48
-# pass 48
+# tests 58
+# pass 58
 # fail 0
 ```
 
-GitHub Actions runs installation, one TypeScript compilation, and all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_05.md` for WORLD-002 details.
+GitHub Actions runs installation, one TypeScript compilation, and all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_06.md` for WORLD-003 details.
 
 ## Project structure
 
@@ -82,4 +83,4 @@ GitHub Actions runs installation, one TypeScript compilation, and all tests for 
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `WORLD-003`: discover objects when a caravan's real route enters the detection radius.
+The next functional checkpoint is `WORLD-004`: add a deterministic wandering monster with a cyclic route.
