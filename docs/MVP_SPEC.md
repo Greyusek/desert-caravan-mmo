@@ -238,4 +238,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-002` — simple doctrine.
 - [x] `GAME-003` — expedition completion/death.
 - [x] `GAME-004` — expedition monster encounter event.
-- [ ] `GAME-005` — pre-combat Power-stub contact resolution.
+- [x] `GAME-005` — pre-combat Power-stub contact resolution.
+- [ ] `GAME-006` — deterministic `FLEE` resolution without tactical combat.

@@ -1077,9 +1077,9 @@ test("GAME-003: depletion before discovery suppresses the impossible doctrine de
   assert.equal(effectiveDoctrine.decision, null);
 });
 
-function monsterInterceptAt(elapsedSeconds = 0) {
-  const world = createDebugMapSnapshot("checkpoint-04", elapsedSeconds);
-  const monster = world.monsters[0];
+function monsterInterceptAt(elapsedSeconds = 0, monsterIndex = 0) {
+  const world = createDebugMapSnapshot("checkpoint-04", elapsedSeconds, 2);
+  const monster = world.monsters[monsterIndex];
   assert.ok(monster);
   const candidates = world.cities.map((city) => ({
     city,
@@ -1130,11 +1130,11 @@ test("GAME-004: QA intercept preset is deterministic and guarantees contact", ()
   );
 });
 
-test("GAME-004: first moving contact becomes a non-terminal pause and timeline event", () => {
+test("GAME-005: weak contact defeats the monster and route execution continues", () => {
   const planned = monsterInterceptAt();
   const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
   assert.ok(contactAt);
-  const selected = monsterInterceptAt(contactAt);
+  const selected = monsterInterceptAt(contactAt + 60);
   const outcome = createExpeditionOutcomeSnapshot(
     selected.route,
     searchSupplies,
@@ -1152,14 +1152,100 @@ test("GAME-004: first moving contact becomes a non-terminal pause and timeline e
     outcome,
   );
 
+  assert.equal(outcome.status, "in-progress");
+  assert.equal(outcome.terminal, false);
+  assert.equal(outcome.interruptionCause, null);
+  assert.equal(outcome.monsterContact?.monsterId, selected.monster.id);
+  assert.equal(
+    outcome.monsterContactResolution?.status,
+    "monster-defeated",
+  );
+  assert.ok(executed.position.elapsedSeconds > contactAt);
+  assert.equal(log.executionStatus, "running");
+  const contactEvent = log.events.find((event) => event.kind === "monster-contact");
+  assert.equal(contactEvent?.occurred, true);
+  assert.equal(contactEvent?.monsterPower, selected.monster.power);
+  assert.equal(contactEvent?.playerPower, 100);
+  assert.equal(contactEvent?.powerResolutionStatus, "monster-defeated");
+  assert.equal(log.events.some((event) => event.kind === "arrival"), true);
+});
+
+test("GAME-005: debug QA exposes deterministic weak and strong patrols", () => {
+  const first = createDebugMapSnapshot("checkpoint-04", 0, 2);
+  const second = createDebugMapSnapshot("checkpoint-04", 0, 2);
+
+  assert.deepEqual(first.monsters, second.monsters);
+  assert.deepEqual(first.monsters.map((monster) => monster.power), [90, 110]);
+});
+
+test("GAME-005: FLEE against PWR 110 remains a non-terminal contact pause", () => {
+  const planned = monsterInterceptAt(0, 1);
+  const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const selected = monsterInterceptAt(contactAt, 1);
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    searchSupplies,
+    searchConsumption,
+    null,
+    selected.contact,
+    "FLEE",
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected.route, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    searchSupplies,
+    searchConsumption,
+    null,
+    null,
+    outcome,
+  );
+
   assert.equal(outcome.status, "paused");
   assert.equal(outcome.terminal, false);
   assert.equal(outcome.interruptionCause, "monster-contact");
-  assert.equal(outcome.monsterContact?.monsterId, selected.monster.id);
+  assert.equal(outcome.failureReason, null);
+  assert.equal(outcome.monsterContactResolution?.status, "flee-required");
   approx(executed.position.elapsedSeconds, contactAt, 1e-6);
   assert.equal(log.executionStatus, "paused");
-  assert.equal(log.events.at(-1)?.kind, "monster-contact");
-  assert.equal(log.events.at(-1)?.monsterPower, selected.monster.power);
+  assert.equal(log.events.at(-1)?.powerResolutionStatus, "flee-required");
+});
+
+test("GAME-005: ACCEPT_FIGHT against PWR 110 is a terminal expedition defeat", () => {
+  const planned = monsterInterceptAt(0, 1);
+  const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const selected = monsterInterceptAt(contactAt, 1);
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    searchSupplies,
+    searchConsumption,
+    null,
+    selected.contact,
+    "ACCEPT_FIGHT",
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected.route, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    searchSupplies,
+    searchConsumption,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.terminal, true);
+  assert.equal(outcome.failureReason, "monster");
+  assert.equal(outcome.failureCause, null);
+  assert.equal(outcome.interruptionCause, "monster-defeat");
+  assert.equal(
+    outcome.monsterContactResolution?.status,
+    "expedition-defeated",
+  );
+  approx(executed.position.elapsedSeconds, contactAt, 1e-6);
+  assert.equal(log.executionStatus, "failed");
+  assert.equal(log.events.at(-1)?.powerResolutionStatus, "expedition-defeated");
   assert.equal(log.events.some((event) => event.kind === "arrival"), false);
 });
 

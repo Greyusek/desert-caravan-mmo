@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 16 — GAME-004: implemented and covered by automated tests.**
+**Checkpoint 17 — GAME-005: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -35,8 +35,9 @@ Also implemented:
 - GAME-002 — automatic `STOP | MARK_AND_CONTINUE` reaction at the authoritative discovery moment, with real movement pause or continued travel and a recorded doctrine decision.
 - GAME-003 — explicit in-progress, paused, completed and failed expedition outcomes resolved at the first authoritative STOP, fatal depletion or arrival boundary.
 - GAME-004 — first continuous-time contact between the finite caravan route and cyclic monster patrol, composed into expedition pause, map state and timeline through SIM-008.
+- GAME-005 — transparent Player Power 100 contact resolution: weaker monsters are defeated automatically, while stronger or equal monsters follow the explicit `FLEE | ACCEPT_FIGHT` doctrine.
 
-Not implemented yet (intentionally): persistent player discovery state, post-stop resume/idle lifecycle, rewards and expedition persistence, production player map and fog of war, server/database, and encounter consequences.
+Not implemented yet (intentionally): deterministic escape resolution after `FLEE`, persistent player discovery state, post-stop resume/idle lifecycle, rewards and expedition persistence, production player map and fog of war, server/database, and tactical combat.
 
 ## Requirements
 
@@ -71,17 +72,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 16:
+Expected for Checkpoint 17:
 
 ```text
-# tests 155
-# pass 155
+# tests 164
+# pass 164
 # fail 0
 ```
 
-This total contains 150 simulation/UI tests and 5 tooling regression tests.
+This total contains 159 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_16.md` for GAME-004 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_17.md` for GAME-005 details.
 
 ## Developer debug map
 
@@ -91,7 +92,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, both discovery doctrines, expedition outcomes and the first moving monster contact. Use `DEV: маршрут на перехват` for a deterministic contact QA route. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power resolution. Select the QA patrol (`PWR 90` or `PWR 110`) and use `DEV: маршрут на перехват` for a deterministic contact route. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -106,4 +107,4 @@ Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay:
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `GAME-005`: resolve the first monster contact with the transparent MVP Power stub (`Player Power 100`, monsters Power 90 / 110) without adding tactical combat.
+The next functional checkpoint is `GAME-006`: resolve `FLEE` deterministically from explicit movement inputs without adding tactical combat.

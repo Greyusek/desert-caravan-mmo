@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 16 · GAME-004</p>
+          <p class="eyebrow">Checkpoint 17 · GAME-005</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -142,7 +142,7 @@
         aria-labelledby="contact-title"
       >
         <div class="contact-copy">
-          <p class="section-kicker">GAME-004 · Moving encounter</p>
+          <p class="section-kicker">GAME-005 · Power resolution</p>
           <div class="contact-heading">
             <div>
               <h2 id="contact-title">Контакта на маршруте нет</h2>
@@ -157,11 +157,39 @@
             <div><dt>Монстр</dt><dd id="contact-monster">—</dd></div>
             <div><dt>Позиция</dt><dd id="contact-position">—</dd></div>
             <div><dt>Дистанция</dt><dd id="contact-distance">—</dd></div>
+            <div><dt>Player Power</dt><dd id="contact-player-power">100</dd></div>
+            <div><dt>Сравнение</dt><dd id="contact-power-comparison">—</dd></div>
           </dl>
         </div>
         <div class="contact-actions">
+          <label class="contact-monster-field" for="contact-monster-select">
+            <span>QA-противник</span>
+            <select id="contact-monster-select"></select>
+          </label>
+          <fieldset class="contact-doctrine">
+            <legend>Если монстр сильнее</legend>
+            <label>
+              <input
+                id="contact-doctrine-flee"
+                name="contact-doctrine"
+                type="radio"
+                value="FLEE"
+                checked
+              />
+              <span>Отступить <small>FLEE · пауза до формулы побега</small></span>
+            </label>
+            <label>
+              <input
+                id="contact-doctrine-fight"
+                name="contact-doctrine"
+                type="radio"
+                value="ACCEPT_FIGHT"
+              />
+              <span>Принять бой <small>ACCEPT_FIGHT · гибель против PWR 110</small></span>
+            </label>
+          </fieldset>
           <button id="contact-dev-route" type="button">DEV: маршрут на перехват</button>
-          <p>QA-пресет выберет ближайший город. Разрешение боя появится в GAME-005.</p>
+          <p>PWR 90 погибает автоматически. Против PWR 110 выбранная доктрина применяется на точной границе контакта.</p>
         </div>
       </section>
 

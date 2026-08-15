@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.17 — Checkpoint 17
+
+- Added `GAME-005`: a public deterministic Player Power 100 versus monster Power contact resolver with explicit route dispositions.
+- Made Player Power 100 defeat Monster Power 90 automatically and continue the original route without an invented combat simulation.
+- Added `FLEE | ACCEPT_FIGHT` doctrine for Monster Power 110: `FLEE` pauses for the next escape checkpoint, while `ACCEPT_FIGHT` is a terminal expedition defeat.
+- Preserved first-boundary semantics with discovery STOP, fatal supply depletion and arrival; an earlier or exact-time fatal boundary still takes precedence over contact.
+- Added two deterministic QA patrols, a monster selector, Power comparison, doctrine controls, result states and authoritative timeline metadata to the debug map.
+- Added nine GAME-005 regressions; repository verification now runs 164 tests.
+- Designated `GAME-006`, deterministic escape resolution after `FLEE` without tactical combat, as the next checkpoint.
+
 ## 0.0.16 — Checkpoint 16
 
 - Added `GAME-004`: a public deterministic expedition/monster contact API that composes finite caravan movement with an absolute-time cyclic patrol through SIM-008.
