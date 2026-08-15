@@ -227,7 +227,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `WORLD-002` — статичные скрытые объекты.
 - [x] `WORLD-003` — route-aware discovery статичных объектов.
 - [x] `SIM-007` — точный first-entry discovery radius check.
-- [ ] `WORLD-004` — wandering monster cyclic route.
+- [x] `WORLD-004` — wandering monster cyclic route.
 - [ ] `SIM-008` — time-aware moving encounter.
 - [ ] `UI-001` — debug map.
 - [ ] `UI-002` — route editor.

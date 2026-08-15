@@ -12,6 +12,7 @@ import {
   positionAtTime,
   projectSupplies,
   timeToFirstDepletion,
+  wanderingMonsterPositionAtTime,
 } from "./index.js";
 
 const start = createWorldCoordinate(55.755864, 37.617698);
@@ -27,7 +28,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — SIM-001..007 demo");
+console.log("Desert Caravan MMO — Checkpoint 07 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -121,4 +122,17 @@ if (discoveryTarget) {
       `  ${discovery.object.id}: route=${discovery.routeDistanceMeters.toFixed(3)} m, T=${discovery.elapsedSeconds.toFixed(3)} s, separation=${discovery.distanceToObjectMeters.toFixed(3)} m`,
     );
   }
+}
+
+console.log(`WORLD-004 wandering monsters: ${world.wanderingMonsters.length}`);
+for (const monster of world.wanderingMonsters) {
+  const period = monster.patrolRoute.totalDurationSeconds;
+  const sampleTime = period * 1.25;
+  const samplePosition = wanderingMonsterPositionAtTime(monster, sampleTime);
+  console.log(
+    `  ${monster.id}: power=${monster.power}, legs=${monster.patrolRoute.segments.length}, loop=${(monster.patrolRoute.totalDistanceMeters / 1_000).toFixed(3)} km / ${(period / 3_600).toFixed(3)} h`,
+  );
+  console.log(
+    `    T=1.25 loops: cycle=${samplePosition.cycleIndex}, segment=${samplePosition.segmentIndex + 1}, position=${samplePosition.coordinate.latitudeDeg.toFixed(6)}, ${samplePosition.coordinate.longitudeDeg.toFixed(6)}`,
+  );
 }
