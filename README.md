@@ -43,6 +43,16 @@ npm run accept:main
 
 The command updates `main` with fast-forward only, installs exact dependencies, builds once, runs all tests and the demo, and verifies a clean working tree. On success, send only the generated summary file; keep the full log for failures. Double-click `scripts\accept-main.cmd` for the same workflow.
 
+One-time bootstrap after the pull request that introduces this command:
+
+```bash
+git switch main
+git pull --ff-only origin main
+npm run accept:main
+```
+
+Starting with the next pull request, `npm run accept:main` performs the update itself.
+
 Because Windows PowerShell may block `npm.ps1`, use `npm.cmd` there:
 
 ```powershell

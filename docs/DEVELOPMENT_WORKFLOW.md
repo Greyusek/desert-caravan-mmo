@@ -14,6 +14,17 @@
 
 ## Локальная приёмка на Windows 11
 
+После merge PR, который впервые добавляет эту автоматизацию, один раз получите сам скрипт вручную:
+
+```bash
+cd /d/dev/newWorld
+git switch main
+git pull --ff-only origin main
+npm run accept:main
+```
+
+Начиная со следующего PR достаточно одной команды — она сама обновит `main`:
+
 Из Git Bash:
 
 ```bash
