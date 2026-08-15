@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 13 — GAME-001: implemented and covered by automated tests.**
+**Checkpoint 14 — GAME-002: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -32,8 +32,9 @@ Also implemented:
 - UI-003 — persistent caravan status, route progress, food/water levels and an ETA survival forecast driven by SIM-005 and SIM-006.
 - UI-004 — deterministic expedition timeline for departure, route milestones, supply warnings, depletion and arrival.
 - GAME-001 — deterministic coarse rumor, hidden local mine, north-up search inset, route-aware discovery/miss states and revealed-only log events.
+- GAME-002 — automatic `STOP | MARK_AND_CONTINUE` reaction at the authoritative discovery moment, with real movement pause or continued travel and a recorded doctrine decision.
 
-Not implemented yet (intentionally): persistent player discovery state, production player map and fog of war, automatic doctrine, server/database, and encounter consequences.
+Not implemented yet (intentionally): persistent player discovery state, post-stop resume/idle lifecycle, production player map and fog of war, server/database, and encounter or depletion consequences.
 
 ## Requirements
 
@@ -68,17 +69,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 13:
+Expected for Checkpoint 14:
 
 ```text
-# tests 122
-# pass 122
+# tests 132
+# pass 132
 # fail 0
 ```
 
-This total contains 117 simulation/UI tests and 5 tooling regression tests.
+This total contains 127 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_13.md` for GAME-001 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_14.md` for GAME-002 details.
 
 ## Developer debug map
 
@@ -88,7 +89,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline and the first local rumor-search scenario. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario and both discovery doctrines. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -103,4 +104,4 @@ Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay:
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `GAME-002`: add the first automatic doctrine decision when the rumored target is discovered.
+The next functional checkpoint is `GAME-003`: turn route completion and fatal supply depletion into explicit expedition outcomes.

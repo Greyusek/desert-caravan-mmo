@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
+  applyDiscoveryDoctrineToRoute,
   createCaravanStatusSnapshot,
   createDebugMapSnapshot,
+  createDiscoveryDoctrineSnapshot,
   createExpeditionEventLogSnapshot,
   createFourSegmentRouteSnapshot,
   createRumorSearchSnapshot,
@@ -693,4 +695,182 @@ test("GAME-001: revealed discovery and miss events keep deterministic timeline o
   assert.ok(missedIndex < arrivalIndex);
   assert.equal(missedLog.events[missedIndex]?.atSeconds, awayPlan.totalDurationSeconds);
   assert.equal(missedLog.events[arrivalIndex]?.active, true);
+});
+
+test("GAME-002: doctrine remains pending and movement stays unchanged before discovery", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5, 0);
+  const searchPlan = createRumorSearchSnapshot("checkpoint-04", origin, plan);
+  const discoveryAtSeconds = searchPlan.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+
+  const beforeRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    discoveryAtSeconds - 1,
+  );
+  const beforeSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    beforeRoute,
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    beforeRoute,
+    beforeSearch,
+    "STOP",
+  );
+  const executedRoute = applyDiscoveryDoctrineToRoute(beforeRoute, doctrine);
+
+  assert.equal(doctrine.status, "pending");
+  assert.equal(doctrine.decision, null);
+  assert.deepEqual(executedRoute.position, beforeRoute.position);
+});
+
+test("GAME-002: STOP freezes the caravan and ends the executable timeline at discovery", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5, 0);
+  const searchPlan = createRumorSearchSnapshot("checkpoint-04", origin, plan);
+  const discoveryAtSeconds = searchPlan.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+
+  const laterRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    discoveryAtSeconds + 1_000,
+  );
+  const laterSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    laterRoute,
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    laterRoute,
+    laterSearch,
+    "STOP",
+  );
+  const executedRoute = applyDiscoveryDoctrineToRoute(laterRoute, doctrine);
+  const executedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    executedRoute,
+  );
+  const status = createCaravanStatusSnapshot(
+    executedRoute,
+    searchSupplies,
+    searchConsumption,
+    doctrine,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    executedRoute,
+    searchSupplies,
+    searchConsumption,
+    executedSearch,
+    doctrine,
+  );
+
+  assert.equal(doctrine.status, "stopped");
+  assert.equal(executedRoute.position.elapsedSeconds, discoveryAtSeconds);
+  approx(
+    executedRoute.position.traveledDistanceMeters,
+    (doctrine.decision?.routeDistanceKilometers ?? 0) * 1_000,
+    1e-6,
+  );
+  assert.equal(status.doctrine?.status, "stopped");
+  assert.equal(log.executionStatus, "stopped");
+  assert.deepEqual(
+    log.events.slice(-2).map(({ id }) => id),
+    ["rumor-target-discovered", "doctrine-stop"],
+  );
+  assert.equal(log.events.some((event) => event.kind === "arrival"), false);
+  assert.equal(log.nextEventId, null);
+});
+
+test("GAME-002: MARK_AND_CONTINUE records the decision and preserves arrival", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5, 0);
+  const arrivedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    plan.totalDurationSeconds,
+  );
+  const arrivedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    arrivedRoute,
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    arrivedRoute,
+    arrivedSearch,
+    "MARK_AND_CONTINUE",
+  );
+  const executedRoute = applyDiscoveryDoctrineToRoute(arrivedRoute, doctrine);
+  const log = createExpeditionEventLogSnapshot(
+    executedRoute,
+    searchSupplies,
+    searchConsumption,
+    arrivedSearch,
+    doctrine,
+  );
+  const decisionIndex = log.events.findIndex(
+    (event) => event.id === "doctrine-mark-and-continue",
+  );
+  const arrivalIndex = log.events.findIndex((event) => event.id === "arrival");
+
+  assert.equal(doctrine.status, "marked-and-continuing");
+  assert.equal(executedRoute.position.status, "arrived");
+  assert.equal(log.executionStatus, "running");
+  assert.ok(decisionIndex >= 0);
+  assert.ok(decisionIndex < arrivalIndex);
+  assert.equal(log.events[decisionIndex]?.doctrine, "MARK_AND_CONTINUE");
+  assert.equal(log.events[arrivalIndex]?.active, true);
+});
+
+test("GAME-002: a missed search never creates a doctrine decision", () => {
+  const origin = rumorOrigin();
+  const direct = directRumorCommands();
+  const away = [
+    {
+      bearingDeg: (direct[0].bearingDeg + 90) % 360,
+      distanceKilometers: direct[0].distanceKilometers,
+    },
+    ...direct.slice(1),
+  ];
+  const plan = createFourSegmentRouteSnapshot(origin.position, away, 5);
+  const arrivedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    away,
+    5,
+    plan.totalDurationSeconds,
+  );
+  const missedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    arrivedRoute,
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    arrivedRoute,
+    missedSearch,
+    "STOP",
+  );
+  const log = createExpeditionEventLogSnapshot(
+    arrivedRoute,
+    searchSupplies,
+    searchConsumption,
+    missedSearch,
+    doctrine,
+  );
+
+  assert.equal(missedSearch.status, "missed");
+  assert.equal(doctrine.status, "pending");
+  assert.equal(doctrine.decision, null);
+  assert.equal(
+    log.events.some((event) => event.kind === "doctrine-decision"),
+    false,
+  );
 });

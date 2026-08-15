@@ -322,6 +322,84 @@ input[type="range"] {
   line-height: 1.45;
 }
 
+.doctrine-control {
+  display: grid;
+  margin: 15px 0 0;
+  padding: 0;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  border: 0;
+}
+
+.doctrine-control legend {
+  width: 100%;
+  margin-bottom: 7px;
+  color: #bba77f;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.doctrine-control label {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid rgba(236, 203, 148, 0.14);
+  border-radius: 11px;
+  color: var(--ink);
+  background: rgba(18, 13, 9, 0.38);
+  cursor: pointer;
+}
+
+.doctrine-control label:has(input:checked) {
+  border-color: rgba(88, 199, 180, 0.48);
+  background: rgba(29, 76, 68, 0.23);
+  box-shadow: inset 0 0 0 1px rgba(88, 199, 180, 0.08);
+}
+
+.doctrine-control input {
+  margin: 3px 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--teal);
+}
+
+.doctrine-control span,
+.doctrine-control strong,
+.doctrine-control small {
+  display: block;
+}
+
+.doctrine-control span {
+  min-width: 0;
+}
+
+.doctrine-control strong {
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+
+.doctrine-control small {
+  margin-top: 4px;
+  color: #8f816a;
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
+.doctrine-result {
+  margin: 10px 0 0;
+  color: #8de2d3;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+[data-state="missed"] .doctrine-result {
+  color: #bba77f;
+}
+
 [data-state="found"] .rumor-result {
   color: #a7f0e3;
 }
@@ -598,6 +676,13 @@ input[type="range"] {
   border-color: rgba(244, 184, 96, 0.46);
 }
 
+.caravan-panel[data-state="stopped"] {
+  border-color: rgba(88, 199, 180, 0.52);
+  background:
+    linear-gradient(130deg, rgba(29, 93, 78, 0.28), transparent 36%),
+    var(--panel);
+}
+
 .caravan-panel[data-state="depleted"] {
   border-color: rgba(239, 111, 94, 0.52);
   background:
@@ -630,6 +715,12 @@ input[type="range"] {
   border-color: rgba(244, 184, 96, 0.36);
   color: var(--accent-strong);
   background: rgba(111, 72, 29, 0.25);
+}
+
+[data-state="stopped"] > .caravan-panel__heading .expedition-state {
+  border-color: rgba(88, 199, 180, 0.52);
+  color: #b7fff1;
+  background: rgba(29, 108, 88, 0.34);
 }
 
 [data-state="depleted"] > .caravan-panel__heading .expedition-state {
@@ -1107,6 +1198,20 @@ input[type="range"] {
   color: #ff9f91;
 }
 
+.event-log-item[data-kind="doctrine-decision"] .event-log-marker {
+  border-color: var(--accent);
+}
+
+.event-log-item[data-kind="doctrine-decision"][data-state="occurred"] .event-log-marker,
+.event-log-item[data-kind="doctrine-decision"][data-state="active"] .event-log-marker {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(244, 184, 96, 0.55);
+}
+
+.event-log-item[data-kind="doctrine-decision"] .event-log-content strong {
+  color: var(--accent-strong);
+}
+
 .event-log-current {
   position: absolute;
   top: 0;
@@ -1410,6 +1515,10 @@ input[type="range"] {
 @media (max-width: 800px) {
   .rumor-facts {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .doctrine-control {
+    grid-template-columns: 1fr;
   }
 
   .route-form {

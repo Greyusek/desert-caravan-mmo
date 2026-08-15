@@ -7,6 +7,7 @@ import {
   createRumorSearchScenario,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
+  evaluateStaticObjectDiscoveryDoctrine,
   generateSeededWorld,
   kilometers,
   positionAtTime,
@@ -40,7 +41,7 @@ const RUMOR_MAP_PIXELS_PER_METER = 0.0022;
 const RUMOR_SECTOR_SAMPLE_COUNT = 16;
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "search-missed" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "search-missed" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -53,6 +54,7 @@ const RUMOR_SECTOR_SAMPLE_COUNT = 16;
  * @property {number | null} distanceKilometers
  * @property {number} order
  * @property {import("../sim-core/dist/src/index.js").StaticWorldObjectKind} [objectKind]
+ * @property {import("../sim-core/dist/src/index.js").StaticObjectDiscoveryDoctrine} [doctrine]
  */
 
 /**
@@ -327,6 +329,61 @@ export function createRumorSearchSnapshot(seed, originCity, route) {
       exactDistanceKilometers:
         scenario.serverTruth.exactDistanceMeters / 1_000,
       plannedDiscoveryAtSeconds: plannedDiscovery?.elapsedSeconds ?? null,
+      plannedDiscovery,
+    },
+  };
+}
+
+/**
+ * GAME-002 keeps doctrine evaluation in sim-core and exposes only the compact
+ * decision state needed by the developer UI.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createRumorSearchSnapshot>} rumorSearch
+ * @param {import("../sim-core/dist/src/index.js").StaticObjectDiscoveryDoctrine} doctrine
+ */
+export function createDiscoveryDoctrineSnapshot(route, rumorSearch, doctrine) {
+  const evaluatedAtSeconds = Math.min(
+    route.position.elapsedSeconds,
+    route.totalDurationSeconds,
+  );
+  const evaluation = evaluateStaticObjectDiscoveryDoctrine(
+    rumorSearch.serverTruth.plannedDiscovery,
+    doctrine,
+    evaluatedAtSeconds,
+  );
+
+  return {
+    doctrine: evaluation.doctrine,
+    status: evaluation.status,
+    evaluatedAtSeconds: evaluation.evaluatedAtSeconds,
+    movementElapsedSeconds: evaluation.movementElapsedSeconds,
+    decision: evaluation.decision
+      ? {
+          ...evaluation.decision,
+          routeDistanceKilometers:
+            evaluation.decision.routeDistanceMeters / 1_000,
+        }
+      : null,
+  };
+}
+
+/**
+ * Re-evaluates only the live route position after doctrine. The original plan,
+ * waypoints and ETA remain intact for comparison in the debug overlay.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot>} doctrine
+ */
+export function applyDiscoveryDoctrineToRoute(route, doctrine) {
+  const evaluated = positionAtTime(
+    route.authoritativeRoute,
+    doctrine.movementElapsedSeconds,
+  );
+
+  return {
+    ...route,
+    position: {
+      ...evaluated,
+      point: projectCoordinate(evaluated.coordinate),
     },
   };
 }
@@ -338,11 +395,13 @@ export function createRumorSearchSnapshot(seed, originCity, route) {
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
  */
 export function createCaravanStatusSnapshot(
   route,
   initialSupplies,
   consumptionProfile,
+  doctrine = null,
 ) {
   const evaluatedAtSeconds = Math.min(
     route.position.elapsedSeconds,
@@ -372,6 +431,7 @@ export function createCaravanStatusSnapshot(
       : route.position.traveledDistanceMeters / totalDistanceMeters;
 
   return {
+    doctrine,
     route: {
       status: route.position.status,
       segmentIndex: route.position.segmentIndex,
@@ -423,18 +483,20 @@ export function createCaravanStatusSnapshot(
 
 /**
  * UI-004 builds a deterministic expedition timeline from existing route and
- * supply truth. It describes milestones and forecasts only; it does not apply
- * death, stop movement, or mutate simulation state.
+ * supply truth. GAME-002 may end executable movement at a STOP decision; the
+ * function still does not mutate state or apply fatal depletion consequences.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
  * @param {ReturnType<typeof createRumorSearchSnapshot> | null} [rumorSearch]
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
  */
 export function createExpeditionEventLogSnapshot(
   route,
   initialSupplies,
   consumptionProfile,
   rumorSearch = null,
+  doctrine = null,
 ) {
   const firstDepletion = timeToFirstDepletion(
     initialSupplies,
@@ -476,7 +538,12 @@ export function createExpeditionEventLogSnapshot(
     route.totalDurationSeconds,
   );
 
-  addRumorSearchEvent(events, rumorSearch, route.totalDurationSeconds);
+  addRumorSearchEvent(
+    events,
+    rumorSearch,
+    doctrine,
+    route.totalDurationSeconds,
+  );
 
   if (
     firstDepletion.atSeconds !== null &&
@@ -503,7 +570,18 @@ export function createExpeditionEventLogSnapshot(
     distanceKilometers: route.totalDistanceKilometers,
     order: 40,
   });
-  events.sort(
+  const stopAtSeconds =
+    doctrine?.status === "stopped"
+      ? doctrine.decision?.decidedAtSeconds ?? null
+      : null;
+  const executionEvents =
+    stopAtSeconds === null
+      ? events
+      : events.filter(
+          (event) =>
+            event.atSeconds <= stopAtSeconds + EVENT_TIME_EPSILON_SECONDS,
+        );
+  executionEvents.sort(
     (left, right) =>
       left.atSeconds - right.atSeconds ||
       left.order - right.order ||
@@ -515,8 +593,8 @@ export function createExpeditionEventLogSnapshot(
     route.totalDurationSeconds,
   );
   let activeEventIndex = -1;
-  for (let index = 0; index < events.length; index += 1) {
-    const event = events[index];
+  for (let index = 0; index < executionEvents.length; index += 1) {
+    const event = executionEvents[index];
     if (
       event &&
       event.atSeconds <= evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS
@@ -525,13 +603,14 @@ export function createExpeditionEventLogSnapshot(
     }
   }
 
-  const presentedEvents = events.map((event, index) => ({
+  const presentedEvents = executionEvents.map((event, index) => ({
     id: event.id,
     kind: event.kind,
     atSeconds: event.atSeconds,
     segmentIndex: event.segmentIndex,
     cause: event.cause,
     objectKind: event.objectKind ?? null,
+    doctrine: event.doctrine ?? null,
     distanceKilometers: event.distanceKilometers,
     occurred: index <= activeEventIndex,
     active: index === activeEventIndex,
@@ -539,6 +618,7 @@ export function createExpeditionEventLogSnapshot(
 
   return {
     evaluatedAtSeconds,
+    executionStatus: stopAtSeconds === null ? "running" : "stopped",
     occurredCount: activeEventIndex + 1,
     totalCount: presentedEvents.length,
     nextEventId: presentedEvents[activeEventIndex + 1]?.id ?? null,
@@ -549,9 +629,15 @@ export function createExpeditionEventLogSnapshot(
 /**
  * @param {PlannedExpeditionEvent[]} events
  * @param {ReturnType<typeof createRumorSearchSnapshot> | null} rumorSearch
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} doctrine
  * @param {number} routeDurationSeconds
  */
-function addRumorSearchEvent(events, rumorSearch, routeDurationSeconds) {
+function addRumorSearchEvent(
+  events,
+  rumorSearch,
+  doctrine,
+  routeDurationSeconds,
+) {
   if (!rumorSearch) return;
 
   if (rumorSearch.status === "found" && rumorSearch.discovery) {
@@ -565,6 +651,23 @@ function addRumorSearchEvent(events, rumorSearch, routeDurationSeconds) {
       objectKind: rumorSearch.rumor.targetKind,
       order: 15,
     });
+
+    if (doctrine?.decision) {
+      events.push({
+        id:
+          doctrine.decision.doctrine === "STOP"
+            ? "doctrine-stop"
+            : "doctrine-mark-and-continue",
+        kind: "doctrine-decision",
+        atSeconds: doctrine.decision.decidedAtSeconds,
+        segmentIndex: doctrine.decision.segmentIndex,
+        cause: null,
+        distanceKilometers: doctrine.decision.routeDistanceKilometers,
+        objectKind: doctrine.decision.objectKind,
+        doctrine: doctrine.decision.doctrine,
+        order: 16,
+      });
+    }
     return;
   }
 

@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 13 · GAME-001</p>
+          <p class="eyebrow">Checkpoint 14 · GAME-002</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -56,7 +56,7 @@
         <div class="rumor-copy">
           <div class="rumor-heading">
             <div>
-              <p class="section-kicker">GAME-001 · Rumor search</p>
+              <p class="section-kicker">GAME-002 · Discovery doctrine</p>
               <h2 id="rumor-title">Слух о руднике</h2>
             </div>
             <p id="rumor-state" class="rumor-state">Идёт поиск</p>
@@ -70,6 +70,37 @@
             <span>Дальность <strong id="rumor-range">30–50 км</strong></span>
             <span>Качество <strong>грубое</strong></span>
           </div>
+          <fieldset class="doctrine-control">
+            <legend>Автодоктрина при обнаружении</legend>
+            <label for="doctrine-stop">
+              <input
+                id="doctrine-stop"
+                type="radio"
+                name="discovery-doctrine"
+                value="STOP"
+                checked
+              />
+              <span>
+                <strong>Остановиться у цели</strong>
+                <small>STOP · маршрут будет поставлен на паузу</small>
+              </span>
+            </label>
+            <label for="doctrine-mark-and-continue">
+              <input
+                id="doctrine-mark-and-continue"
+                type="radio"
+                name="discovery-doctrine"
+                value="MARK_AND_CONTINUE"
+              />
+              <span>
+                <strong>Отметить и продолжить</strong>
+                <small>MARK_AND_CONTINUE · караван не меняет курс</small>
+              </span>
+            </label>
+          </fieldset>
+          <p id="doctrine-result" class="doctrine-result">
+            Решение будет принято автоматически в момент обнаружения.
+          </p>
           <p id="rumor-result" class="rumor-result">
             Постройте маршрут через отмеченный сектор.
           </p>
@@ -245,7 +276,7 @@
           </form>
           <p class="supply-settings__note">
             В пути применяются moving-расходы SIM-006. Расход на стоянке сохранён
-            в профиле, но начнёт влиять на экспедицию в следующих checkpoint.
+            в профиле; длительная жизнь после STOP появится в GAME-003.
           </p>
         </details>
         <p class="caravan-panel__scope-note">
