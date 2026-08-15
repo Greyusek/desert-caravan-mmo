@@ -4,6 +4,7 @@ import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
   createDebugMapSnapshot,
+  createFourSegmentRouteSnapshot,
   projectCoordinate,
   splitPathAtAntimeridian,
 } from "../map-model.js";
@@ -116,4 +117,107 @@ test("UI-001: an antimeridian crossing is split at opposite map edges", () => {
   assert.equal(paths[0]?.at(-1)?.x, DEBUG_MAP_WIDTH);
   assert.equal(paths[1]?.[0]?.x, 0);
   approx(paths[0]?.at(-1)?.y ?? Number.NaN, paths[1]?.[0]?.y ?? Number.NaN);
+});
+
+const fourSegments = [
+  { bearingDeg: 315, distanceKilometers: 200 },
+  { bearingDeg: 270, distanceKilometers: 120 },
+  { bearingDeg: 225, distanceKilometers: 200 },
+  { bearingDeg: 90, distanceKilometers: 350 },
+];
+
+test("UI-002: the editor resolves exactly four chained spherical segments", () => {
+  const route = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    fourSegments,
+    5,
+  );
+
+  assert.equal(route.segments.length, 4);
+  assert.equal(route.totalDistanceKilometers, 870);
+  assert.equal(route.totalDurationSeconds, 174 * 3_600);
+  assert.deepEqual(route.segments[0]?.start, route.start);
+  assert.deepEqual(route.segments[1]?.start, route.segments[0]?.end);
+  assert.deepEqual(route.segments[2]?.start, route.segments[1]?.end);
+  assert.deepEqual(route.segments[3]?.start, route.segments[2]?.end);
+  assert.deepEqual(route.end, route.segments[3]?.end);
+  assert.ok(
+    route.routePaths.flat().length > route.segments.length + 1,
+    "long spherical legs should be sampled instead of drawn as endpoint chords",
+  );
+});
+
+test("UI-002: route overlay is reproducible for the same editor values and time", () => {
+  const start = { latitudeDeg: -4.988644, longitudeDeg: -112.712295 };
+
+  assert.deepEqual(
+    createFourSegmentRouteSnapshot(start, fourSegments, 5, 12_345),
+    createFourSegmentRouteSnapshot(start, fourSegments, 5, 12_345),
+  );
+});
+
+test("UI-002: elapsed time evaluates the caravan through SIM-005", () => {
+  const route = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    fourSegments,
+    5,
+    20 * 3_600,
+  );
+
+  assert.equal(route.position.status, "moving");
+  assert.equal(route.position.segmentIndex, 0);
+  approx(route.position.segmentProgress, 0.5);
+  approx(route.position.traveledDistanceMeters, 100_000);
+
+  const arrived = createFourSegmentRouteSnapshot(
+    route.start,
+    fourSegments,
+    5,
+    route.totalDurationSeconds,
+  );
+  assert.equal(arrived.position.status, "arrived");
+  assert.equal(arrived.position.segmentIndex, null);
+  assert.deepEqual(arrived.position.coordinate, arrived.end);
+});
+
+test("UI-002: a route crossing the antimeridian uses separate map paths", () => {
+  const route = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 179 },
+    [
+      { bearingDeg: 90, distanceKilometers: 500 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+    5,
+  );
+
+  assert.equal(route.routePaths.length, 2);
+  assert.equal(route.routePaths[0]?.at(-1)?.x, DEBUG_MAP_WIDTH);
+  assert.equal(route.routePaths[1]?.[0]?.x, 0);
+});
+
+test("UI-002: editor values are validated before route rendering", () => {
+  const start = { latitudeDeg: 0, longitudeDeg: 0 };
+
+  assert.throws(
+    () => createFourSegmentRouteSnapshot(start, fourSegments.slice(0, 3), 5),
+    /exactly four segments/,
+  );
+  assert.throws(
+    () => createFourSegmentRouteSnapshot(start, fourSegments, 0),
+    /speedKilometersPerHour must be a positive finite number/,
+  );
+  assert.throws(
+    () =>
+      createFourSegmentRouteSnapshot(
+        start,
+        [
+          ...fourSegments.slice(0, 3),
+          { bearingDeg: 90, distanceKilometers: -1 },
+        ],
+        5,
+      ),
+    /distanceKilometers must be a non-negative finite number/,
+  );
 });

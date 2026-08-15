@@ -4,6 +4,7 @@ import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
   createDebugMapSnapshot,
+  createFourSegmentRouteSnapshot,
 } from "./map-model.js";
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
@@ -26,6 +27,16 @@ const objectCount = requireElement("object-count", HTMLElement);
 const monsterCount = requireElement("monster-count", HTMLElement);
 const detailTitle = requireElement("detail-title", HTMLParagraphElement);
 const detailList = requireElement("detail-list", HTMLDListElement);
+const routeForm = requireElement("route-form", HTMLFormElement);
+const routeStartCity = requireElement("route-start-city", HTMLSelectElement);
+const routeSpeed = requireElement("route-speed", HTMLInputElement);
+const routeSummary = requireElement("route-summary", HTMLOutputElement);
+const routeBearingInputs = [1, 2, 3, 4].map((index) =>
+  requireElement(`route-bearing-${index}`, HTMLInputElement),
+);
+const routeDistanceInputs = [1, 2, 3, 4].map((index) =>
+  requireElement(`route-distance-${index}`, HTMLInputElement),
+);
 
 let elapsedSeconds = 0;
 
@@ -38,6 +49,13 @@ seedForm.addEventListener("submit", (event) => {
 
 timeSlider.addEventListener("input", () => {
   elapsedSeconds = Number(timeSlider.value);
+  render();
+});
+
+routeForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  elapsedSeconds = 0;
+  timeSlider.value = "0";
   render();
 });
 
@@ -55,10 +73,34 @@ worldMap.addEventListener("click", (event) => {
 
 render();
 
+/** @returns {void} */
 function render() {
   try {
     const snapshot = createDebugMapSnapshot(seedInput.value.trim(), elapsedSeconds);
+    syncStartCityOptions(snapshot.cities);
+    const startCity = snapshot.cities.find(
+      (city) => city.id === routeStartCity.value,
+    );
+    if (!startCity) throw new Error("Выберите существующий стартовый город");
+
+    const route = createFourSegmentRouteSnapshot(
+      startCity.position,
+      readRouteCommands(),
+      routeSpeed.valueAsNumber,
+      elapsedSeconds,
+    );
     const firstMonster = snapshot.monsters[0];
+    const maximumElapsedSeconds = Math.max(
+      route.totalDurationSeconds,
+      firstMonster?.periodSeconds ?? 0,
+    );
+
+    if (elapsedSeconds > maximumElapsedSeconds) {
+      elapsedSeconds = maximumElapsedSeconds;
+      timeSlider.value = String(elapsedSeconds);
+      render();
+      return;
+    }
 
     errorMessage.hidden = true;
     mapTitle.textContent = `Seed: ${snapshot.seed}`;
@@ -66,27 +108,23 @@ function render() {
     objectCount.textContent = String(snapshot.staticObjects.length);
     monsterCount.textContent = String(snapshot.monsters.length);
     timeOutput.textContent = formatElapsed(elapsedSeconds);
+    routeSummary.textContent = formatRouteSummary(route);
 
-    if (firstMonster) {
-      timeSlider.max = String(Math.ceil(firstMonster.periodSeconds));
-      if (elapsedSeconds > firstMonster.periodSeconds) {
-        elapsedSeconds = firstMonster.periodSeconds;
-        timeSlider.value = String(elapsedSeconds);
-      }
-    } else {
-      timeSlider.max = "0";
-      timeSlider.value = "0";
-    }
+    timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
+    timeSlider.value = String(elapsedSeconds);
 
-    drawSnapshot(snapshot);
+    drawSnapshot(snapshot, route);
   } catch (error) {
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
   }
 }
 
-/** @param {ReturnType<typeof createDebugMapSnapshot>} snapshot */
-function drawSnapshot(snapshot) {
+/**
+ * @param {ReturnType<typeof createDebugMapSnapshot>} snapshot
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ */
+function drawSnapshot(snapshot, route) {
   worldMap.replaceChildren();
   drawGrid();
 
@@ -98,6 +136,43 @@ function drawSnapshot(snapshot) {
       });
       worldMap.append(polyline);
     }
+  }
+
+  for (const path of route.routePaths) {
+    worldMap.append(
+      svgElement("polyline", {
+        class: "caravan-route-path",
+        points: path.map((point) => `${point.x},${point.y}`).join(" "),
+      }),
+    );
+  }
+
+  for (const segment of route.segments) {
+    const group = svgElement("g", {
+      "data-detail-title": `Маршрут · сегмент ${segment.index + 1}`,
+      "data-detail-rows": JSON.stringify([
+        ["Азимут", `${segment.bearingDeg.toFixed(1)}°`],
+        ["Дистанция", `${segment.distanceKilometers.toFixed(1)} км`],
+        ["ETA", formatDuration(segment.etaEndSeconds)],
+        ["Широта", segment.end.latitudeDeg.toFixed(6)],
+        ["Долгота", segment.end.longitudeDeg.toFixed(6)],
+      ]),
+    });
+    const marker = svgElement("circle", {
+      class: "route-waypoint",
+      cx: segment.endPoint.x,
+      cy: segment.endPoint.y,
+      r: 5,
+    });
+    const label = svgElement("text", {
+      class: "route-waypoint-label",
+      x: segment.endPoint.x,
+      y: segment.endPoint.y + 3,
+      "text-anchor": "middle",
+    });
+    label.textContent = String(segment.index + 1);
+    group.append(marker, label, svgTitle(`Конец сегмента ${segment.index + 1}`));
+    worldMap.append(group);
   }
 
   for (const city of snapshot.cities) {
@@ -174,6 +249,68 @@ function drawSnapshot(snapshot) {
     label.textContent = `PWR ${monster.power}`;
     worldMap.append(marker, label);
   }
+
+  const caravanSegment =
+    route.position.segmentIndex === null
+      ? "Прибыл"
+      : `Сегмент ${route.position.segmentIndex + 1}`;
+  const caravan = svgElement("g", {
+    "data-detail-title": "Караван · активный маршрут",
+    "data-detail-rows": JSON.stringify([
+      ["Статус", caravanSegment],
+      ["Скорость", `${route.speedKilometersPerHour.toFixed(1)} км/ч`],
+      ["Пройдено", `${(route.position.traveledDistanceMeters / 1_000).toFixed(1)} км`],
+      ["Осталось", `${(route.position.remainingDistanceMeters / 1_000).toFixed(1)} км`],
+      ["Время", formatElapsed(route.position.elapsedSeconds)],
+      ["Широта", route.position.coordinate.latitudeDeg.toFixed(6)],
+      ["Долгота", route.position.coordinate.longitudeDeg.toFixed(6)],
+    ]),
+  });
+  caravan.append(
+    svgElement("circle", {
+      class: "caravan-marker",
+      cx: route.position.point.x,
+      cy: route.position.point.y,
+      r: 8,
+    }),
+    svgTitle("Караван"),
+  );
+  worldMap.append(caravan);
+}
+
+/**
+ * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
+ */
+function syncStartCityOptions(cities) {
+  const currentIds = Array.from(
+    routeStartCity.options,
+    (option) => option.value,
+  );
+  const nextIds = cities.map((city) => city.id);
+  if (
+    currentIds.length === nextIds.length &&
+    currentIds.every((id, index) => id === nextIds[index])
+  ) {
+    return;
+  }
+
+  const selectedId = routeStartCity.value;
+  routeStartCity.replaceChildren(
+    ...cities.map((city) => {
+      const option = document.createElement("option");
+      option.value = city.id;
+      option.textContent = `${city.name} · ${city.id}`;
+      return option;
+    }),
+  );
+  routeStartCity.value = nextIds.includes(selectedId) ? selectedId : (nextIds[0] ?? "");
+}
+
+function readRouteCommands() {
+  return routeBearingInputs.map((input, index) => ({
+    bearingDeg: input.valueAsNumber,
+    distanceKilometers: routeDistanceInputs[index]?.valueAsNumber ?? Number.NaN,
+  }));
 }
 
 function drawGrid() {
@@ -278,4 +415,15 @@ function formatElapsed(seconds) {
   const minutes = Math.floor((wholeSeconds % 3_600) / 60);
   const remainder = wholeSeconds % 60;
   return `T+${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+/** @param {number} seconds */
+function formatDuration(seconds) {
+  const hours = seconds / 3_600;
+  return hours >= 48 ? `${(hours / 24).toFixed(1)} дн` : `${hours.toFixed(1)} ч`;
+}
+
+/** @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route */
+function formatRouteSummary(route) {
+  return `${route.totalDistanceKilometers.toLocaleString("ru-RU", { maximumFractionDigits: 1 })} км · ETA ${formatDuration(route.totalDurationSeconds)} · ${route.speedKilometersPerHour.toFixed(1)} км/ч`;
 }

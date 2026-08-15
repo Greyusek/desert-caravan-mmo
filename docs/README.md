@@ -14,6 +14,7 @@
 - `CHECKPOINT_07.md` — детерминированный блуждающий монстр и замкнутый patrol-loop.
 - `CHECKPOINT_08.md` — time-aware встреча двух движущихся сущностей.
 - `CHECKPOINT_09.md` — dependency-free north-up debug-карта seeded-мира.
+- `CHECKPOINT_10.md` — четырёхсегментный редактор маршрута каравана и его сферическая визуализация.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004` и `UI-001` покрыты 86 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 91 тест в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004` и `UI-001..UI-002` покрыты 91 simulation/UI-тестом; вместе с 5 tooling-регрессиями GitHub Actions запускает 96 тестов в pull request.

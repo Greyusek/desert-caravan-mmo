@@ -1,14 +1,26 @@
 // @ts-check
 
 import {
+  createRoutePlan,
+  destinationPoint,
   generateSeededWorld,
+  kilometers,
+  positionAtTime,
   wanderingMonsterPositionAtTime,
 } from "../sim-core/dist/src/index.js";
 
 /** @typedef {import("../sim-core/dist/src/index.js").WorldCoordinate} WorldCoordinate */
 
+/**
+ * @typedef {object} DebugRouteCommand
+ * @property {number} bearingDeg
+ * @property {number} distanceKilometers
+ */
+
 export const DEBUG_MAP_WIDTH = 1_000;
 export const DEBUG_MAP_HEIGHT = 500;
+const ROUTE_SAMPLE_TARGET_METERS = 100_000;
+const MAX_ROUTE_SAMPLES_PER_SEGMENT = 64;
 
 /**
  * @typedef {object} ProjectedPoint
@@ -126,6 +138,102 @@ export function createDebugMapSnapshot(seed, elapsedSeconds = 0) {
 }
 
 /**
+ * Resolves the fixed four-leg UI-002 editor through the public simulation API.
+ * The UI keeps kilometers and km/h at its boundary; sim-core continues to
+ * receive meters and meters per second.
+ * @param {WorldCoordinate} start
+ * @param {readonly DebugRouteCommand[]} commands
+ * @param {number} speedKilometersPerHour
+ * @param {number} [elapsedSeconds]
+ */
+export function createFourSegmentRouteSnapshot(
+  start,
+  commands,
+  speedKilometersPerHour,
+  elapsedSeconds = 0,
+) {
+  if (commands.length !== 4) {
+    throw new RangeError("UI-002 route must contain exactly four segments");
+  }
+  assertPositiveFinite(speedKilometersPerHour, "speedKilometersPerHour");
+  assertNonNegativeFinite(elapsedSeconds, "elapsedSeconds");
+
+  const route = createRoutePlan(
+    start,
+    commands.map((command, index) => {
+      assertNonNegativeFinite(
+        command.distanceKilometers,
+        `commands[${index}].distanceKilometers`,
+      );
+      return {
+        bearingDeg: command.bearingDeg,
+        distanceMeters: kilometers(command.distanceKilometers),
+      };
+    }),
+    (speedKilometersPerHour * 1_000) / 3_600,
+  );
+  const evaluated = positionAtTime(route, elapsedSeconds);
+  const coordinates = sampleRouteCoordinates(route);
+
+  return {
+    start: route.start,
+    end: route.end,
+    speedKilometersPerHour,
+    totalDistanceKilometers: route.totalDistanceMeters / 1_000,
+    totalDurationSeconds: route.totalDurationSeconds,
+    routePaths: splitPathAtAntimeridian(coordinates),
+    segments: route.segments.map((segment) => ({
+      index: segment.index,
+      bearingDeg: segment.bearingDeg,
+      distanceKilometers: segment.distanceMeters / 1_000,
+      durationSeconds: segment.durationSeconds,
+      etaEndSeconds: segment.etaEndSeconds,
+      start: segment.start,
+      end: segment.end,
+      startPoint: projectCoordinate(segment.start),
+      endPoint: projectCoordinate(segment.end),
+    })),
+    position: {
+      ...evaluated,
+      point: projectCoordinate(evaluated.coordinate),
+    },
+  };
+}
+
+/**
+ * Equirectangular projection does not preserve great-circle legs as straight
+ * lines. Sampling the authoritative destination-point function keeps long UI
+ * routes visibly spherical while bounding the amount of SVG data.
+ * @param {ReturnType<typeof createRoutePlan>} route
+ * @returns {WorldCoordinate[]}
+ */
+function sampleRouteCoordinates(route) {
+  /** @type {WorldCoordinate[]} */
+  const coordinates = [route.start];
+
+  for (const segment of route.segments) {
+    const sampleCount = Math.min(
+      MAX_ROUTE_SAMPLES_PER_SEGMENT,
+      Math.max(1, Math.ceil(segment.distanceMeters / ROUTE_SAMPLE_TARGET_METERS)),
+    );
+    for (let sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex += 1) {
+      const distanceMeters =
+        (segment.distanceMeters * sampleIndex) / sampleCount;
+      coordinates.push(
+        destinationPoint(
+          segment.start,
+          segment.bearingDeg,
+          distanceMeters,
+          route.planetRadiusMeters,
+        ),
+      );
+    }
+  }
+
+  return coordinates;
+}
+
+/**
  * @param {number} latitudeDeg
  * @param {number} longitudeDeg
  * @returns {ProjectedPoint}
@@ -152,5 +260,12 @@ function projectDegrees(latitudeDeg, longitudeDeg) {
 function assertNonNegativeFinite(value, name) {
   if (!Number.isFinite(value) || value < 0) {
     throw new RangeError(`${name} must be a non-negative finite number`);
+  }
+}
+
+/** @param {number} value @param {string} name */
+function assertPositiveFinite(value, name) {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`${name} must be a positive finite number`);
   }
 }
