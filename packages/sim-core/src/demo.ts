@@ -5,6 +5,7 @@ import {
   createWorldCoordinate,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
+  findFirstMovingEncounter,
   greatCircleDistance,
   generateSeededWorld,
   kilometers,
@@ -28,7 +29,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 07 demo");
+console.log("Desert Caravan MMO — Checkpoint 08 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -136,3 +137,40 @@ for (const monster of world.wanderingMonsters) {
     `    T=1.25 loops: cycle=${samplePosition.cycleIndex}, segment=${samplePosition.segmentIndex + 1}, position=${samplePosition.coordinate.latitudeDeg.toFixed(6)}, ${samplePosition.coordinate.longitudeDeg.toFixed(6)}`,
   );
 }
+
+const encounterPoint = createWorldCoordinate(0, 0);
+const patrolStart = destinationPoint(encounterPoint, 270, meters(1_000));
+const caravanStart = destinationPoint(encounterPoint, 180, meters(1_000));
+const encounterPatrol = createRoutePlan(
+  patrolStart,
+  [
+    { bearingDeg: 90, distanceMeters: meters(2_000) },
+    { bearingDeg: 270, distanceMeters: meters(2_000) },
+  ],
+  10,
+);
+const encounterCaravan = createRoutePlan(
+  caravanStart,
+  [{ bearingDeg: 0, distanceMeters: meters(2_000) }],
+  10,
+);
+const synchronizedEncounter = findFirstMovingEncounter(
+  { route: encounterPatrol, startsAtSeconds: 0, mode: "cyclic" },
+  { route: encounterCaravan, startsAtSeconds: 0, mode: "finite" },
+  { startSeconds: 0, endSeconds: 400 },
+);
+const delayedEncounter = findFirstMovingEncounter(
+  { route: encounterPatrol, startsAtSeconds: 0, mode: "cyclic" },
+  { route: encounterCaravan, startsAtSeconds: 100, mode: "finite" },
+  { startSeconds: 0, endSeconds: 400 },
+);
+
+console.log("\nSIM-008 moving encounter:");
+if (synchronizedEncounter) {
+  console.log(
+    `  synchronized crossing: T=${synchronizedEncounter.atSeconds.toFixed(6)} s, separation=${synchronizedEncounter.separationMeters.toFixed(3)} m`,
+  );
+}
+console.log(
+  `  same paths with 100 s delay: ${delayedEncounter === null ? "no encounter" : "encounter"}`,
+);

@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 07 — WORLD-004: implemented and covered by automated tests.**
+**Checkpoint 08 — SIM-008: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -26,8 +26,9 @@ Also implemented:
 - WORLD-002 — deterministic hidden oasis, mine, ruins, and cave objects, isolated by PRNG namespace.
 - WORLD-003 / SIM-007 — exact first discovery when a real spherical route enters a hidden object's radius.
 - WORLD-004 — deterministic wandering monsters with physically closed cyclic patrol routes.
+- SIM-008 — first encounter between finite or cyclic routes in an overlapping absolute-time window.
 
-Not implemented yet (intentionally): time-aware moving encounters, player discovery state, UI/server/database.
+Not implemented yet (intentionally): player discovery state, UI/server/database, and encounter consequences.
 
 ## Requirements
 
@@ -62,17 +63,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 07:
+Expected for Checkpoint 08:
 
 ```text
-# tests 71
-# pass 71
+# tests 81
+# pass 81
 # fail 0
 ```
 
-This total contains 68 simulation/world tests and 3 tooling regression tests.
+This total contains 78 simulation/world tests and 3 tooling regression tests.
 
-GitHub Actions runs installation, one TypeScript compilation, and all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_07.md` for WORLD-004 details.
+GitHub Actions runs installation, one TypeScript compilation, and all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_08.md` for SIM-008 details.
 
 ## Project structure
 
@@ -86,4 +87,4 @@ GitHub Actions runs installation, one TypeScript compilation, and all tests for 
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `SIM-008`: detect encounters only when two moving routes overlap in both space and time.
+The next functional checkpoint is `UI-001`: choose the minimal browser shell and add a north-up debug map over `sim-core`.

@@ -5,3 +5,4 @@ export * from "./supplies.js";
 export * from "./world.js";
 export * from "./discovery.js";
 export * from "./monster.js";
+export * from "./encounter.js";
