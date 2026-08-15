@@ -1,10 +1,14 @@
 import {
+  DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
   createRoutePlan,
   createWorldCoordinate,
+  destinationPoint,
+  discoverStaticObjectsAlongRoute,
   greatCircleDistance,
   generateSeededWorld,
   kilometers,
+  meters,
   positionAtTime,
   projectSupplies,
   timeToFirstDepletion,
@@ -23,7 +27,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — SIM-001..006 demo");
+console.log("Desert Caravan MMO — SIM-001..007 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -94,4 +98,27 @@ for (const object of world.staticObjects) {
   console.log(
     `  ${object.id} ${object.kind}: ${object.position.latitudeDeg.toFixed(6)}, ${object.position.longitudeDeg.toFixed(6)}`,
   );
+}
+
+const discoveryTarget = world.staticObjects[0];
+if (discoveryTarget) {
+  const discoveryStart = destinationPoint(discoveryTarget.position, 180, meters(500));
+  const discoveryRoute = createRoutePlan(
+    discoveryStart,
+    [{ bearingDeg: 0, distanceMeters: meters(1_000) }],
+    5,
+  );
+  const discoveries = discoverStaticObjectsAlongRoute(
+    discoveryRoute,
+    world.staticObjects,
+  );
+
+  console.log(
+    `WORLD-003 route discovery: radius=${DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS} m, found=${discoveries.length}`,
+  );
+  for (const discovery of discoveries) {
+    console.log(
+      `  ${discovery.object.id}: route=${discovery.routeDistanceMeters.toFixed(3)} m, T=${discovery.elapsedSeconds.toFixed(3)} s, separation=${discovery.distanceToObjectMeters.toFixed(3)} m`,
+    );
+  }
 }
