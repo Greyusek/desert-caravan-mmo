@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveNpmInvocation } from "./npm-invocation.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "..");
@@ -15,7 +16,6 @@ const logDirectory = resolve(
   "..",
   `${basename(repositoryRoot)}-logs`,
 );
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const argumentsSet = new Set(process.argv.slice(2));
 const knownArguments = new Set(["--help", "--verify-only"]);
 
@@ -107,6 +107,11 @@ function runStep(step, command, commandArguments) {
   return `${stdout}${stderr}`.trimEnd();
 }
 
+function runNpmStep(step, commandArguments) {
+  const invocation = resolveNpmInvocation(commandArguments);
+  return runStep(step, invocation.command, invocation.commandArguments);
+}
+
 function requireCleanWorkingTree(step) {
   const status = runStep(step, "git", [
     "status",
@@ -158,8 +163,8 @@ try {
     }
   }
 
-  runStep("Install exact dependencies", npmCommand, ["ci"]);
-  const verificationOutput = runStep("Build, test, and run demo", npmCommand, [
+  runNpmStep("Install exact dependencies", ["ci"]);
+  const verificationOutput = runNpmStep("Build, test, and run demo", [
     "run",
     "verify:local",
   ]);

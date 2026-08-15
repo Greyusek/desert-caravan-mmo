@@ -20,7 +20,7 @@ The returned event is authoritative server-side data and still contains the hidd
 
 ## Automated verification
 
-Ten WORLD-003 tests cover direct first entry, the 150 m default, starting inside the radius, a near miss, tangent contact, rejection of the infinite route outside segment endpoints, cumulative multi-segment distance/ETA, antimeridian continuity, travel-order sorting, zero radius, and invalid-radius validation. The complete suite contains 58 tests.
+Ten WORLD-003 tests cover direct first entry, the 150 m default, starting inside the radius, a near miss, tangent contact, rejection of the infinite route outside segment endpoints, cumulative multi-segment distance/ETA, antimeridian continuity, travel-order sorting, zero radius, and invalid-radius validation. The simulation/world suite contains 58 tests; repository verification contains 61 tests including the Windows acceptance tooling regressions.
 
 ## Next checkpoint
 

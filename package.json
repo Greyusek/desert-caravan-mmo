@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p packages/sim-core/tsconfig.json",
     "test": "npm run build && npm run test:compiled",
-    "test:compiled": "node --test packages/sim-core/tests/*.test.mjs",
+    "test:compiled": "node --test packages/sim-core/tests/*.test.mjs scripts/*.test.mjs",
     "demo": "npm run build && npm run demo:compiled",
     "demo:compiled": "node packages/sim-core/dist/src/demo.js",
     "verify": "npm run build && npm run test:compiled",

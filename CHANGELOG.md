@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Windows acceptance fix
+
+- Fixed `npm run accept:main` on Windows by avoiding direct `spawnSync` execution of `npm.cmd`.
+- Added three cross-platform npm invocation regression tests; repository verification now runs 61 tests.
+
 ## 0.0.6 — Checkpoint 06
 
 - Added `WORLD-003` / `SIM-007`: exact first-entry discovery of static objects along spherical route segments.

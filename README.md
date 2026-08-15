@@ -64,10 +64,12 @@ npm.cmd run accept:main
 Expected for Checkpoint 06:
 
 ```text
-# tests 58
-# pass 58
+# tests 61
+# pass 61
 # fail 0
 ```
+
+This total contains 58 simulation/world tests and 3 tooling regression tests.
 
 GitHub Actions runs installation, one TypeScript compilation, and all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_06.md` for WORLD-003 details.
 
