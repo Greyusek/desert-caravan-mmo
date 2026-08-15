@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.9 — Checkpoint 09
+
+- Added `UI-001`: a dependency-free, north-up browser debug map over the public `sim-core` API.
+- Added deterministic seed controls, a patrol-time slider, city/static-object/monster layers, exact developer coordinates and encounter radii, and antimeridian-safe patrol rendering.
+- Added a restricted local static server and the `npm run debug-map` launch command without production dependencies.
+- Added eight projection/snapshot regressions and two server-safety tests; repository verification now runs 91 tests.
+- Designated `UI-002`, the four-segment caravan route editor, as the next checkpoint.
+
 ## 0.0.8 — Checkpoint 08
 
 - Added `SIM-008`: first moving encounter across overlapping absolute-time windows.

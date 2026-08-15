@@ -229,7 +229,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `SIM-007` — точный first-entry discovery radius check.
 - [x] `WORLD-004` — wandering monster cyclic route.
 - [x] `SIM-008` — time-aware moving encounter.
-- [ ] `UI-001` — debug map.
+- [x] `UI-001` — debug map.
 - [ ] `UI-002` — route editor.
 - [ ] `UI-003` — caravan panel.
 - [ ] `UI-004` — event log.

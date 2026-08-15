@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Desert Caravan MMO — Debug Map</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Checkpoint 09 · UI-001</p>
+          <h1>World Debug Map</h1>
+          <p class="hero__copy">
+            Север всегда сверху. Все координаты и скрытые объекты показаны только
+            для проверки симуляции.
+          </p>
+        </div>
+        <div class="status-pill"><span></span> DEV OVERLAY</div>
+      </header>
+
+      <section class="control-bar" aria-label="Параметры debug-карты">
+        <form id="seed-form" class="seed-control">
+          <label for="seed-input">Seed мира</label>
+          <div class="input-row">
+            <input
+              id="seed-input"
+              name="seed"
+              value="checkpoint-04"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="submit">Построить</button>
+          </div>
+        </form>
+
+        <div class="time-control">
+          <div class="control-label-row">
+            <label for="time-slider">Время патруля</label>
+            <output id="time-output" for="time-slider">T+00:00:00</output>
+          </div>
+          <input id="time-slider" type="range" min="0" max="1" step="1" value="0" />
+        </div>
+      </section>
+
+      <p id="error-message" class="error-message" role="alert" hidden></p>
+
+      <section class="workspace">
+        <article class="map-card">
+          <div class="map-card__heading">
+            <div>
+              <p class="section-kicker">Equirectangular projection</p>
+              <h2 id="map-title">Seed: checkpoint-04</h2>
+            </div>
+            <p class="north-mark" aria-label="Север сверху"><span>↑</span> N</p>
+          </div>
+          <div class="map-frame">
+            <svg
+              id="world-map"
+              viewBox="0 0 1000 500"
+              role="img"
+              aria-label="Debug-карта детерминированного мира"
+            ></svg>
+          </div>
+          <p class="map-hint">Нажмите на маркер, чтобы увидеть точные серверные данные.</p>
+        </article>
+
+        <aside class="inspector" aria-label="Инспектор мира">
+          <section class="metric-grid" aria-label="Сводка объектов">
+            <div class="metric"><strong id="city-count">0</strong><span>городов</span></div>
+            <div class="metric"><strong id="object-count">0</strong><span>скрытых</span></div>
+            <div class="metric"><strong id="monster-count">0</strong><span>монстров</span></div>
+          </section>
+
+          <section class="panel">
+            <p class="section-kicker">Условные обозначения</p>
+            <h2>Слои мира</h2>
+            <ul class="legend">
+              <li><span class="legend-dot legend-dot--city"></span>Город</li>
+              <li><span class="legend-dot legend-dot--oasis"></span>Оазис</li>
+              <li><span class="legend-dot legend-dot--mine"></span>Рудник</li>
+              <li><span class="legend-dot legend-dot--ruins"></span>Руины</li>
+              <li><span class="legend-dot legend-dot--cave"></span>Пещера</li>
+              <li><span class="legend-dot legend-dot--monster"></span>Монстр и patrol-loop</li>
+            </ul>
+          </section>
+
+          <section class="panel detail-panel">
+            <p class="section-kicker">Server truth</p>
+            <h2>Инспектор</h2>
+            <p id="detail-title" class="detail-title">Выберите маркер</p>
+            <dl id="detail-list" class="detail-list">
+              <div><dt>Подсказка</dt><dd>Координаты скрыты в игровом UI</dd></div>
+            </dl>
+          </section>
+
+          <section class="panel warning-panel">
+            <p><strong>DEV ONLY</strong></p>
+            <p>Этот экран не является картой игрока и не моделирует туман войны.</p>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 08 — SIM-008: implemented and covered by automated tests.**
+**Checkpoint 09 — UI-001: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -27,8 +27,9 @@ Also implemented:
 - WORLD-003 / SIM-007 — exact first discovery when a real spherical route enters a hidden object's radius.
 - WORLD-004 — deterministic wandering monsters with physically closed cyclic patrol routes.
 - SIM-008 — first encounter between finite or cyclic routes in an overlapping absolute-time window.
+- UI-001 — dependency-free north-up browser debug map for the complete deterministic world.
 
-Not implemented yet (intentionally): player discovery state, UI/server/database, and encounter consequences.
+Not implemented yet (intentionally): player discovery state, route editor, player-facing map, server/database, and encounter consequences.
 
 ## Requirements
 
@@ -63,23 +64,34 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 08:
+Expected for Checkpoint 09:
 
 ```text
-# tests 81
-# pass 81
+# tests 91
+# pass 91
 # fail 0
 ```
 
-This total contains 78 simulation/world tests and 3 tooling regression tests.
+This total contains 86 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions runs installation, one TypeScript compilation, and all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_08.md` for SIM-008 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_09.md` for UI-001 details.
+
+## Developer debug map
+
+Launch the first browser view with:
+
+```bash
+npm run debug-map
+```
+
+Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii and patrol routes. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
 ```text
 /docs
 /packages
+  /debug-map
   /sim-core
     /src
     /tests
@@ -87,4 +99,4 @@ GitHub Actions runs installation, one TypeScript compilation, and all tests for 
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `UI-001`: choose the minimal browser shell and add a north-up debug map over `sim-core`.
+The next functional checkpoint is `UI-002`: add a four-segment caravan route editor and display its resolved route on the debug map.
