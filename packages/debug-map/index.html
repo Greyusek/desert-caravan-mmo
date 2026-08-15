@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 09 · UI-001</p>
+          <p class="eyebrow">Checkpoint 10 · UI-002</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -38,7 +38,7 @@
 
         <div class="time-control">
           <div class="control-label-row">
-            <label for="time-slider">Время патруля</label>
+            <label for="time-slider">Время симуляции</label>
             <output id="time-output" for="time-slider">T+00:00:00</output>
           </div>
           <input id="time-slider" type="range" min="0" max="1" step="1" value="0" />
@@ -46,6 +46,76 @@
       </section>
 
       <p id="error-message" class="error-message" role="alert" hidden></p>
+
+      <section class="route-editor" aria-labelledby="route-editor-title">
+        <div class="route-editor__heading">
+          <div>
+            <p class="section-kicker">UI-002 · Route plan</p>
+            <h2 id="route-editor-title">Маршрут каравана</h2>
+          </div>
+          <output id="route-summary" class="route-summary" form="route-form">
+            Маршрут не рассчитан
+          </output>
+        </div>
+
+        <form id="route-form" class="route-form">
+          <label class="route-field route-field--start" for="route-start-city">
+            <span>Стартовый город</span>
+            <select id="route-start-city" name="startCity"></select>
+          </label>
+
+          <label class="route-field route-field--speed" for="route-speed">
+            <span>Скорость, км/ч</span>
+            <input
+              id="route-speed"
+              name="speed"
+              type="number"
+              min="0.1"
+              step="0.1"
+              value="5"
+              required
+            />
+          </label>
+
+          <fieldset class="route-segment">
+            <legend>Сегмент 1</legend>
+            <label for="route-bearing-1">Азимут, °</label>
+            <input id="route-bearing-1" type="number" step="1" value="315" required />
+            <label for="route-distance-1">Дистанция, км</label>
+            <input id="route-distance-1" type="number" min="0" step="1" value="2000" required />
+          </fieldset>
+
+          <fieldset class="route-segment">
+            <legend>Сегмент 2</legend>
+            <label for="route-bearing-2">Азимут, °</label>
+            <input id="route-bearing-2" type="number" step="1" value="270" required />
+            <label for="route-distance-2">Дистанция, км</label>
+            <input id="route-distance-2" type="number" min="0" step="1" value="1200" required />
+          </fieldset>
+
+          <fieldset class="route-segment">
+            <legend>Сегмент 3</legend>
+            <label for="route-bearing-3">Азимут, °</label>
+            <input id="route-bearing-3" type="number" step="1" value="225" required />
+            <label for="route-distance-3">Дистанция, км</label>
+            <input id="route-distance-3" type="number" min="0" step="1" value="2000" required />
+          </fieldset>
+
+          <fieldset class="route-segment">
+            <legend>Сегмент 4</legend>
+            <label for="route-bearing-4">Азимут, °</label>
+            <input id="route-bearing-4" type="number" step="1" value="90" required />
+            <label for="route-distance-4">Дистанция, км</label>
+            <input id="route-distance-4" type="number" min="0" step="1" value="3500" required />
+          </fieldset>
+
+          <button class="route-submit" type="submit">Обновить маршрут</button>
+        </form>
+        <p class="route-note">
+          Старт привязан к авторитетной координате города. Четыре команды передаются
+          в sim-core как азимут и расстояние.
+        </p>
+      </section>
 
       <section class="workspace">
         <article class="map-card">
@@ -84,6 +154,7 @@
               <li><span class="legend-dot legend-dot--ruins"></span>Руины</li>
               <li><span class="legend-dot legend-dot--cave"></span>Пещера</li>
               <li><span class="legend-dot legend-dot--monster"></span>Монстр и patrol-loop</li>
+              <li><span class="legend-dot legend-dot--caravan"></span>Караван и маршрут</li>
             </ul>
           </section>
 

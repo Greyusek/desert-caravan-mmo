@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.10 — Checkpoint 10
+
+- Added `UI-002`: a four-segment caravan route editor anchored to any generated city.
+- Added km/h and kilometer UI inputs that resolve through the public meter-based `sim-core` route API.
+- Added a sampled, antimeridian-safe spherical route overlay, numbered waypoints, total distance, ETA and a time-aware caravan marker with developer details.
+- Added five route-editor regressions; repository verification now runs 96 tests.
+- Designated `UI-003`, the persistent caravan status and supplies panel, as the next checkpoint.
+
 ## 0.0.9 — Checkpoint 09
 
 - Added `UI-001`: a dependency-free, north-up browser debug map over the public `sim-core` API.

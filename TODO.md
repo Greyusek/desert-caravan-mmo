@@ -15,10 +15,11 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `WORLD-004`: add deterministic wandering monsters with cyclic patrol routes.
 - [x] `SIM-008`: detect encounters between two moving entities in overlapping time windows.
 - [x] `UI-001`: add a dependency-free north-up developer debug map.
+- [x] `UI-002`: add a four-segment caravan route editor to the debug map.
 
 ## Next
 
-- [ ] `UI-002`: add a four-segment caravan route editor to the debug map.
+- [ ] `UI-003`: add a persistent caravan status and supplies panel.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Maintenance rules

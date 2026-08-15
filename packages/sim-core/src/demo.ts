@@ -29,7 +29,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 09 demo");
+console.log("Desert Caravan MMO — Checkpoint 10 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -175,4 +175,4 @@ console.log(
   `  same paths with 100 s delay: ${delayedEncounter === null ? "no encounter" : "encounter"}`,
 );
 
-console.log("\nUI-001 debug map: npm run debug-map -> http://127.0.0.1:4173");
+console.log("\nUI-002 route editor: npm run debug-map -> http://127.0.0.1:4173");
