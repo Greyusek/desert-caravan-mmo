@@ -1,6 +1,7 @@
 import {
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
+  createRumorSearchScenario,
   createRoutePlan,
   createWorldCoordinate,
   destinationPoint,
@@ -29,7 +30,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 12 demo");
+console.log("Desert Caravan MMO — Checkpoint 13 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -99,6 +100,36 @@ console.log(`WORLD-002 hidden static objects: ${world.staticObjects.length}`);
 for (const object of world.staticObjects) {
   console.log(
     `  ${object.id} ${object.kind}: ${object.position.latitudeDeg.toFixed(6)}, ${object.position.longitudeDeg.toFixed(6)}`,
+  );
+}
+
+const rumorOrigin = world.cities[0];
+if (rumorOrigin) {
+  const rumorScenario = createRumorSearchScenario(world.seed, rumorOrigin);
+  const rumorRoute = createRoutePlan(
+    rumorOrigin.position,
+    [
+      {
+        bearingDeg: rumorScenario.serverTruth.exactBearingDeg,
+        distanceMeters: rumorScenario.serverTruth.exactDistanceMeters,
+      },
+    ],
+    speedMetersPerSecond,
+  );
+  const rumorDiscovery = discoverStaticObjectsAlongRoute(
+    rumorRoute,
+    [rumorScenario.serverTruth.target],
+  )[0];
+
+  console.log("\nGAME-001 rumor search:");
+  console.log(
+    `  player clue: ${rumorScenario.rumor.bearingSector.name}, ${(rumorScenario.rumor.distanceRange.minimumMeters / 1_000).toFixed(0)}-${(rumorScenario.rumor.distanceRange.maximumMeters / 1_000).toFixed(0)} km from ${rumorOrigin.id}`,
+  );
+  console.log(
+    `  DEV truth: ${rumorScenario.serverTruth.target.id}, bearing=${rumorScenario.serverTruth.exactBearingDeg.toFixed(6)}°, distance=${(rumorScenario.serverTruth.exactDistanceMeters / 1_000).toFixed(6)} km`,
+  );
+  console.log(
+    `  direct route: ${rumorDiscovery ? `found at ${(rumorDiscovery.routeDistanceMeters / 1_000).toFixed(6)} km / T=${(rumorDiscovery.elapsedSeconds / 3_600).toFixed(6)} h` : "missed"}`,
   );
 }
 
@@ -175,4 +206,4 @@ console.log(
   `  same paths with 100 s delay: ${delayedEncounter === null ? "no encounter" : "encounter"}`,
 );
 
-console.log("\nUI-004 expedition event log: npm run debug-map -> http://127.0.0.1:4173");
+console.log("\nGAME-001 rumor search UI: npm run debug-map -> http://127.0.0.1:4173");

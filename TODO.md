@@ -18,10 +18,11 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `UI-002`: add a four-segment caravan route editor to the debug map.
 - [x] `UI-003`: add a persistent caravan status and supplies panel.
 - [x] `UI-004`: add a compact deterministic expedition event log.
+- [x] `GAME-001`: add the first deterministic rumor-driven search scenario.
 
 ## Next
 
-- [ ] `GAME-001`: add the first deterministic rumor-driven search scenario.
+- [ ] `GAME-002`: add a simple `STOP | MARK_AND_CONTINUE` discovery doctrine.
 - [ ] UX (deferred): add local map/time zoom so short monster patrol loops remain readable beside long caravan routes.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 

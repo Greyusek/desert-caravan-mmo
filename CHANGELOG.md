@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.13 — Checkpoint 13
+
+- Added `GAME-001`: a deterministic rumor about a hidden mine 30–50 km northwest of the selected origin city.
+- Kept player-facing knowledge coarse while isolating exact target position, bearing and distance as server truth in a namespaced PRNG stream.
+- Added a coordinate-free local north-up search inset, route overlay, live searching/found/missed states and a DEV-only direct-route control.
+- Reused WORLD-003's authoritative 150 m route-entry discovery instead of duplicating proximity logic in the browser.
+- Added revealed-only discovery and miss events to the expedition timeline so future outcomes are not leaked.
+- Added twelve GAME-001 regressions; repository verification now runs 122 tests.
+- Designated `GAME-002`, the first automatic `STOP | MARK_AND_CONTINUE` discovery doctrine, as the next checkpoint.
+
 ## 0.0.12 — Checkpoint 12
 
 - Added `UI-004`: a compact deterministic expedition timeline in the debug-map sidebar.
