@@ -20,10 +20,11 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `UI-004`: add a compact deterministic expedition event log.
 - [x] `GAME-001`: add the first deterministic rumor-driven search scenario.
 - [x] `GAME-002`: add a simple `STOP | MARK_AND_CONTINUE` discovery doctrine.
+- [x] `GAME-003`: add explicit completion, pause and fatal-depletion expedition outcomes.
 
 ## Next
 
-- [ ] `GAME-003`: add expedition completion and fatal depletion outcomes.
+- [ ] `GAME-004`: connect SIM-008 moving monster encounters to the expedition and event timeline without combat.
 - [ ] UX (deferred): add local map/time zoom so short monster patrol loops remain readable beside long caravan routes.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 

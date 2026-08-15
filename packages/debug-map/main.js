@@ -3,11 +3,12 @@
 import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
-  applyDiscoveryDoctrineToRoute,
+  applyExpeditionOutcomeToRoute,
   createCaravanStatusSnapshot,
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
   createExpeditionEventLogSnapshot,
+  createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
   createRumorSearchSnapshot,
   projectCoordinate,
@@ -59,6 +60,14 @@ const waterProgress = requireElement("water-progress", HTMLProgressElement);
 const waterMeta = requireElement("water-meta", HTMLParagraphElement);
 const forecastTitle = requireElement("forecast-title", HTMLElement);
 const forecastDetail = requireElement("forecast-detail", HTMLParagraphElement);
+const outcomePanel = requireElement("outcome-panel", HTMLElement);
+const outcomeTitle = requireElement("outcome-title", HTMLHeadingElement);
+const outcomeDetail = requireElement("outcome-detail", HTMLParagraphElement);
+const outcomeState = requireElement("outcome-state", HTMLParagraphElement);
+const outcomeTime = requireElement("outcome-time", HTMLElement);
+const outcomeCause = requireElement("outcome-cause", HTMLElement);
+const outcomePosition = requireElement("outcome-position", HTMLElement);
+const outcomeAction = requireElement("outcome-action", HTMLButtonElement);
 const supplyForm = requireElement("supply-form", HTMLFormElement);
 const initialFood = requireElement("initial-food", HTMLInputElement);
 const initialWater = requireElement("initial-water", HTMLInputElement);
@@ -89,6 +98,8 @@ let elapsedSeconds = 0;
 let supplySettings = readSupplySettings();
 /** @type {ReturnType<typeof createRumorSearchSnapshot> | null} */
 let activeRumorSearch = null;
+/** @type {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} */
+let activeOutcome = null;
 
 seedForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -119,6 +130,16 @@ supplyForm.addEventListener("submit", (event) => {
 
 doctrineStop.addEventListener("change", render);
 doctrineMarkAndContinue.addEventListener("change", render);
+
+outcomeAction.addEventListener("click", () => {
+  if (!activeOutcome) return;
+  elapsedSeconds =
+    activeOutcome.status === "in-progress"
+      ? activeOutcome.planned.atSeconds
+      : 0;
+  timeSlider.value = String(elapsedSeconds);
+  render();
+});
 
 rumorDevRoute.addEventListener("click", () => {
   if (!activeRumorSearch) return;
@@ -171,35 +192,49 @@ function render() {
       startCity,
       plannedRoute,
     );
-    const doctrine = createDiscoveryDoctrineSnapshot(
+    const proposedDoctrine = createDiscoveryDoctrineSnapshot(
       plannedRoute,
       plannedRumorSearch,
       readDiscoveryDoctrine(),
     );
-    const route = applyDiscoveryDoctrineToRoute(plannedRoute, doctrine);
+    const outcome = createExpeditionOutcomeSnapshot(
+      plannedRoute,
+      supplySettings.initial,
+      supplySettings.profile,
+      proposedDoctrine,
+    );
+    const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
     const rumorSearch = createRumorSearchSnapshot(
       snapshot.seed,
       startCity,
       route,
+    );
+    const doctrine = createDiscoveryDoctrineSnapshot(
+      route,
+      rumorSearch,
+      readDiscoveryDoctrine(),
     );
     const caravanStatus = createCaravanStatusSnapshot(
       route,
       supplySettings.initial,
       supplySettings.profile,
       doctrine,
+      outcome,
     );
     activeRumorSearch = rumorSearch;
+    activeOutcome = outcome;
     const eventLog = createExpeditionEventLogSnapshot(
       route,
       supplySettings.initial,
       supplySettings.profile,
       rumorSearch,
       doctrine,
+      outcome,
     );
     const firstMonster = snapshot.monsters[0];
     const maximumElapsedSeconds =
-      doctrine.status === "stopped" && doctrine.decision
-        ? doctrine.decision.decidedAtSeconds
+      outcome.status !== "in-progress"
+        ? outcome.planned.atSeconds
         : Math.max(
             route.totalDurationSeconds,
             firstMonster?.periodSeconds ?? 0,
@@ -221,14 +256,16 @@ function render() {
     routeSummary.textContent = formatRouteSummary(route);
     renderRumorSearch(rumorSearch, doctrine);
     renderCaravanStatus(caravanStatus);
+    renderExpeditionOutcome(outcome);
     renderEventLog(eventLog, route);
 
     timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
     timeSlider.value = String(elapsedSeconds);
 
-    drawSnapshot(snapshot, route, rumorSearch, doctrine);
+    drawSnapshot(snapshot, route, rumorSearch, doctrine, outcome);
   } catch (error) {
     activeRumorSearch = null;
+    activeOutcome = null;
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
   }
@@ -243,9 +280,13 @@ function renderEventLog(log, route) {
   const nextEvent = log.events.find((event) => event.id === log.nextEventId);
   eventLogNext.textContent = nextEvent
     ? `Следующее: ${eventTitle(nextEvent)} · ${formatElapsed(nextEvent.atSeconds)}`
-    : log.executionStatus === "stopped"
-      ? "Маршрут остановлен доктриной"
-      : "Маршрут завершён";
+    : log.executionStatus === "stopped" || log.executionStatus === "paused"
+      ? "Маршрут поставлен на паузу доктриной"
+      : log.executionStatus === "failed"
+        ? "Экспедиция завершена гибелью каравана"
+        : log.executionStatus === "completed"
+          ? "Экспедиция успешно завершена"
+          : "Маршрут завершён";
 
   eventLogList.replaceChildren(
     ...log.events.map((event) => {
@@ -328,7 +369,7 @@ function eventDetail(event, route) {
     return "Порог раннего предупреждения";
   }
   if (event.kind === "supplies-depleted") {
-    return `${formatDepletionCause(event.cause)} · последствия появятся в GAME-003`;
+    return `${formatDepletionCause(event.cause)} · гибель на ${formatNumber(event.distanceKilometers ?? 0, 1)} км пути`;
   }
   if (event.kind === "target-discovered") {
     return `Сегмент ${(event.segmentIndex ?? 0) + 1} · ${formatNumber(event.distanceKilometers ?? 0, 1)} км пути`;
@@ -506,11 +547,15 @@ function drawRumorMap(search) {
  * @param {ReturnType<typeof createCaravanStatusSnapshot>} status
  */
 function renderCaravanStatus(status) {
-  const doctrineStopped = status.doctrine?.status === "stopped";
+  const outcomeFailed = status.outcome?.status === "failed";
+  const outcomeCompleted = status.outcome?.status === "completed";
+  const doctrineStopped = status.outcome?.status === "paused";
   const doctrineContinues =
     status.doctrine?.status === "marked-and-continuing";
-  const panelState = status.supplies.depleted
+  const panelState = outcomeFailed
     ? "depleted"
+    : outcomeCompleted
+      ? "completed"
     : doctrineStopped
       ? "stopped"
     : status.forecast.canFinish
@@ -518,8 +563,10 @@ function renderCaravanStatus(status) {
       : "risk";
   caravanPanel.dataset.state = panelState;
   caravanStateLabel.textContent =
-    panelState === "depleted"
-      ? "Критический запас"
+    outcomeFailed
+      ? "Экспедиция потеряна"
+      : outcomeCompleted
+        ? "Экспедиция завершена"
       : doctrineStopped
         ? "Остановлен у цели"
         : doctrineContinues
@@ -529,7 +576,11 @@ function renderCaravanStatus(status) {
         : "Готов к пути";
 
   caravanRouteStatus.textContent =
-    doctrineStopped
+    outcomeFailed
+      ? `Погиб · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
+      : outcomeCompleted
+        ? "Прибыл · маршрут завершён"
+      : doctrineStopped
       ? `Стоянка · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
       : status.route.status === "arrived"
       ? "Прибыл · маршрут завершён"
@@ -537,9 +588,13 @@ function renderCaravanStatus(status) {
   caravanDistance.textContent = `${formatNumber(status.route.traveledDistanceKilometers, 1)} / ${formatNumber(status.route.traveledDistanceKilometers + status.route.remainingDistanceKilometers, 1)} км`;
   routeProgress.value = status.route.progress;
   routeProgress.textContent = `${Math.round(status.route.progress * 100)}%`;
-  routeProgressLabel.textContent = doctrineStopped
-    ? `${Math.round(status.route.progress * 100)}% · STOP ${formatElapsed(status.doctrine?.decision?.decidedAtSeconds ?? 0)}`
-    : `${Math.round(status.route.progress * 100)}% · ETA ${formatDuration(status.route.totalDurationSeconds)}`;
+  routeProgressLabel.textContent = outcomeFailed
+    ? `${Math.round(status.route.progress * 100)}% · ГИБЕЛЬ ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
+    : outcomeCompleted
+      ? `100% · ФИНИШ ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
+      : doctrineStopped
+        ? `${Math.round(status.route.progress * 100)}% · STOP ${formatElapsed(status.doctrine?.decision?.decidedAtSeconds ?? 0)}`
+        : `${Math.round(status.route.progress * 100)}% · ETA ${formatDuration(status.route.totalDurationSeconds)}`;
 
   renderSupply(
     foodCard,
@@ -562,18 +617,76 @@ function renderCaravanStatus(status) {
     supplySettings.profile.moving.waterUnitsPerHour,
   );
 
-  if (status.supplies.depleted) {
-    forecastTitle.textContent = "Критические запасы исчерпаны";
-    forecastDetail.textContent = `${formatDepletionCause(status.supplies.depletionCause)} · ${formatElapsed(status.forecast.firstDepletionAtSeconds ?? 0)}`;
+  if (outcomeFailed) {
+    forecastTitle.textContent = "Караван погиб";
+    forecastDetail.textContent = `${formatDepletionCause(status.outcome?.failureCause ?? null)} исчерпаны на ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}.`;
+  } else if (outcomeCompleted) {
+    forecastTitle.textContent = "Экспедиция завершена";
+    forecastDetail.textContent = `Финиш: еда ${formatNumber(status.supplies.foodRemaining, 1)} · вода ${formatNumber(status.supplies.waterRemaining, 1)}`;
   } else if (doctrineStopped) {
     forecastTitle.textContent = "Маршрут поставлен на паузу";
-    forecastDetail.textContent = "Караван ждёт у найденной цели; продолжение появится в GAME-003";
+    forecastDetail.textContent = "Караван ждёт у найденной цели; это не финальный исход.";
   } else if (status.forecast.canFinish) {
     forecastTitle.textContent = "Запасов хватит до финиша";
     forecastDetail.textContent = `На финише: еда ${formatNumber(status.forecast.foodAtArrival, 1)} · вода ${formatNumber(status.forecast.waterAtArrival, 1)}`;
   } else {
     forecastTitle.textContent = "Запасов не хватит";
     forecastDetail.textContent = `${formatDepletionCause(status.forecast.depletionCause)} закончатся на ${formatElapsed(status.forecast.firstDepletionAtSeconds ?? 0)}`;
+  }
+}
+
+/**
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
+ */
+function renderExpeditionOutcome(outcome) {
+  outcomePanel.dataset.state = outcome.status;
+  outcomeTime.textContent = formatElapsed(outcome.planned.atSeconds);
+  outcomePosition.textContent =
+    outcome.planned.segmentIndex === null
+      ? `Финиш · ${formatNumber(outcome.planned.routeDistanceKilometers, 1)} км`
+      : `Сегмент ${outcome.planned.segmentIndex + 1} · ${formatNumber(outcome.planned.routeDistanceKilometers, 1)} км`;
+
+  if (outcome.status === "in-progress") {
+    outcomeState.textContent = "В пути";
+    outcomeTitle.textContent = "Экспедиция продолжается";
+    outcomeAction.textContent = "DEV: к исходу";
+    if (outcome.planned.status === "failed") {
+      outcomeDetail.textContent =
+        "Если план не изменить, критические запасы закончатся раньше финиша.";
+      outcomeCause.textContent = formatDepletionCause(
+        outcome.planned.failureCause,
+      );
+    } else if (outcome.planned.status === "paused") {
+      outcomeDetail.textContent =
+        "Следующая граница исполнения — автоматическая остановка у найденной цели.";
+      outcomeCause.textContent = "Доктрина STOP";
+    } else {
+      outcomeDetail.textContent =
+        "Маршрут и запас провизии позволяют добраться до конечной точки.";
+      outcomeCause.textContent = "Прибытие";
+    }
+    return;
+  }
+
+  outcomeAction.textContent = "Повторить экспедицию";
+  if (outcome.status === "failed") {
+    outcomeState.textContent = "Поражение";
+    outcomeTitle.textContent = "Караван погиб в пути";
+    outcomeDetail.textContent =
+      "Фатальное истощение остановило движение; будущие этапы и прибытие отменены.";
+    outcomeCause.textContent = formatDepletionCause(outcome.failureCause);
+  } else if (outcome.status === "completed") {
+    outcomeState.textContent = "Успех";
+    outcomeTitle.textContent = "Экспедиция завершена";
+    outcomeDetail.textContent =
+      "Караван достиг конечной точки маршрута и сохранил оставшиеся запасы.";
+    outcomeCause.textContent = "Прибытие";
+  } else {
+    outcomeState.textContent = "Пауза";
+    outcomeTitle.textContent = "Караван остановлен у цели";
+    outcomeDetail.textContent =
+      "Доктрина STOP прервала движение, но экспедиция не считается завершённой.";
+    outcomeCause.textContent = "Доктрина STOP";
   }
 }
 
@@ -633,8 +746,9 @@ function readDiscoveryDoctrine() {
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {ReturnType<typeof createRumorSearchSnapshot>} rumorSearch
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot>} doctrine
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
  */
-function drawSnapshot(snapshot, route, rumorSearch, doctrine) {
+function drawSnapshot(snapshot, route, rumorSearch, doctrine, outcome) {
   worldMap.replaceChildren();
   drawGrid();
 
@@ -787,8 +901,12 @@ function drawSnapshot(snapshot, route, rumorSearch, doctrine) {
   }
 
   const caravanSegment =
-    doctrine.status === "stopped"
+    outcome.status === "failed"
+      ? `Погиб · сегмент ${(route.position.segmentIndex ?? 0) + 1}`
+      : outcome.status === "paused"
       ? `Остановлен · сегмент ${(route.position.segmentIndex ?? 0) + 1}`
+      : outcome.status === "completed"
+        ? "Экспедиция завершена"
       : route.position.segmentIndex === null
       ? "Прибыл"
       : `Сегмент ${route.position.segmentIndex + 1}`;
@@ -796,6 +914,7 @@ function drawSnapshot(snapshot, route, rumorSearch, doctrine) {
     "data-detail-title": "Караван · активный маршрут",
     "data-detail-rows": JSON.stringify([
       ["Статус", caravanSegment],
+      ["Исход", outcome.status],
       ["Доктрина", doctrine.doctrine],
       ["Скорость", `${route.speedKilometersPerHour.toFixed(1)} км/ч`],
       ["Пройдено", `${(route.position.traveledDistanceMeters / 1_000).toFixed(1)} км`],
@@ -807,7 +926,7 @@ function drawSnapshot(snapshot, route, rumorSearch, doctrine) {
   });
   caravan.append(
     svgElement("circle", {
-      class: "caravan-marker",
+      class: `caravan-marker caravan-marker--${outcome.status}`,
       cx: route.position.point.x,
       cy: route.position.point.y,
       r: 8,

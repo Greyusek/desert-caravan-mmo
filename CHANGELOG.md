@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.15 — Checkpoint 15
+
+- Added `GAME-003`: a pure deterministic expedition outcome resolver with explicit `in-progress`, `paused`, `completed` and `failed` states.
+- Resolved the first authoritative boundary among discovery-doctrine STOP, fatal food/water depletion and route arrival; fatal depletion wins exact-time ties to preserve the SIM-006 MVP rule.
+- Capped movement, supplies and executable timeline events at the resolved boundary, preventing arrival or doctrine actions after an earlier death.
+- Added a dedicated debug-map outcome panel with boundary cause and position plus a DEV control that jumps to the outcome and then repeats the same expedition from T+0.
+- Preserved STOP as a non-terminal pause while arrival and fatal depletion become terminal success/failure states.
+- Added thirteen GAME-003 regressions; repository verification now runs 145 tests.
+- Designated `GAME-004`, connecting SIM-008 moving monster encounters to the live expedition and timeline without combat, as the next checkpoint.
+
 ## 0.0.14 — Checkpoint 14
 
 - Added `GAME-002`: a pure deterministic `STOP | MARK_AND_CONTINUE` decision over the authoritative static-object discovery event.

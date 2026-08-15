@@ -4,10 +4,12 @@ import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
   applyDiscoveryDoctrineToRoute,
+  applyExpeditionOutcomeToRoute,
   createCaravanStatusSnapshot,
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
   createExpeditionEventLogSnapshot,
+  createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
   createRumorSearchSnapshot,
   projectCoordinate,
@@ -873,4 +875,202 @@ test("GAME-002: a missed search never creates a doctrine decision", () => {
     log.events.some((event) => event.kind === "doctrine-decision"),
     false,
   );
+});
+
+test("GAME-003: safe arrival becomes a completed terminal outcome", () => {
+  const plan = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    fourSegments,
+    5,
+  );
+  const selected = createFourSegmentRouteSnapshot(
+    plan.start,
+    fourSegments,
+    5,
+    plan.totalDurationSeconds + 1_000,
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected,
+    { foodUnits: 2_000, waterUnits: 4_000 },
+    consumption,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected, outcome);
+  const status = createCaravanStatusSnapshot(
+    executed,
+    { foodUnits: 2_000, waterUnits: 4_000 },
+    consumption,
+    null,
+    outcome,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    { foodUnits: 2_000, waterUnits: 4_000 },
+    consumption,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "completed");
+  assert.equal(outcome.terminal, true);
+  assert.equal(executed.position.status, "arrived");
+  assert.equal(status.outcome?.status, "completed");
+  assert.equal(log.executionStatus, "completed");
+  assert.equal(log.events.at(-1)?.id, "arrival");
+  assert.equal(log.events.at(-1)?.active, true);
+});
+
+test("GAME-003: fatal depletion freezes the caravan and removes future arrival", () => {
+  const initial = { foodUnits: 100, waterUnits: 20 };
+  const selected = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    fourSegments,
+    5,
+    10 * 3_600,
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected,
+    initial,
+    consumption,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    initial,
+    consumption,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.failureCause, "water");
+  assert.equal(executed.position.elapsedSeconds, 3_600);
+  assert.equal(executed.position.traveledDistanceMeters, 5_000);
+  assert.equal(log.executionStatus, "failed");
+  assert.equal(log.events.at(-1)?.id, "supplies-depleted");
+  assert.equal(log.events.at(-1)?.active, true);
+  assert.equal(log.events.at(-1)?.distanceKilometers, 5);
+  assert.equal(log.events.some((event) => event.kind === "arrival"), false);
+});
+
+test("GAME-003: exact depletion at ETA fails instead of also arriving", () => {
+  const initial = { foodUnits: 870, waterUnits: 1_740 };
+  const selected = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    timelineSegments,
+    5,
+    1_740 * 3_600,
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected,
+    initial,
+    timelineConsumption,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    initial,
+    timelineConsumption,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.failureCause, "both");
+  assert.equal(log.events.at(-1)?.kind, "supplies-depleted");
+  assert.equal(log.events.some((event) => event.kind === "arrival"), false);
+});
+
+test("GAME-003: STOP before depletion remains a non-terminal pause", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5);
+  const searchPlan = createRumorSearchSnapshot("checkpoint-04", origin, plan);
+  const discoveryAtSeconds = searchPlan.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+  const selected = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    plan.totalDurationSeconds,
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    selected,
+    searchPlan,
+    "STOP",
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected,
+    { foodUnits: 100, waterUnits: 200 },
+    consumption,
+    doctrine,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected, outcome);
+  const executedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    executed,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    { foodUnits: 100, waterUnits: 200 },
+    consumption,
+    executedSearch,
+    doctrine,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "paused");
+  assert.equal(outcome.terminal, false);
+  assert.equal(executed.position.elapsedSeconds, discoveryAtSeconds);
+  assert.equal(log.executionStatus, "paused");
+  assert.equal(log.events.at(-1)?.id, "doctrine-stop");
+  assert.equal(log.events.some((event) => event.kind === "supplies-depleted"), false);
+});
+
+test("GAME-003: depletion before discovery suppresses the impossible doctrine decision", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5);
+  const selected = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    plan.totalDurationSeconds,
+  );
+  const plannedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    selected,
+  );
+  const proposedDoctrine = createDiscoveryDoctrineSnapshot(
+    selected,
+    plannedSearch,
+    "STOP",
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected,
+    { foodUnits: 1, waterUnits: 1 },
+    consumption,
+    proposedDoctrine,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected, outcome);
+  const executedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    executed,
+  );
+  const effectiveDoctrine = createDiscoveryDoctrineSnapshot(
+    executed,
+    executedSearch,
+    "STOP",
+  );
+
+  assert.equal(outcome.status, "failed");
+  assert.equal(proposedDoctrine.status, "stopped");
+  assert.equal(executedSearch.status, "searching");
+  assert.equal(effectiveDoctrine.status, "pending");
+  assert.equal(effectiveDoctrine.decision, null);
 });

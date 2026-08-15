@@ -6,6 +6,7 @@ import {
   createWorldCoordinate,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
+  evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
   findFirstMovingEncounter,
   greatCircleDistance,
@@ -31,7 +32,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 14 demo");
+console.log("Desert Caravan MMO — Checkpoint 15 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -88,6 +89,26 @@ console.log(
 const idleAtTenHours = projectSupplies(supplies, consumption, "idle", 10 * 3_600);
 console.log(
   `If idle for 10h instead: food=${idleAtTenHours.foodRemaining.toFixed(3)}, water=${idleAtTenHours.waterRemaining.toFixed(3)}`,
+);
+
+const failedExpedition = evaluateExpeditionOutcome(
+  route,
+  supplies,
+  consumption,
+  route.totalDurationSeconds,
+);
+const completedExpedition = evaluateExpeditionOutcome(
+  route,
+  { foodUnits: 20, waterUnits: 20 },
+  consumption,
+  route.totalDurationSeconds,
+);
+console.log("\nGAME-003 expedition outcomes:");
+console.log(
+  `  unsafe supplies: ${failedExpedition.status} at T=${((failedExpedition.endedAtSeconds ?? 0) / 3_600).toFixed(3)} h, cause=${failedExpedition.failureCause}`,
+);
+console.log(
+  `  sufficient supplies: ${completedExpedition.status} at T=${((completedExpedition.endedAtSeconds ?? 0) / 3_600).toFixed(3)} h`,
 );
 
 const world = generateSeededWorld("checkpoint-04");
@@ -221,4 +242,4 @@ console.log(
   `  same paths with 100 s delay: ${delayedEncounter === null ? "no encounter" : "encounter"}`,
 );
 
-console.log("\nGAME-002 doctrine UI: npm run debug-map -> http://127.0.0.1:4173");
+console.log("\nGAME-003 outcome UI: npm run debug-map -> http://127.0.0.1:4173");

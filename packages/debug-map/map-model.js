@@ -7,6 +7,7 @@ import {
   createRumorSearchScenario,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
+  evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
   generateSeededWorld,
   kilometers,
@@ -389,6 +390,69 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
 }
 
 /**
+ * GAME-003 composes route ETA, moving supplies and an optional GAME-002 STOP
+ * into one authoritative execution outcome.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {SupplyStock} initialSupplies
+ * @param {ConsumptionProfile} consumptionProfile
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
+ */
+export function createExpeditionOutcomeSnapshot(
+  route,
+  initialSupplies,
+  consumptionProfile,
+  doctrine = null,
+) {
+  const pausedAtSeconds =
+    doctrine?.status === "stopped"
+      ? doctrine.decision?.decidedAtSeconds ?? null
+      : null;
+  const evaluation = evaluateExpeditionOutcome(
+    route.authoritativeRoute,
+    initialSupplies,
+    consumptionProfile,
+    route.position.elapsedSeconds,
+    pausedAtSeconds,
+  );
+  const boundaryPosition = positionAtTime(
+    route.authoritativeRoute,
+    evaluation.planned.atSeconds,
+  );
+
+  return {
+    ...evaluation,
+    planned: {
+      ...evaluation.planned,
+      segmentIndex: boundaryPosition.segmentIndex,
+      routeDistanceKilometers:
+        boundaryPosition.traveledDistanceMeters / 1_000,
+      coordinate: boundaryPosition.coordinate,
+    },
+  };
+}
+
+/**
+ * Re-evaluates live SIM-005 movement at the first GAME-003 boundary while
+ * preserving the original route plan and ETA for forecast/inspection.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
+ */
+export function applyExpeditionOutcomeToRoute(route, outcome) {
+  const evaluated = positionAtTime(
+    route.authoritativeRoute,
+    outcome.movementElapsedSeconds,
+  );
+
+  return {
+    ...route,
+    position: {
+      ...evaluated,
+      point: projectCoordinate(evaluated.coordinate),
+    },
+  };
+}
+
+/**
  * UI-003 combines the authoritative route position and SIM-006 supply model
  * into a presentation snapshot. Consumption stops at route arrival because
  * post-arrival activity is outside this checkpoint's scope.
@@ -396,12 +460,14 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} [outcome]
  */
 export function createCaravanStatusSnapshot(
   route,
   initialSupplies,
   consumptionProfile,
   doctrine = null,
+  outcome = null,
 ) {
   const evaluatedAtSeconds = Math.min(
     route.position.elapsedSeconds,
@@ -432,6 +498,7 @@ export function createCaravanStatusSnapshot(
 
   return {
     doctrine,
+    outcome,
     route: {
       status: route.position.status,
       segmentIndex: route.position.segmentIndex,
@@ -483,13 +550,14 @@ export function createCaravanStatusSnapshot(
 
 /**
  * UI-004 builds a deterministic expedition timeline from existing route and
- * supply truth. GAME-002 may end executable movement at a STOP decision; the
- * function still does not mutate state or apply fatal depletion consequences.
+ * supply truth. GAME-003 trims it at the first authoritative pause, completion
+ * or fatal-depletion boundary without mutating simulation state.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
  * @param {ReturnType<typeof createRumorSearchSnapshot> | null} [rumorSearch]
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} [outcome]
  */
 export function createExpeditionEventLogSnapshot(
   route,
@@ -497,6 +565,7 @@ export function createExpeditionEventLogSnapshot(
   consumptionProfile,
   rumorSearch = null,
   doctrine = null,
+  outcome = null,
 ) {
   const firstDepletion = timeToFirstDepletion(
     initialSupplies,
@@ -550,13 +619,18 @@ export function createExpeditionEventLogSnapshot(
     firstDepletion.atSeconds <=
       route.totalDurationSeconds + EVENT_TIME_EPSILON_SECONDS
   ) {
+    const depletionPosition = positionAtTime(
+      route.authoritativeRoute,
+      firstDepletion.atSeconds,
+    );
     events.push({
       id: "supplies-depleted",
       kind: "supplies-depleted",
       atSeconds: firstDepletion.atSeconds,
-      segmentIndex: null,
+      segmentIndex: depletionPosition.segmentIndex,
       cause: firstDepletion.cause,
-      distanceKilometers: null,
+      distanceKilometers:
+        depletionPosition.traveledDistanceMeters / 1_000,
       order: 30,
     });
   }
@@ -570,16 +644,24 @@ export function createExpeditionEventLogSnapshot(
     distanceKilometers: route.totalDistanceKilometers,
     order: 40,
   });
-  const stopAtSeconds =
-    doctrine?.status === "stopped"
+  const legacyStopAtSeconds =
+    outcome === null && doctrine?.status === "stopped"
       ? doctrine.decision?.decidedAtSeconds ?? null
       : null;
+  const boundaryAtSeconds = outcome?.planned.atSeconds ?? legacyStopAtSeconds;
+  const boundaryStatus = outcome?.planned.status ??
+    (legacyStopAtSeconds === null ? null : "paused");
   const executionEvents =
-    stopAtSeconds === null
+    boundaryAtSeconds === null
       ? events
       : events.filter(
           (event) =>
-            event.atSeconds <= stopAtSeconds + EVENT_TIME_EPSILON_SECONDS,
+            event.atSeconds <=
+              boundaryAtSeconds + EVENT_TIME_EPSILON_SECONDS &&
+            !(
+              boundaryStatus === "failed" &&
+              (event.kind === "arrival" || event.kind === "search-missed")
+            ),
         );
   executionEvents.sort(
     (left, right) =>
@@ -618,7 +700,14 @@ export function createExpeditionEventLogSnapshot(
 
   return {
     evaluatedAtSeconds,
-    executionStatus: stopAtSeconds === null ? "running" : "stopped",
+    executionStatus:
+      outcome === null
+        ? legacyStopAtSeconds === null
+          ? "running"
+          : "stopped"
+        : outcome.status === "in-progress"
+          ? "running"
+          : outcome.status,
     occurredCount: activeEventIndex + 1,
     totalCount: presentedEvents.length,
     nextEventId: presentedEvents[activeEventIndex + 1]?.id ?? null,

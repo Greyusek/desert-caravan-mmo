@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 14 · GAME-002</p>
+          <p class="eyebrow">Checkpoint 15 · GAME-003</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -276,13 +276,41 @@
           </form>
           <p class="supply-settings__note">
             В пути применяются moving-расходы SIM-006. Расход на стоянке сохранён
-            в профиле; длительная жизнь после STOP появится в GAME-003.
+            в профиле; длительная жизнь и возобновление после STOP пока вне scope.
           </p>
         </details>
         <p class="caravan-panel__scope-note">
-          Панель прогнозирует критическое истощение; игровые последствия будут
-          добавлены в GAME-003.
+          Прибытие и критическое истощение теперь завершают исполнение маршрута.
         </p>
+      </section>
+
+      <section
+        id="outcome-panel"
+        class="outcome-panel"
+        data-state="in-progress"
+        aria-labelledby="outcome-title"
+      >
+        <div class="outcome-copy">
+          <p class="section-kicker">GAME-003 · Expedition outcome</p>
+          <div class="outcome-heading">
+            <div>
+              <h2 id="outcome-title">Экспедиция продолжается</h2>
+              <p id="outcome-detail" class="outcome-detail">
+                Авторитетный исход ещё не наступил.
+              </p>
+            </div>
+            <p id="outcome-state" class="outcome-state">В пути</p>
+          </div>
+          <dl class="outcome-facts">
+            <div><dt>Граница</dt><dd id="outcome-time">—</dd></div>
+            <div><dt>Причина</dt><dd id="outcome-cause">—</dd></div>
+            <div><dt>Позиция</dt><dd id="outcome-position">—</dd></div>
+          </dl>
+        </div>
+        <div class="outcome-actions">
+          <button id="outcome-action" type="button">DEV: к исходу</button>
+          <p>После исхода кнопка повторяет текущий план с T+00:00:00.</p>
+        </div>
       </section>
 
       <section class="workspace">

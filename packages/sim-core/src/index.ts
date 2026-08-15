@@ -3,6 +3,7 @@ export * from "./geometry.js";
 export * from "./route.js";
 export * from "./rumor.js";
 export * from "./doctrine.js";
+export * from "./expedition.js";
 export * from "./supplies.js";
 export * from "./world.js";
 export * from "./discovery.js";
