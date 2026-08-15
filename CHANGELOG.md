@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.12 — Checkpoint 12
+
+- Added `UI-004`: a compact deterministic expedition timeline in the debug-map sidebar.
+- Added ordered departure, segment-completion, 25% supply warning, first-depletion and route-arrival events derived from existing route and SIM-006 truth.
+- Added live occurred/current/future states tied to the simulation-time slider and kept future events visibly marked as forecasts.
+- Combined simultaneous food/water warnings, preserved separate warnings for different depletion ratios, and ordered exact depletion before same-time arrival.
+- Added eight event-log regressions; repository verification now runs 110 tests.
+- Designated `GAME-001`, the first deterministic rumor-driven search scenario, as the next checkpoint.
+
 ## 0.0.11 — Checkpoint 11
 
 - Added `UI-003`: a persistent caravan status panel driven by the existing SIM-005 route position and SIM-006 supply APIs.

@@ -5,6 +5,7 @@ import {
   DEBUG_MAP_WIDTH,
   createCaravanStatusSnapshot,
   createDebugMapSnapshot,
+  createExpeditionEventLogSnapshot,
   createFourSegmentRouteSnapshot,
   projectCoordinate,
   splitPathAtAntimeridian,
@@ -314,5 +315,140 @@ test("UI-003: invalid stock and consumption values are rejected by SIM-006", () 
         idle: consumption.idle,
       }),
     /moving.foodUnitsPerHour must be a non-negative finite number/,
+  );
+});
+
+const timelineSegments = [
+  { bearingDeg: 315, distanceKilometers: 2_000 },
+  { bearingDeg: 270, distanceKilometers: 1_200 },
+  { bearingDeg: 225, distanceKilometers: 2_000 },
+  { bearingDeg: 90, distanceKilometers: 3_500 },
+];
+const timelineSupplies = { foodUnits: 1_000, waterUnits: 2_000 };
+const timelineConsumption = {
+  moving: { foodUnitsPerHour: 0.5, waterUnitsPerHour: 1 },
+  idle: { foodUnitsPerHour: 0.25, waterUnitsPerHour: 0.4 },
+};
+
+function eventLogAt(
+  elapsedSeconds,
+  commands = timelineSegments,
+  initial = timelineSupplies,
+  profile = timelineConsumption,
+) {
+  const route = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    commands,
+    5,
+    elapsedSeconds,
+  );
+  return createExpeditionEventLogSnapshot(route, initial, profile);
+}
+
+test("UI-004: identical route, supplies and time reproduce the complete log", () => {
+  assert.deepEqual(eventLogAt(700 * 3_600), eventLogAt(700 * 3_600));
+});
+
+test("UI-004: safe expedition milestones are ordered by authoritative ETA", () => {
+  const log = eventLogAt(0);
+
+  assert.deepEqual(
+    log.events.map(({ id, atSeconds }) => ({ id, atHours: atSeconds / 3_600 })),
+    [
+      { id: "departure", atHours: 0 },
+      { id: "segment-01", atHours: 400 },
+      { id: "segment-02", atHours: 640 },
+      { id: "segment-03", atHours: 1_040 },
+      { id: "supplies-low-both", atHours: 1_500 },
+      { id: "arrival", atHours: 1_740 },
+    ],
+  );
+});
+
+test("UI-004: selected time marks occurred, active and next events", () => {
+  const log = eventLogAt(700 * 3_600);
+
+  assert.equal(log.occurredCount, 3);
+  assert.equal(log.totalCount, 6);
+  assert.equal(log.events[2]?.id, "segment-02");
+  assert.equal(log.events[2]?.active, true);
+  assert.equal(log.events[3]?.occurred, false);
+  assert.equal(log.nextEventId, "segment-03");
+});
+
+test("UI-004: simultaneous low food and water become one warning", () => {
+  const log = eventLogAt(0);
+  const warnings = log.events.filter((event) => event.kind === "supplies-low");
+
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0]?.cause, "both");
+  assert.equal(warnings[0]?.atSeconds, 1_500 * 3_600);
+});
+
+test("UI-004: different supply ratios produce separate ordered warnings", () => {
+  const longRoute = [
+    { bearingDeg: 0, distanceKilometers: 2_000 },
+    { bearingDeg: 90, distanceKilometers: 2_000 },
+    { bearingDeg: 180, distanceKilometers: 2_000 },
+    { bearingDeg: 270, distanceKilometers: 5_000 },
+  ];
+  const profile = {
+    moving: { foodUnitsPerHour: 0.5, waterUnitsPerHour: 0.8 },
+    idle: timelineConsumption.idle,
+  };
+  const log = eventLogAt(0, longRoute, timelineSupplies, profile);
+  const warnings = log.events.filter((event) => event.kind === "supplies-low");
+
+  assert.deepEqual(
+    warnings.map(({ cause, atSeconds }) => ({ cause, atHours: atSeconds / 3_600 })),
+    [
+      { cause: "food", atHours: 1_500 },
+      { cause: "water", atHours: 1_875 },
+    ],
+  );
+});
+
+test("UI-004: exact depletion at ETA is critical before arrival", () => {
+  const exactSupplies = { foodUnits: 870, waterUnits: 1_740 };
+  const log = eventLogAt(
+    1_740 * 3_600,
+    timelineSegments,
+    exactSupplies,
+  );
+  const lastTwo = log.events.slice(-2);
+
+  assert.deepEqual(
+    lastTwo.map(({ kind, atSeconds }) => ({ kind, atHours: atSeconds / 3_600 })),
+    [
+      { kind: "supplies-depleted", atHours: 1_740 },
+      { kind: "arrival", atHours: 1_740 },
+    ],
+  );
+  assert.equal(lastTwo[0]?.cause, "both");
+  assert.equal(lastTwo[1]?.active, true);
+});
+
+test("UI-004: evaluation clamps at arrival after the route has ended", () => {
+  const log = eventLogAt(2_000 * 3_600);
+
+  assert.equal(log.evaluatedAtSeconds, 1_740 * 3_600);
+  assert.equal(log.occurredCount, log.totalCount);
+  assert.equal(log.events.at(-1)?.id, "arrival");
+  assert.equal(log.events.at(-1)?.active, true);
+  assert.equal(log.nextEventId, null);
+});
+
+test("UI-004: invalid supply inputs are still rejected by SIM-006", () => {
+  assert.throws(
+    () => eventLogAt(0, timelineSegments, { foodUnits: -1, waterUnits: 1 }),
+    /foodUnits must be a non-negative finite number/,
+  );
+  assert.throws(
+    () =>
+      eventLogAt(0, timelineSegments, timelineSupplies, {
+        moving: { foodUnitsPerHour: 1, waterUnitsPerHour: -1 },
+        idle: timelineConsumption.idle,
+      }),
+    /moving.waterUnitsPerHour must be a non-negative finite number/,
   );
 });

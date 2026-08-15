@@ -26,6 +26,23 @@ export const DEBUG_MAP_WIDTH = 1_000;
 export const DEBUG_MAP_HEIGHT = 500;
 const ROUTE_SAMPLE_TARGET_METERS = 100_000;
 const MAX_ROUTE_SAMPLES_PER_SEGMENT = 64;
+const LOW_SUPPLY_FRACTION = 0.25;
+const EVENT_TIME_EPSILON_SECONDS = 1e-9;
+
+/**
+ * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "arrival"} ExpeditionEventKind
+ */
+
+/**
+ * @typedef {object} PlannedExpeditionEvent
+ * @property {string} id
+ * @property {ExpeditionEventKind} kind
+ * @property {number} atSeconds
+ * @property {number | null} segmentIndex
+ * @property {"food" | "water" | "both" | null} cause
+ * @property {number | null} distanceKilometers
+ * @property {number} order
+ */
 
 /**
  * @typedef {object} ProjectedPoint
@@ -293,6 +310,202 @@ export function createCaravanStatusSnapshot(
       waterAtArrival: atArrival.waterRemaining,
     },
   };
+}
+
+/**
+ * UI-004 builds a deterministic expedition timeline from existing route and
+ * supply truth. It describes milestones and forecasts only; it does not apply
+ * death, stop movement, or mutate simulation state.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {SupplyStock} initialSupplies
+ * @param {ConsumptionProfile} consumptionProfile
+ */
+export function createExpeditionEventLogSnapshot(
+  route,
+  initialSupplies,
+  consumptionProfile,
+) {
+  const firstDepletion = timeToFirstDepletion(
+    initialSupplies,
+    consumptionProfile,
+    "moving",
+  );
+  /** @type {PlannedExpeditionEvent[]} */
+  const events = [
+    {
+      id: "departure",
+      kind: "departure",
+      atSeconds: 0,
+      segmentIndex: null,
+      cause: null,
+      distanceKilometers: 0,
+      order: 0,
+    },
+  ];
+
+  let cumulativeDistanceKilometers = 0;
+  for (const segment of route.segments.slice(0, -1)) {
+    cumulativeDistanceKilometers += segment.distanceKilometers;
+    events.push({
+      id: `segment-${String(segment.index + 1).padStart(2, "0")}`,
+      kind: "segment-completed",
+      atSeconds: segment.etaEndSeconds,
+      segmentIndex: segment.index,
+      cause: null,
+      distanceKilometers: cumulativeDistanceKilometers,
+      order: 20,
+    });
+  }
+
+  addLowSupplyEvents(
+    events,
+    initialSupplies,
+    consumptionProfile,
+    firstDepletion.atSeconds,
+    route.totalDurationSeconds,
+  );
+
+  if (
+    firstDepletion.atSeconds !== null &&
+    firstDepletion.atSeconds <=
+      route.totalDurationSeconds + EVENT_TIME_EPSILON_SECONDS
+  ) {
+    events.push({
+      id: "supplies-depleted",
+      kind: "supplies-depleted",
+      atSeconds: firstDepletion.atSeconds,
+      segmentIndex: null,
+      cause: firstDepletion.cause,
+      distanceKilometers: null,
+      order: 30,
+    });
+  }
+
+  events.push({
+    id: "arrival",
+    kind: "arrival",
+    atSeconds: route.totalDurationSeconds,
+    segmentIndex: null,
+    cause: null,
+    distanceKilometers: route.totalDistanceKilometers,
+    order: 40,
+  });
+  events.sort(
+    (left, right) =>
+      left.atSeconds - right.atSeconds ||
+      left.order - right.order ||
+      left.id.localeCompare(right.id),
+  );
+
+  const evaluatedAtSeconds = Math.min(
+    route.position.elapsedSeconds,
+    route.totalDurationSeconds,
+  );
+  let activeEventIndex = -1;
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
+    if (
+      event &&
+      event.atSeconds <= evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS
+    ) {
+      activeEventIndex = index;
+    }
+  }
+
+  const presentedEvents = events.map((event, index) => ({
+    id: event.id,
+    kind: event.kind,
+    atSeconds: event.atSeconds,
+    segmentIndex: event.segmentIndex,
+    cause: event.cause,
+    distanceKilometers: event.distanceKilometers,
+    occurred: index <= activeEventIndex,
+    active: index === activeEventIndex,
+  }));
+
+  return {
+    evaluatedAtSeconds,
+    occurredCount: activeEventIndex + 1,
+    totalCount: presentedEvents.length,
+    nextEventId: presentedEvents[activeEventIndex + 1]?.id ?? null,
+    events: presentedEvents,
+  };
+}
+
+/**
+ * @param {PlannedExpeditionEvent[]} events
+ * @param {SupplyStock} initialSupplies
+ * @param {ConsumptionProfile} consumptionProfile
+ * @param {number | null} firstDepletionAtSeconds
+ * @param {number} routeDurationSeconds
+ */
+function addLowSupplyEvents(
+  events,
+  initialSupplies,
+  consumptionProfile,
+  firstDepletionAtSeconds,
+  routeDurationSeconds,
+) {
+  const foodAtSeconds = lowSupplyAtSeconds(
+    initialSupplies.foodUnits,
+    consumptionProfile.moving.foodUnitsPerHour,
+  );
+  const waterAtSeconds = lowSupplyAtSeconds(
+    initialSupplies.waterUnits,
+    consumptionProfile.moving.waterUnitsPerHour,
+  );
+  const warningLimit = Math.min(
+    routeDurationSeconds,
+    firstDepletionAtSeconds ?? Number.POSITIVE_INFINITY,
+  );
+  const foodIsRelevant = isRelevantWarning(foodAtSeconds, warningLimit);
+  const waterIsRelevant = isRelevantWarning(waterAtSeconds, warningLimit);
+
+  if (
+    foodIsRelevant &&
+    waterIsRelevant &&
+    foodAtSeconds !== null &&
+    waterAtSeconds !== null &&
+    Math.abs(foodAtSeconds - waterAtSeconds) <= EVENT_TIME_EPSILON_SECONDS
+  ) {
+    events.push(lowSupplyEvent("both", foodAtSeconds));
+    return;
+  }
+
+  if (foodIsRelevant && foodAtSeconds !== null) {
+    events.push(lowSupplyEvent("food", foodAtSeconds));
+  }
+  if (waterIsRelevant && waterAtSeconds !== null) {
+    events.push(lowSupplyEvent("water", waterAtSeconds));
+  }
+}
+
+/** @param {number | null} atSeconds @param {number} warningLimit */
+function isRelevantWarning(atSeconds, warningLimit) {
+  return (
+    atSeconds !== null &&
+    atSeconds > EVENT_TIME_EPSILON_SECONDS &&
+    atSeconds <= warningLimit + EVENT_TIME_EPSILON_SECONDS
+  );
+}
+
+/** @param {"food" | "water" | "both"} cause @param {number} atSeconds */
+function lowSupplyEvent(cause, atSeconds) {
+  return {
+    id: `supplies-low-${cause}`,
+    kind: /** @type {const} */ ("supplies-low"),
+    atSeconds,
+    segmentIndex: null,
+    cause,
+    distanceKilometers: null,
+    order: 10,
+  };
+}
+
+/** @param {number} stock @param {number} ratePerHour */
+function lowSupplyAtSeconds(stock, ratePerHour) {
+  if (stock === 0 || ratePerHour === 0) return null;
+  return (stock * (1 - LOW_SUPPLY_FRACTION) * 3_600) / ratePerHour;
 }
 
 /**

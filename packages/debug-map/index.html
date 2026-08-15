@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 11 · UI-003</p>
+          <p class="eyebrow">Checkpoint 12 · UI-004</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -236,6 +236,19 @@
               <li><span class="legend-dot legend-dot--monster"></span>Монстр и patrol-loop</li>
               <li><span class="legend-dot legend-dot--caravan"></span>Караван и маршрут</li>
             </ul>
+          </section>
+
+          <section class="panel event-panel" aria-labelledby="event-log-title">
+            <div class="event-panel__heading">
+              <div>
+                <p class="section-kicker">UI-004 · Timeline</p>
+                <h2 id="event-log-title">Журнал экспедиции</h2>
+              </div>
+              <output id="event-log-count" class="event-log-count">0 / 0</output>
+            </div>
+            <p id="event-log-next" class="event-log-next">Расчёт событий…</p>
+            <ol id="event-log-list" class="event-log-list" aria-live="polite"></ol>
+            <p class="event-log-note">Будущие события показаны как прогноз.</p>
           </section>
 
           <section class="panel detail-panel">

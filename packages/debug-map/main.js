@@ -5,6 +5,7 @@ import {
   DEBUG_MAP_WIDTH,
   createCaravanStatusSnapshot,
   createDebugMapSnapshot,
+  createExpeditionEventLogSnapshot,
   createFourSegmentRouteSnapshot,
 } from "./map-model.js";
 
@@ -61,6 +62,9 @@ const movingFoodRate = requireElement("moving-food-rate", HTMLInputElement);
 const movingWaterRate = requireElement("moving-water-rate", HTMLInputElement);
 const idleFoodRate = requireElement("idle-food-rate", HTMLInputElement);
 const idleWaterRate = requireElement("idle-water-rate", HTMLInputElement);
+const eventLogCount = requireElement("event-log-count", HTMLOutputElement);
+const eventLogNext = requireElement("event-log-next", HTMLParagraphElement);
+const eventLogList = requireElement("event-log-list", HTMLOListElement);
 
 let elapsedSeconds = 0;
 let supplySettings = readSupplySettings();
@@ -127,6 +131,11 @@ function render() {
       supplySettings.initial,
       supplySettings.profile,
     );
+    const eventLog = createExpeditionEventLogSnapshot(
+      route,
+      supplySettings.initial,
+      supplySettings.profile,
+    );
     const firstMonster = snapshot.monsters[0];
     const maximumElapsedSeconds = Math.max(
       route.totalDurationSeconds,
@@ -148,6 +157,7 @@ function render() {
     timeOutput.textContent = formatElapsed(elapsedSeconds);
     routeSummary.textContent = formatRouteSummary(route);
     renderCaravanStatus(caravanStatus);
+    renderEventLog(eventLog, route);
 
     timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
     timeSlider.value = String(elapsedSeconds);
@@ -157,6 +167,92 @@ function render() {
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
   }
+}
+
+/**
+ * @param {ReturnType<typeof createExpeditionEventLogSnapshot>} log
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ */
+function renderEventLog(log, route) {
+  eventLogCount.textContent = `${log.occurredCount} / ${log.totalCount}`;
+  const nextEvent = log.events.find((event) => event.id === log.nextEventId);
+  eventLogNext.textContent = nextEvent
+    ? `Следующее: ${eventTitle(nextEvent)} · ${formatElapsed(nextEvent.atSeconds)}`
+    : "Маршрут завершён";
+
+  eventLogList.replaceChildren(
+    ...log.events.map((event) => {
+      const item = document.createElement("li");
+      item.className = "event-log-item";
+      item.dataset.state = event.active
+        ? "active"
+        : event.occurred
+          ? "occurred"
+          : "future";
+      item.dataset.kind = event.kind;
+
+      const marker = document.createElement("span");
+      marker.className = "event-log-marker";
+      marker.setAttribute("aria-hidden", "true");
+
+      const content = document.createElement("div");
+      content.className = "event-log-content";
+      const time = document.createElement("time");
+      time.textContent = formatElapsed(event.atSeconds);
+      const title = document.createElement("strong");
+      title.textContent = eventTitle(event);
+      const detail = document.createElement("span");
+      detail.textContent = eventDetail(event, route);
+      content.append(time, title, detail);
+
+      if (event.active) {
+        const current = document.createElement("span");
+        current.className = "event-log-current";
+        current.textContent = "сейчас";
+        content.append(current);
+      }
+
+      item.append(marker, content);
+      return item;
+    }),
+  );
+}
+
+/**
+ * @param {ReturnType<typeof createExpeditionEventLogSnapshot>["events"][number]} event
+ */
+function eventTitle(event) {
+  if (event.kind === "departure") return "Караван вышел в путь";
+  if (event.kind === "segment-completed") {
+    return `Завершён сегмент ${(event.segmentIndex ?? 0) + 1}`;
+  }
+  if (event.kind === "supplies-low") {
+    return `${formatDepletionCause(event.cause)}: осталось 25%`;
+  }
+  if (event.kind === "supplies-depleted") {
+    return "Критические запасы исчерпаны";
+  }
+  return "Маршрут достиг финиша";
+}
+
+/**
+ * @param {ReturnType<typeof createExpeditionEventLogSnapshot>["events"][number]} event
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ */
+function eventDetail(event, route) {
+  if (event.kind === "departure") {
+    return `${formatNumber(route.totalDistanceKilometers, 1)} км · ${formatNumber(route.speedKilometersPerHour, 1)} км/ч`;
+  }
+  if (event.kind === "segment-completed") {
+    return `${formatNumber(event.distanceKilometers ?? 0, 1)} км пройдено`;
+  }
+  if (event.kind === "supplies-low") {
+    return "Порог раннего предупреждения";
+  }
+  if (event.kind === "supplies-depleted") {
+    return `${formatDepletionCause(event.cause)} · последствия появятся в GAME-003`;
+  }
+  return `${formatNumber(event.distanceKilometers ?? 0, 1)} км · ETA ${formatDuration(route.totalDurationSeconds)}`;
 }
 
 /**

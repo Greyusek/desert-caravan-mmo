@@ -16,6 +16,7 @@
 - `CHECKPOINT_09.md` — dependency-free north-up debug-карта seeded-мира.
 - `CHECKPOINT_10.md` — четырёхсегментный редактор маршрута каравана и его сферическая визуализация.
 - `CHECKPOINT_11.md` — постоянная панель состояния каравана, провизии и прогноза до финиша.
+- `CHECKPOINT_12.md` — детерминированный журнал событий экспедиции.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004` и `UI-001..UI-003` покрыты 97 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 102 теста в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004` и `UI-001..UI-004` покрыты 105 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 110 тестов в pull request.

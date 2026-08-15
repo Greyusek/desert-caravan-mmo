@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 11 — UI-003: implemented and covered by automated tests.**
+**Checkpoint 12 — UI-004: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -30,8 +30,9 @@ Also implemented:
 - UI-001 — dependency-free north-up browser debug map for the complete deterministic world.
 - UI-002 — four-segment caravan route editor with a resolved spherical route, ETA and time-aware caravan marker.
 - UI-003 — persistent caravan status, route progress, food/water levels and an ETA survival forecast driven by SIM-005 and SIM-006.
+- UI-004 — deterministic expedition timeline for departure, route milestones, supply warnings, depletion and arrival.
 
-Not implemented yet (intentionally): player discovery state, event log, player-facing map, server/database, and encounter consequences.
+Not implemented yet (intentionally): rumor scenario, player discovery state, player-facing map, server/database, and encounter consequences.
 
 ## Requirements
 
@@ -66,17 +67,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 11:
+Expected for Checkpoint 12:
 
 ```text
-# tests 102
-# pass 102
+# tests 110
+# pass 110
 # fail 0
 ```
 
-This total contains 97 simulation/UI tests and 5 tooling regression tests.
+This total contains 105 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_11.md` for UI-003 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_12.md` for UI-004 details.
 
 ## Developer debug map
 
@@ -86,7 +87,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route and a persistent supply forecast. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast and a deterministic event timeline. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -101,4 +102,4 @@ Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay:
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `UI-004`: add a compact deterministic expedition event log.
+The next functional checkpoint is `GAME-001`: add the first deterministic rumor-driven search scenario.
