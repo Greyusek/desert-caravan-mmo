@@ -1,9 +1,16 @@
 # Changelog
 
-## Unreleased — Windows acceptance fix
+## 0.0.7 — Checkpoint 07
+
+- Added `WORLD-004`: deterministic wandering monsters with stable IDs and isolated PRNG streams.
+- Added physically closed three-leg patrol routes and cyclic position evaluation at arbitrary elapsed time.
+- Added provisional MVP movement constants and ten monster tests; repository verification now runs 71 tests.
+- Designated `SIM-008`, time-aware encounter detection for two moving entities, as the next checkpoint.
+
+### Development workflow included since 0.0.6
 
 - Fixed `npm run accept:main` on Windows by avoiding direct `spawnSync` execution of `npm.cmd`.
-- Added three cross-platform npm invocation regression tests; repository verification now runs 61 tests.
+- Added three cross-platform npm invocation regression tests.
 
 ## 0.0.6 — Checkpoint 06
 

@@ -1,4 +1,16 @@
-import { createWorldCoordinate, type WorldCoordinate } from "./types.js";
+import { destinationPoint, greatCircleDistance } from "./geometry.js";
+import {
+  DEFAULT_INTERACTION_RADIUS_METERS,
+  DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
+  DEFAULT_WANDERING_MONSTER_SPEED_METERS_PER_SECOND,
+  type WanderingMonster,
+} from "./monster.js";
+import { createRoutePlan, type RouteCommand } from "./route.js";
+import {
+  createWorldCoordinate,
+  normalizeBearing,
+  type WorldCoordinate,
+} from "./types.js";
 
 export interface City {
   readonly id: string;
@@ -10,6 +22,7 @@ export interface SeededWorld {
   readonly seed: string;
   readonly cities: readonly City[];
   readonly staticObjects: readonly StaticWorldObject[];
+  readonly wanderingMonsters: readonly WanderingMonster[];
 }
 
 export type StaticWorldObjectKind = "oasis" | "mine" | "ruins" | "cave";
@@ -27,12 +40,16 @@ export type StaticWorldObjectCounts = Partial<
 export interface WorldGenerationOptions {
   readonly cityCount?: number;
   readonly staticObjectCounts?: StaticWorldObjectCounts;
+  readonly wanderingMonsterCount?: number;
 }
 
 const DEFAULT_CITY_COUNT = 10;
 const CITY_NAME_PREFIX = "City";
 const STATIC_OBJECT_KINDS = ["oasis", "mine", "ruins", "cave"] as const;
 const DEFAULT_STATIC_OBJECT_COUNT = 1;
+const DEFAULT_WANDERING_MONSTER_COUNT = 1;
+const WANDERING_MONSTER_MINIMUM_LEG_METERS = 4_000;
+const WANDERING_MONSTER_MAXIMUM_LEG_METERS = 12_000;
 
 /**
  * WORLD-001 — creates the first reproducible world layer.
@@ -80,13 +97,98 @@ export function generateSeededWorld(
     }));
   });
 
-  return { seed, cities, staticObjects };
+  const wanderingMonsterCount =
+    options.wanderingMonsterCount ?? DEFAULT_WANDERING_MONSTER_COUNT;
+  assertWanderingMonsterCount(wanderingMonsterCount);
+
+  const wanderingMonsters = Array.from(
+    { length: wanderingMonsterCount },
+    (_, index): WanderingMonster => createWanderingMonster(seed, index),
+  );
+
+  return { seed, cities, staticObjects, wanderingMonsters };
 }
 
 function assertStaticObjectCount(count: number, kind: StaticWorldObjectKind): void {
   if (!Number.isSafeInteger(count) || count < 0) {
     throw new RangeError(`staticObjectCounts.${kind} must be a non-negative safe integer`);
   }
+}
+
+function assertWanderingMonsterCount(count: number): void {
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new RangeError(
+      "wanderingMonsterCount must be a non-negative safe integer",
+    );
+  }
+}
+
+function createWanderingMonster(seed: string, index: number): WanderingMonster {
+  const sequence = index + 1;
+  const random = mulberry32(hashSeed(`${seed}:wandering-monster:${sequence}`));
+  const start = createWorldCoordinate(
+    randomInRange(random, -60, 60),
+    randomInRange(random, -180, 180),
+  );
+  const firstBearing = randomInRange(random, 0, 360);
+  const firstDistance = randomInRange(
+    random,
+    WANDERING_MONSTER_MINIMUM_LEG_METERS,
+    WANDERING_MONSTER_MAXIMUM_LEG_METERS,
+  );
+  const secondBearing = normalizeBearing(
+    firstBearing + randomInRange(random, 70, 160),
+  );
+  const secondDistance = randomInRange(
+    random,
+    WANDERING_MONSTER_MINIMUM_LEG_METERS,
+    WANDERING_MONSTER_MAXIMUM_LEG_METERS,
+  );
+  const firstEnd = destinationPoint(start, firstBearing, firstDistance);
+  const secondEnd = destinationPoint(firstEnd, secondBearing, secondDistance);
+  const closingDistance = greatCircleDistance(secondEnd, start);
+  const commands: readonly RouteCommand[] = [
+    { bearingDeg: firstBearing, distanceMeters: firstDistance },
+    { bearingDeg: secondBearing, distanceMeters: secondDistance },
+    {
+      bearingDeg: initialBearingDegrees(secondEnd, start),
+      distanceMeters: closingDistance,
+    },
+  ];
+
+  return {
+    id: `wandering-monster-${String(sequence).padStart(2, "0")}`,
+    kind: "wandering-monster",
+    power: index % 2 === 0 ? 90 : 110,
+    visionRadiusMeters: DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
+    interactionRadiusMeters: DEFAULT_INTERACTION_RADIUS_METERS,
+    patrolRoute: createRoutePlan(
+      start,
+      commands,
+      DEFAULT_WANDERING_MONSTER_SPEED_METERS_PER_SECOND,
+    ),
+  };
+}
+
+function initialBearingDegrees(
+  start: WorldCoordinate,
+  destination: WorldCoordinate,
+): number {
+  const degreesToRadians = Math.PI / 180;
+  const radiansToDegrees = 180 / Math.PI;
+  const startLatitude = start.latitudeDeg * degreesToRadians;
+  const destinationLatitude = destination.latitudeDeg * degreesToRadians;
+  const longitudeDelta =
+    (destination.longitudeDeg - start.longitudeDeg) * degreesToRadians;
+  const y = Math.sin(longitudeDelta) * Math.cos(destinationLatitude);
+  const x =
+    Math.cos(startLatitude) * Math.sin(destinationLatitude) -
+    Math.sin(startLatitude) *
+      Math.cos(destinationLatitude) *
+      Math.cos(longitudeDelta);
+
+  if (Math.abs(x) + Math.abs(y) < Number.EPSILON) return 0;
+  return normalizeBearing(Math.atan2(y, x) * radiansToDegrees);
 }
 
 /** FNV-1a over UTF-16 code units, kept local so world generation stays dependency-free. */
