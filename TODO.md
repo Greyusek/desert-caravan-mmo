@@ -11,6 +11,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `WORLD-002`: add deterministic hidden static objects (oasis, mine, ruins, cave).
 - [x] `DEVX-001`: document the CI-gated pre-MVP workflow and add one-command local acceptance.
 - [x] `WORLD-003` / `SIM-007`: detect hidden static objects on the caravan's real route.
+- [x] `DEVX-002`: make local acceptance launch npm reliably on Windows.
 
 ## Next
 
