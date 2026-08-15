@@ -7,12 +7,12 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] Establish GitHub-driven CI (`npm ci` → TypeScript build → automated tests).
 - [x] Normalize repository line endings for Windows and Linux.
 - [x] `WORLD-001`: generate a deterministic seeded world containing ten initial cities.
-- [ ] Open and merge the feature PR after CI succeeds.
+- [x] Open and merge PR #1 after CI succeeds.
+- [x] `WORLD-002`: add deterministic hidden static objects (oasis, mine, ruins, cave).
 
 ## Next
 
-- [ ] `WORLD-002`: add deterministic hidden static objects (oasis, mine, ruins, cave).
-- [ ] Define object discovery checks against the caravan's real route and detection radius.
+- [ ] `WORLD-003`: define object discovery checks against the caravan's real route and detection radius.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Maintenance rules

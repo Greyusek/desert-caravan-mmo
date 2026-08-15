@@ -9,14 +9,30 @@ export interface City {
 export interface SeededWorld {
   readonly seed: string;
   readonly cities: readonly City[];
+  readonly staticObjects: readonly StaticWorldObject[];
 }
+
+export type StaticWorldObjectKind = "oasis" | "mine" | "ruins" | "cave";
+
+export interface StaticWorldObject {
+  readonly id: string;
+  readonly kind: StaticWorldObjectKind;
+  readonly position: WorldCoordinate;
+}
+
+export type StaticWorldObjectCounts = Partial<
+  Readonly<Record<StaticWorldObjectKind, number>>
+>;
 
 export interface WorldGenerationOptions {
   readonly cityCount?: number;
+  readonly staticObjectCounts?: StaticWorldObjectCounts;
 }
 
 const DEFAULT_CITY_COUNT = 10;
 const CITY_NAME_PREFIX = "City";
+const STATIC_OBJECT_KINDS = ["oasis", "mine", "ruins", "cave"] as const;
+const DEFAULT_STATIC_OBJECT_COUNT = 1;
 
 /**
  * WORLD-001 — creates the first reproducible world layer.
@@ -47,7 +63,30 @@ export function generateSeededWorld(
     ),
   }));
 
-  return { seed, cities };
+  const staticObjects = STATIC_OBJECT_KINDS.flatMap((kind) => {
+    const count = options.staticObjectCounts?.[kind] ?? DEFAULT_STATIC_OBJECT_COUNT;
+    assertStaticObjectCount(count, kind);
+
+    // A stream per kind prevents counts in one category (or cities) from
+    // perturbing the positions generated for any other category.
+    const kindRandom = mulberry32(hashSeed(`${seed}:static-object:${kind}`));
+    return Array.from({ length: count }, (_, index): StaticWorldObject => ({
+      id: `${kind}-${String(index + 1).padStart(2, "0")}`,
+      kind,
+      position: createWorldCoordinate(
+        randomInRange(kindRandom, -70, 70),
+        randomInRange(kindRandom, -180, 180),
+      ),
+    }));
+  });
+
+  return { seed, cities, staticObjects };
+}
+
+function assertStaticObjectCount(count: number, kind: StaticWorldObjectKind): void {
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new RangeError(`staticObjectCounts.${kind} must be a non-negative safe integer`);
+  }
 }
 
 /** FNV-1a over UTF-16 code units, kept local so world generation stays dependency-free. */
