@@ -21,6 +21,7 @@
 - `CHECKPOINT_14.md` — автоматическая доктрина `STOP | MARK_AND_CONTINUE` после обнаружения цели.
 - `CHECKPOINT_15.md` — явные исходы экспедиции: пауза, прибытие или фатальное истощение.
 - `CHECKPOINT_16.md` — первый авторитетный контакт движущегося каравана с циклическим патрулём.
+- `CHECKPOINT_17.md` — прозрачное разрешение контакта через Player Power 100, monster Power 90/110 и доктрину сильной угрозы.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-004` и `GAME-001..GAME-004` покрыты 150 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 155 тестов в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-004` и `GAME-001..GAME-005` покрыты 159 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 164 теста в pull request.

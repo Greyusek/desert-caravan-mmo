@@ -16,6 +16,7 @@ import {
   meters,
   positionAtTime,
   projectSupplies,
+  resolveMonsterPowerContact,
   timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
 } from "./index.js";
@@ -33,7 +34,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 16 demo");
+console.log("Desert Caravan MMO — Checkpoint 17 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -261,4 +262,16 @@ console.log(
     : "  no contact",
 );
 
-console.log("\nCheckpoint 16 UI: npm run debug-map -> http://127.0.0.1:4173");
+console.log("\nGAME-005 Power contact resolution:");
+for (const [monsterPower, doctrine] of [
+  [90, "FLEE"],
+  [110, "FLEE"],
+  [110, "ACCEPT_FIGHT"],
+] as const) {
+  const resolution = resolveMonsterPowerContact(monsterPower, doctrine);
+  console.log(
+    `  player=${resolution.playerPower} vs monster=${monsterPower}, doctrine=${resolution.doctrine ?? "AUTO"}: ${resolution.status} / route=${resolution.routeDisposition}`,
+  );
+}
+
+console.log("\nCheckpoint 17 UI: npm run debug-map -> http://127.0.0.1:4173");

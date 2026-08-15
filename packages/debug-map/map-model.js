@@ -15,6 +15,7 @@ import {
   kilometers,
   positionAtTime,
   projectSupplies,
+  resolveMonsterPowerContact,
   timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
 } from "../sim-core/dist/src/index.js";
@@ -61,6 +62,10 @@ const RUMOR_SECTOR_SAMPLE_COUNT = 16;
  * @property {string} [monsterId]
  * @property {number} [monsterPower]
  * @property {number} [separationMeters]
+ * @property {number} [playerPower]
+ * @property {number} [powerDelta]
+ * @property {import("../sim-core/dist/src/index.js").PowerContactResolutionStatus} [powerResolutionStatus]
+ * @property {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine | null} [contactDoctrine]
  */
 
 /**
@@ -135,10 +140,15 @@ export function splitPathAtAntimeridian(coordinates) {
  * Hidden coordinates are included intentionally because this is dev-only.
  * @param {string} seed
  * @param {number} [elapsedSeconds]
+ * @param {number} [wanderingMonsterCount]
  */
-export function createDebugMapSnapshot(seed, elapsedSeconds = 0) {
+export function createDebugMapSnapshot(
+  seed,
+  elapsedSeconds = 0,
+  wanderingMonsterCount = 1,
+) {
   assertNonNegativeFinite(elapsedSeconds, "elapsedSeconds");
-  const world = generateSeededWorld(seed);
+  const world = generateSeededWorld(seed, { wanderingMonsterCount });
 
   return {
     seed: world.seed,
@@ -501,13 +511,15 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
 }
 
 /**
- * GAME-004 composes route ETA, moving supplies, an optional GAME-002 STOP and
- * the first moving-monster contact into one authoritative execution outcome.
+ * GAME-005 composes route ETA, supplies, discovery STOP and the first moving
+ * contact with the transparent Power stub. A weak-monster victory continues
+ * the route, FLEE pauses, and ACCEPT_FIGHT against a stronger monster fails.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
  * @param {ReturnType<typeof createMonsterContactSnapshot> | null} [monsterContact]
+ * @param {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine} [strongMonsterDoctrine]
  */
 export function createExpeditionOutcomeSnapshot(
   route,
@@ -515,6 +527,7 @@ export function createExpeditionOutcomeSnapshot(
   consumptionProfile,
   doctrine = null,
   monsterContact = null,
+  strongMonsterDoctrine = "FLEE",
 ) {
   const doctrinePauseAtSeconds =
     doctrine?.status === "stopped"
@@ -522,26 +535,72 @@ export function createExpeditionOutcomeSnapshot(
       : null;
   const monsterPauseAtSeconds =
     monsterContact?.contact?.expeditionElapsedSeconds ?? null;
-  const monsterPauseWins =
-    monsterPauseAtSeconds !== null &&
-    (doctrinePauseAtSeconds === null ||
-      monsterPauseAtSeconds <=
-        doctrinePauseAtSeconds + EVENT_TIME_EPSILON_SECONDS);
-  const pausedAtSeconds = monsterPauseWins
-    ? monsterPauseAtSeconds
-    : doctrinePauseAtSeconds;
-  const selectedInterruptionCause = monsterPauseWins
-    ? /** @type {const} */ ("monster-contact")
-    : doctrinePauseAtSeconds !== null
-      ? /** @type {const} */ ("doctrine-stop")
-      : null;
-  const evaluation = evaluateExpeditionOutcome(
+  const baselineEvaluation = evaluateExpeditionOutcome(
     route.authoritativeRoute,
     initialSupplies,
     consumptionProfile,
     route.position.elapsedSeconds,
-    pausedAtSeconds,
+    doctrinePauseAtSeconds,
   );
+  const contactResolution = monsterContact?.contact
+    ? resolveMonsterPowerContact(
+        monsterContact.contact.monsterPower,
+        strongMonsterDoctrine,
+      )
+    : null;
+  const contactExecutes =
+    monsterPauseAtSeconds !== null &&
+    monsterPauseAtSeconds <
+      route.totalDurationSeconds - EVENT_TIME_EPSILON_SECONDS &&
+    (monsterPauseAtSeconds <
+      baselineEvaluation.planned.atSeconds - EVENT_TIME_EPSILON_SECONDS ||
+      (Math.abs(
+        monsterPauseAtSeconds - baselineEvaluation.planned.atSeconds,
+      ) <= EVENT_TIME_EPSILON_SECONDS &&
+        baselineEvaluation.planned.status === "paused"));
+  const contactDisposition = contactExecutes
+    ? contactResolution?.routeDisposition ?? null
+    : null;
+
+  let evaluation = baselineEvaluation;
+  /** @type {"doctrine-stop" | "monster-contact" | "monster-defeat" | null} */
+  let interruptionCause =
+    baselineEvaluation.planned.status === "paused"
+      ? /** @type {const} */ ("doctrine-stop")
+      : null;
+
+  if (contactDisposition === "pause" && monsterPauseAtSeconds !== null) {
+    evaluation = evaluateExpeditionOutcome(
+      route.authoritativeRoute,
+      initialSupplies,
+      consumptionProfile,
+      route.position.elapsedSeconds,
+      monsterPauseAtSeconds,
+    );
+    interruptionCause = /** @type {const} */ ("monster-contact");
+  } else if (contactDisposition === "fail" && monsterPauseAtSeconds !== null) {
+    const occurred =
+      route.position.elapsedSeconds + EVENT_TIME_EPSILON_SECONDS >=
+      monsterPauseAtSeconds;
+    /** @type {"failed" | "in-progress"} */
+    const contactStatus = occurred ? "failed" : "in-progress";
+    evaluation = {
+      status: contactStatus,
+      evaluatedAtSeconds: route.position.elapsedSeconds,
+      movementElapsedSeconds: occurred
+        ? monsterPauseAtSeconds
+        : route.position.elapsedSeconds,
+      planned: {
+        status: /** @type {const} */ ("failed"),
+        atSeconds: monsterPauseAtSeconds,
+        failureCause: null,
+      },
+      endedAtSeconds: occurred ? monsterPauseAtSeconds : null,
+      failureCause: null,
+      terminal: occurred,
+    };
+    interruptionCause = /** @type {const} */ ("monster-defeat");
+  }
   const boundaryPosition = positionAtTime(
     route.authoritativeRoute,
     evaluation.planned.atSeconds,
@@ -549,14 +608,15 @@ export function createExpeditionOutcomeSnapshot(
 
   return {
     ...evaluation,
-    interruptionCause:
-      evaluation.planned.status === "paused"
-        ? selectedInterruptionCause
-        : null,
-    monsterContact:
-      evaluation.planned.status === "paused" && monsterPauseWins
-        ? monsterContact?.contact ?? null
-        : null,
+    interruptionCause,
+    failureReason:
+      evaluation.planned.status !== "failed"
+        ? null
+        : interruptionCause === "monster-defeat"
+          ? /** @type {const} */ ("monster")
+          : /** @type {const} */ ("supplies"),
+    monsterContact: contactExecutes ? monsterContact?.contact ?? null : null,
+    monsterContactResolution: contactExecutes ? contactResolution : null,
     planned: {
       ...evaluation.planned,
       segmentIndex: boundaryPosition.segmentIndex,
@@ -750,7 +810,7 @@ export function createExpeditionEventLogSnapshot(
     route.totalDurationSeconds,
   );
 
-  if (outcome?.interruptionCause === "monster-contact" && outcome.monsterContact) {
+  if (outcome?.monsterContact && outcome.monsterContactResolution) {
     events.push({
       id: `monster-contact-${outcome.monsterContact.monsterId}`,
       kind: "monster-contact",
@@ -761,6 +821,10 @@ export function createExpeditionEventLogSnapshot(
       monsterId: outcome.monsterContact.monsterId,
       monsterPower: outcome.monsterContact.monsterPower,
       separationMeters: outcome.monsterContact.separationMeters,
+      playerPower: outcome.monsterContactResolution.playerPower,
+      powerDelta: outcome.monsterContactResolution.powerDelta,
+      powerResolutionStatus: outcome.monsterContactResolution.status,
+      contactDoctrine: outcome.monsterContactResolution.doctrine,
       order: 17,
     });
   }
@@ -847,6 +911,10 @@ export function createExpeditionEventLogSnapshot(
     monsterId: event.monsterId ?? null,
     monsterPower: event.monsterPower ?? null,
     separationMeters: event.separationMeters ?? null,
+    playerPower: event.playerPower ?? null,
+    powerDelta: event.powerDelta ?? null,
+    powerResolutionStatus: event.powerResolutionStatus ?? null,
+    contactDoctrine: event.contactDoctrine ?? null,
     distanceKilometers: event.distanceKilometers,
     occurred: index <= activeEventIndex,
     active: index === activeEventIndex,

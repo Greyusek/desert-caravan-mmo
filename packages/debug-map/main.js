@@ -103,6 +103,23 @@ const contactTime = requireElement("contact-time", HTMLElement);
 const contactMonster = requireElement("contact-monster", HTMLElement);
 const contactPosition = requireElement("contact-position", HTMLElement);
 const contactDistance = requireElement("contact-distance", HTMLElement);
+const contactPlayerPower = requireElement("contact-player-power", HTMLElement);
+const contactPowerComparison = requireElement(
+  "contact-power-comparison",
+  HTMLElement,
+);
+const contactMonsterSelect = requireElement(
+  "contact-monster-select",
+  HTMLSelectElement,
+);
+const contactDoctrineFlee = requireElement(
+  "contact-doctrine-flee",
+  HTMLInputElement,
+);
+const contactDoctrineFight = requireElement(
+  "contact-doctrine-fight",
+  HTMLInputElement,
+);
 const contactDevRoute = requireElement("contact-dev-route", HTMLButtonElement);
 
 let elapsedSeconds = 0;
@@ -143,6 +160,13 @@ supplyForm.addEventListener("submit", (event) => {
 
 doctrineStop.addEventListener("change", render);
 doctrineMarkAndContinue.addEventListener("change", render);
+contactMonsterSelect.addEventListener("change", () => {
+  elapsedSeconds = 0;
+  timeSlider.value = "0";
+  render();
+});
+contactDoctrineFlee.addEventListener("change", render);
+contactDoctrineFight.addEventListener("change", render);
 
 outcomeAction.addEventListener("click", () => {
   if (!activeOutcome) return;
@@ -171,7 +195,9 @@ rumorDevRoute.addEventListener("click", () => {
 });
 
 contactDevRoute.addEventListener("click", () => {
-  const monster = activeSnapshot?.monsters[0];
+  const monster = activeSnapshot?.monsters.find(
+    (candidate) => candidate.id === contactMonsterSelect.value,
+  );
   if (!activeSnapshot || !monster) return;
 
   const candidates = activeSnapshot.cities.map((city) => ({
@@ -218,8 +244,13 @@ render();
 /** @returns {void} */
 function render() {
   try {
-    const snapshot = createDebugMapSnapshot(seedInput.value.trim(), elapsedSeconds);
+    const snapshot = createDebugMapSnapshot(
+      seedInput.value.trim(),
+      elapsedSeconds,
+      2,
+    );
     syncStartCityOptions(snapshot.cities);
+    syncContactMonsterOptions(snapshot.monsters);
     const startCity = snapshot.cities.find(
       (city) => city.id === routeStartCity.value,
     );
@@ -241,9 +272,11 @@ function render() {
       plannedRumorSearch,
       readDiscoveryDoctrine(),
     );
-    const firstMonster = snapshot.monsters[0];
-    const monsterContact = firstMonster
-      ? createMonsterContactSnapshot(plannedRoute, firstMonster)
+    const selectedMonster = snapshot.monsters.find(
+      (monster) => monster.id === contactMonsterSelect.value,
+    );
+    const monsterContact = selectedMonster
+      ? createMonsterContactSnapshot(plannedRoute, selectedMonster)
       : null;
     const outcome = createExpeditionOutcomeSnapshot(
       plannedRoute,
@@ -251,6 +284,7 @@ function render() {
       supplySettings.profile,
       proposedDoctrine,
       monsterContact,
+      readStrongMonsterDoctrine(),
     );
     const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
     const rumorSearch = createRumorSearchSnapshot(
@@ -286,7 +320,7 @@ function render() {
         ? outcome.planned.atSeconds
         : Math.max(
             route.totalDurationSeconds,
-            firstMonster?.periodSeconds ?? 0,
+            selectedMonster?.periodSeconds ?? 0,
           );
 
     if (elapsedSeconds > maximumElapsedSeconds) {
@@ -345,9 +379,12 @@ function renderMonsterContact(snapshot, outcome) {
     contactMonster.textContent = "—";
     contactPosition.textContent = "—";
     contactDistance.textContent = "—";
+    contactPlayerPower.textContent = "100";
+    contactPowerComparison.textContent = "—";
     return;
   }
 
+  const resolution = outcome.monsterContactResolution;
   contactTime.textContent = formatElapsed(contact.atSeconds);
   contactMonster.textContent = `${contact.monsterId} · PWR ${contact.monsterPower}`;
   contactPosition.textContent =
@@ -355,8 +392,16 @@ function renderMonsterContact(snapshot, outcome) {
       ? `Финиш · ${formatNumber(contact.routeDistanceKilometers, 1)} км`
       : `Сегмент ${contact.segmentIndex + 1} · ${formatNumber(contact.routeDistanceKilometers, 1)} км`;
   contactDistance.textContent = `${formatNumber(contact.separationMeters, 1)} м / ${formatNumber(contact.interactionRadiusMeters, 0)} м`;
+  contactPlayerPower.textContent = String(resolution?.playerPower ?? 100);
+  const playerPower = resolution?.playerPower ?? 100;
+  const comparison = playerPower > contact.monsterPower
+    ? ">"
+    : playerPower < contact.monsterPower
+      ? "<"
+      : "=";
+  contactPowerComparison.textContent = `${playerPower} ${comparison} ${contact.monsterPower}`;
 
-  if (outcome.interruptionCause !== "monster-contact") {
+  if (!outcome.monsterContact || !resolution) {
     contactPanel.dataset.state = "bypassed";
     contactState.textContent = "Не исполнится";
     contactTitle.textContent = "Перехват есть в плане, но не в исполнении";
@@ -369,20 +414,40 @@ function renderMonsterContact(snapshot, outcome) {
     return;
   }
 
-  if (outcome.status === "paused") {
-    contactPanel.dataset.state = "contact";
-    contactState.textContent = "Контакт";
-    contactTitle.textContent = "Караван встретил патруль";
+  const occurred = snapshot?.status === "contact";
+  if (resolution.status === "monster-defeated") {
+    contactPanel.dataset.state = occurred ? "victory" : "forecast";
+    contactState.textContent = occurred ? "Победа" : "Победа рассчитана";
+    contactTitle.textContent = occurred
+      ? "Слабый патруль уничтожен"
+      : "Караван сильнее патруля";
     contactDetail.textContent =
-      "Движение остановлено на первой точной границе 500 м. Бой ещё не разрешается.";
+      occurred
+        ? "Player Power выше: монстр погиб, а караван продолжил исходный маршрут."
+        : "На границе 500 м Power сравнятся автоматически; остановки маршрута не будет.";
     return;
   }
 
-  contactPanel.dataset.state = "forecast";
-  contactState.textContent = "Перехват впереди";
-  contactTitle.textContent = "На маршруте рассчитан контакт";
-  contactDetail.textContent =
-    "SIM-008 непрерывно свёл конечный маршрут каравана и циклический патруль монстра.";
+  if (resolution.status === "flee-required") {
+    contactPanel.dataset.state = occurred ? "flee" : "danger";
+    contactState.textContent = occurred ? "Отход" : "Опасный контакт";
+    contactTitle.textContent = occurred
+      ? "Караван выбрал FLEE"
+      : "Патруль сильнее каравана";
+    contactDetail.textContent = occurred
+      ? "Маршрут поставлен на паузу: шанс успешного бегства появится отдельным следующим слоем."
+      : "На границе контакта будет применена доктрина FLEE без выдуманной вероятности успеха.";
+    return;
+  }
+
+  contactPanel.dataset.state = occurred ? "defeat" : "danger";
+  contactState.textContent = occurred ? "Поражение" : "Смертельный риск";
+  contactTitle.textContent = occurred
+    ? "Караван принял проигрышный бой"
+    : "ACCEPT_FIGHT приведёт к гибели";
+  contactDetail.textContent = occurred
+    ? "Monster Power выше: экспедиция погибла на точной границе контакта."
+    : "Выбран ACCEPT_FIGHT; если приказ не изменить, сильный монстр уничтожит караван.";
 }
 
 /**
@@ -399,7 +464,9 @@ function renderEventLog(log, route) {
         ? "Маршрут остановлен контактом с монстром"
         : "Маршрут поставлен на паузу доктриной"
       : log.executionStatus === "failed"
-        ? "Экспедиция завершена гибелью каравана"
+        ? activeOutcome?.failureReason === "monster"
+          ? "Экспедиция уничтожена сильным монстром"
+          : "Экспедиция завершена гибелью каравана"
         : log.executionStatus === "completed"
           ? "Экспедиция успешно завершена"
           : "Маршрут завершён";
@@ -465,7 +532,13 @@ function eventTitle(event) {
       : "Доктрина: отметить и продолжить";
   }
   if (event.kind === "monster-contact") {
-    return `Контакт с ${event.monsterId ?? "монстром"}`;
+    if (event.powerResolutionStatus === "monster-defeated") {
+      return `Победа над ${event.monsterId ?? "монстром"}`;
+    }
+    if (event.powerResolutionStatus === "flee-required") {
+      return `FLEE от ${event.monsterId ?? "монстра"}`;
+    }
+    return `Гибель от ${event.monsterId ?? "монстра"}`;
   }
   if (event.kind === "search-missed") {
     return "Поиск завершён без находки";
@@ -499,7 +572,14 @@ function eventDetail(event, route) {
       : "Цель добавлена в знания экспедиции; курс не изменён";
   }
   if (event.kind === "monster-contact") {
-    return `PWR ${event.monsterPower ?? "—"} · ${formatNumber(event.separationMeters ?? 0, 1)} м · движение остановлено`;
+    const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
+    if (event.powerResolutionStatus === "monster-defeated") {
+      return `${comparison} · монстр погиб, маршрут продолжается`;
+    }
+    if (event.powerResolutionStatus === "flee-required") {
+      return `${comparison} · отход выбран, маршрут на паузе`;
+    }
+    return `${comparison} · ACCEPT_FIGHT, экспедиция погибла`;
   }
   if (event.kind === "search-missed") {
     return `Караван не вошёл в радиус 150 м от цели слуха`;
@@ -672,8 +752,15 @@ function renderCaravanStatus(status) {
   const outcomeFailed = status.outcome?.status === "failed";
   const outcomeCompleted = status.outcome?.status === "completed";
   const paused = status.outcome?.status === "paused";
+  const monsterDefeat =
+    outcomeFailed && status.outcome?.failureReason === "monster";
   const monsterContactPause =
     paused && status.outcome?.interruptionCause === "monster-contact";
+  const monsterVictoryOccurred =
+    status.outcome?.monsterContactResolution?.status === "monster-defeated" &&
+    status.outcome.monsterContact !== null &&
+    status.route.evaluatedAtSeconds + 1e-9 >=
+      status.outcome.monsterContact.expeditionElapsedSeconds;
   const doctrineContinues =
     status.doctrine?.status === "marked-and-continuing";
   const panelState = outcomeFailed
@@ -688,7 +775,9 @@ function renderCaravanStatus(status) {
   caravanPanel.dataset.state = panelState;
   caravanStateLabel.textContent =
     outcomeFailed
-      ? "Экспедиция потеряна"
+      ? monsterDefeat
+        ? "Караван уничтожен"
+        : "Экспедиция потеряна"
       : outcomeCompleted
         ? "Экспедиция завершена"
       : paused
@@ -697,13 +786,15 @@ function renderCaravanStatus(status) {
           : "Остановлен у цели"
         : doctrineContinues
           ? "Цель отмечена · в пути"
+        : monsterVictoryOccurred
+          ? "Патруль побеждён · в пути"
       : panelState === "risk"
         ? "Риск истощения"
         : "Готов к пути";
 
   caravanRouteStatus.textContent =
     outcomeFailed
-      ? `Погиб · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
+      ? `${monsterDefeat ? "Разбит" : "Погиб"} · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
       : outcomeCompleted
         ? "Прибыл · маршрут завершён"
       : paused
@@ -744,16 +835,25 @@ function renderCaravanStatus(status) {
   );
 
   if (outcomeFailed) {
-    forecastTitle.textContent = "Караван погиб";
-    forecastDetail.textContent = `${formatDepletionCause(status.outcome?.failureCause ?? null)} исчерпаны на ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}.`;
+    forecastTitle.textContent = monsterDefeat
+      ? "Караван уничтожен"
+      : "Караван погиб";
+    forecastDetail.textContent = monsterDefeat
+      ? `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} < Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; ACCEPT_FIGHT завершил экспедицию.`
+      : `${formatDepletionCause(status.outcome?.failureCause ?? null)} исчерпаны на ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}.`;
   } else if (outcomeCompleted) {
     forecastTitle.textContent = "Экспедиция завершена";
     forecastDetail.textContent = `Финиш: еда ${formatNumber(status.supplies.foodRemaining, 1)} · вода ${formatNumber(status.supplies.waterRemaining, 1)}`;
   } else if (paused) {
-    forecastTitle.textContent = "Маршрут поставлен на паузу";
+    forecastTitle.textContent = monsterContactPause
+      ? "Выбран FLEE"
+      : "Маршрут поставлен на паузу";
     forecastDetail.textContent = monsterContactPause
-      ? "Караван встретил патруль; разрешение контакта появится в GAME-005."
+      ? "Сильный патруль остановил маршрут; формула побега появится в следующем checkpoint."
       : "Караван ждёт у найденной цели; это не финальный исход.";
+  } else if (monsterVictoryOccurred) {
+    forecastTitle.textContent = "Слабый патруль уничтожен";
+    forecastDetail.textContent = `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} > Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; караван продолжает маршрут.`;
   } else if (status.forecast.canFinish) {
     forecastTitle.textContent = "Запасов хватит до финиша";
     forecastDetail.textContent = `На финише: еда ${formatNumber(status.forecast.foodAtArrival, 1)} · вода ${formatNumber(status.forecast.waterAtArrival, 1)}`;
@@ -779,18 +879,20 @@ function renderExpeditionOutcome(outcome) {
     outcomeTitle.textContent = "Экспедиция продолжается";
     outcomeAction.textContent = "DEV: к исходу";
     if (outcome.planned.status === "failed") {
-      outcomeDetail.textContent =
-        "Если план не изменить, критические запасы закончатся раньше финиша.";
-      outcomeCause.textContent = formatDepletionCause(
-        outcome.planned.failureCause,
-      );
+      const monsterDefeat = outcome.failureReason === "monster";
+      outcomeDetail.textContent = monsterDefeat
+        ? "Выбран ACCEPT_FIGHT против более сильного монстра; контакт станет терминальной границей."
+        : "Если план не изменить, критические запасы закончатся раньше финиша.";
+      outcomeCause.textContent = monsterDefeat
+        ? "Сильный монстр · ACCEPT_FIGHT"
+        : formatDepletionCause(outcome.planned.failureCause);
     } else if (outcome.planned.status === "paused") {
       const monsterContact = outcome.interruptionCause === "monster-contact";
       outcomeDetail.textContent = monsterContact
-        ? "Следующая граница исполнения — контакт движущегося каравана с патрулём."
+        ? "Следующая граница исполнения — FLEE от более сильного движущегося патруля."
         : "Следующая граница исполнения — автоматическая остановка у найденной цели.";
       outcomeCause.textContent = monsterContact
-        ? "Контакт с монстром"
+        ? "Сильный монстр · FLEE"
         : "Доктрина STOP";
     } else {
       outcomeDetail.textContent =
@@ -802,11 +904,17 @@ function renderExpeditionOutcome(outcome) {
 
   outcomeAction.textContent = "Повторить экспедицию";
   if (outcome.status === "failed") {
+    const monsterDefeat = outcome.failureReason === "monster";
     outcomeState.textContent = "Поражение";
-    outcomeTitle.textContent = "Караван погиб в пути";
-    outcomeDetail.textContent =
-      "Фатальное истощение остановило движение; будущие этапы и прибытие отменены.";
-    outcomeCause.textContent = formatDepletionCause(outcome.failureCause);
+    outcomeTitle.textContent = monsterDefeat
+      ? "Караван уничтожен сильным патрулём"
+      : "Караван погиб в пути";
+    outcomeDetail.textContent = monsterDefeat
+      ? "ACCEPT_FIGHT против превосходящего Power завершил экспедицию на границе контакта."
+      : "Фатальное истощение остановило движение; будущие этапы и прибытие отменены.";
+    outcomeCause.textContent = monsterDefeat
+      ? `PWR ${outcome.monsterContactResolution?.playerPower ?? "—"} < ${outcome.monsterContactResolution?.monsterPower ?? "—"}`
+      : formatDepletionCause(outcome.failureCause);
   } else if (outcome.status === "completed") {
     outcomeState.textContent = "Успех";
     outcomeTitle.textContent = "Экспедиция завершена";
@@ -820,10 +928,10 @@ function renderExpeditionOutcome(outcome) {
       ? "Караван встретил патруль"
       : "Караван остановлен у цели";
     outcomeDetail.textContent = monsterContact
-      ? "Первый контакт прервал движение; боевой исход пока не разрешается."
+      ? "Выбран FLEE; маршрут ждёт отдельную детерминированную формулу побега."
       : "Доктрина STOP прервала движение, но экспедиция не считается завершённой.";
     outcomeCause.textContent = monsterContact
-      ? "Контакт с монстром"
+      ? "Сильный монстр · FLEE"
       : "Доктрина STOP";
   }
 }
@@ -877,6 +985,11 @@ function readSupplySettings() {
 /** @returns {import("../sim-core/dist/src/index.js").StaticObjectDiscoveryDoctrine} */
 function readDiscoveryDoctrine() {
   return doctrineMarkAndContinue.checked ? "MARK_AND_CONTINUE" : "STOP";
+}
+
+/** @returns {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine} */
+function readStrongMonsterDoctrine() {
+  return contactDoctrineFight.checked ? "ACCEPT_FIGHT" : "FLEE";
 }
 
 /**
@@ -1023,6 +1136,18 @@ function drawSnapshot(
 
   if (monsterContact?.contact) {
     const contact = monsterContact.contact;
+    const contactResolution =
+      outcome.monsterContact?.monsterId === contact.monsterId
+        ? outcome.monsterContactResolution
+        : null;
+    const contactResultLabel =
+      contactResolution?.status === "monster-defeated"
+        ? "VICTORY"
+        : contactResolution?.status === "flee-required"
+          ? "FLEE"
+          : contactResolution?.status === "expedition-defeated"
+            ? "DEFEAT"
+            : "CONTACT";
     const marker = svgElement("circle", {
       class: "contact-world-marker",
       cx: contact.caravanPoint.x,
@@ -1032,7 +1157,10 @@ function drawSnapshot(
       "data-detail-rows": JSON.stringify([
         ["Время", formatElapsed(contact.atSeconds)],
         ["Монстр", contact.monsterId],
-        ["Power", String(contact.monsterPower)],
+        ["Player Power", String(contactResolution?.playerPower ?? 100)],
+        ["Monster Power", String(contact.monsterPower)],
+        ["Разрешение", contactResolution?.status ?? "Не исполнится"],
+        ["Доктрина", contactResolution?.doctrine ?? "AUTO"],
         ["Радиус", `${contact.interactionRadiusMeters} м`],
         ["Разделение", `${contact.separationMeters.toFixed(3)} м`],
         ["Путь", `${contact.routeDistanceKilometers.toFixed(1)} км`],
@@ -1043,8 +1171,10 @@ function drawSnapshot(
       x: contact.caravanPoint.x + 15,
       y: contact.caravanPoint.y - 11,
     });
-    label.textContent = "CONTACT";
-    marker.append(svgTitle(`Первый контакт с ${contact.monsterId}`));
+    label.textContent = contactResultLabel;
+    marker.append(
+      svgTitle(`${contactResultLabel}: контакт с ${contact.monsterId}`),
+    );
     worldMap.append(marker, label);
   }
 
@@ -1135,6 +1265,33 @@ function syncStartCityOptions(cities) {
     }),
   );
   routeStartCity.value = nextIds.includes(selectedId) ? selectedId : (nextIds[0] ?? "");
+}
+
+/**
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"]} monsters
+ */
+function syncContactMonsterOptions(monsters) {
+  const currentIds = Array.from(contactMonsterSelect.options, (option) => option.value);
+  const nextIds = monsters.map((monster) => monster.id);
+  if (
+    currentIds.length === nextIds.length &&
+    currentIds.every((id, index) => id === nextIds[index])
+  ) {
+    return;
+  }
+
+  const selectedId = contactMonsterSelect.value;
+  contactMonsterSelect.replaceChildren(
+    ...monsters.map((monster) => {
+      const option = document.createElement("option");
+      option.value = monster.id;
+      option.textContent = `${monster.id} · PWR ${monster.power}`;
+      return option;
+    }),
+  );
+  contactMonsterSelect.value = nextIds.includes(selectedId)
+    ? selectedId
+    : (nextIds[0] ?? "");
 }
 
 function readRouteCommands() {
