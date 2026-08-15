@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.16 — Checkpoint 16
+
+- Added `GAME-004`: a public deterministic expedition/monster contact API that composes finite caravan movement with an absolute-time cyclic patrol through SIM-008.
+- Made the first 500 m moving contact a non-terminal expedition pause that freezes movement, supply projection and executable future events.
+- Preserved first-boundary rules: earlier STOP still wins, while fatal depletion wins earlier and exact-time contact ties.
+- Added a dedicated contact forecast/state panel, a contact marker and a `monster-contact` timeline event with authoritative monster power and separation.
+- Added a deterministic DEV intercept preset that chooses the nearest city and synchronizes the route with whole patrol cycles for reliable manual QA.
+- Added ten GAME-004 regressions; repository verification now runs 155 tests.
+- Designated `GAME-005`, transparent Player Power 100 versus monster Power 90/110 contact resolution without tactical combat, as the next checkpoint.
+
 ## 0.0.15 — Checkpoint 15
 
 - Added `GAME-003`: a pure deterministic expedition outcome resolver with explicit `in-progress`, `paused`, `completed` and `failed` states.

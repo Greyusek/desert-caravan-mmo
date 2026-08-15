@@ -232,6 +232,127 @@ input[type="range"] {
     var(--panel);
 }
 
+.contact-panel {
+  display: grid;
+  margin-top: 18px;
+  padding: 18px 20px;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  align-items: center;
+  gap: 22px;
+  border: 1px solid rgba(88, 199, 180, 0.28);
+  border-radius: 18px;
+  background:
+    linear-gradient(125deg, rgba(29, 76, 68, 0.16), transparent 45%),
+    var(--panel);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.2);
+}
+
+.contact-panel[data-state="forecast"] {
+  border-color: rgba(244, 184, 96, 0.52);
+  background:
+    linear-gradient(125deg, rgba(111, 72, 29, 0.24), transparent 45%),
+    var(--panel);
+}
+
+.contact-panel[data-state="contact"] {
+  border-color: rgba(239, 111, 94, 0.7);
+  background:
+    radial-gradient(circle at 12% 50%, rgba(157, 52, 39, 0.2), transparent 30rem),
+    var(--panel);
+  box-shadow: 0 18px 65px rgba(111, 32, 24, 0.18);
+}
+
+.contact-panel[data-state="bypassed"] {
+  opacity: 0.78;
+}
+
+.contact-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.contact-detail {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.contact-state {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 7px 11px;
+  border: 1px solid rgba(88, 199, 180, 0.38);
+  border-radius: 999px;
+  color: #b7fff1;
+  background: rgba(29, 108, 88, 0.26);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-state="forecast"] .contact-state {
+  border-color: rgba(244, 184, 96, 0.48);
+  color: var(--accent-strong);
+  background: rgba(111, 72, 29, 0.3);
+}
+
+[data-state="contact"] .contact-state {
+  border-color: rgba(239, 111, 94, 0.58);
+  color: #ffb2a8;
+  background: rgba(91, 31, 25, 0.45);
+}
+
+.contact-facts {
+  display: grid;
+  margin: 13px 0 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.contact-facts div {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(236, 203, 148, 0.12);
+  border-radius: 10px;
+  background: rgba(18, 13, 9, 0.38);
+}
+
+.contact-facts dt {
+  color: #8f816a;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.contact-facts dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.contact-actions {
+  text-align: center;
+}
+
+.contact-actions button {
+  width: 100%;
+}
+
+.contact-actions p {
+  margin: 8px 0 0;
+  color: #8f816a;
+  font-size: 0.62rem;
+  line-height: 1.4;
+}
+
 .rumor-copy,
 .rumor-map-card {
   min-width: 0;
@@ -1355,6 +1476,20 @@ input[type="range"] {
   color: var(--accent-strong);
 }
 
+.event-log-item[data-kind="monster-contact"] .event-log-marker {
+  border-color: rgba(239, 111, 94, 0.7);
+}
+
+.event-log-item[data-kind="monster-contact"][data-state="occurred"] .event-log-marker,
+.event-log-item[data-kind="monster-contact"][data-state="active"] .event-log-marker {
+  background: var(--danger);
+  box-shadow: 0 0 10px rgba(239, 111, 94, 0.75);
+}
+
+.event-log-item[data-kind="monster-contact"] .event-log-content strong {
+  color: #ff9f91;
+}
+
 .event-log-current {
   position: absolute;
   top: 0;
@@ -1536,6 +1671,25 @@ input[type="range"] {
   stroke-dasharray: 3 2;
 }
 
+.contact-world-marker {
+  fill: rgba(239, 111, 94, 0.12);
+  stroke: #ff9f91;
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 7px rgba(239, 111, 94, 0.7));
+}
+
+.contact-world-label {
+  pointer-events: none;
+  fill: #ff9f91;
+  stroke: #1d1711;
+  stroke-width: 4px;
+  paint-order: stroke;
+  font-size: 9px;
+  font-weight: 800;
+}
+
 .city-marker {
   fill: #f8d795;
   stroke: #5b3e20;
@@ -1701,11 +1855,13 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .outcome-panel {
+  .outcome-panel,
+  .contact-panel {
     grid-template-columns: 1fr;
   }
 
-  .outcome-actions {
+  .outcome-actions,
+  .contact-actions {
     width: 100%;
     text-align: left;
   }
@@ -1721,6 +1877,14 @@ input[type="range"] {
   .control-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .contact-heading {
+    flex-direction: column;
+  }
+
+  .contact-facts {
+    grid-template-columns: 1fr 1fr;
   }
 
   .status-pill {

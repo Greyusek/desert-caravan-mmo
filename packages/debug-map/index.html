@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 15 · GAME-003</p>
+          <p class="eyebrow">Checkpoint 16 · GAME-004</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -135,6 +135,36 @@
         </article>
       </section>
 
+      <section
+        id="contact-panel"
+        class="contact-panel"
+        data-state="clear"
+        aria-labelledby="contact-title"
+      >
+        <div class="contact-copy">
+          <p class="section-kicker">GAME-004 · Moving encounter</p>
+          <div class="contact-heading">
+            <div>
+              <h2 id="contact-title">Контакта на маршруте нет</h2>
+              <p id="contact-detail" class="contact-detail">
+                SIM-008 проверяет движение каравана и патруля непрерывно.
+              </p>
+            </div>
+            <p id="contact-state" class="contact-state">Чистый маршрут</p>
+          </div>
+          <dl class="contact-facts">
+            <div><dt>Граница</dt><dd id="contact-time">—</dd></div>
+            <div><dt>Монстр</dt><dd id="contact-monster">—</dd></div>
+            <div><dt>Позиция</dt><dd id="contact-position">—</dd></div>
+            <div><dt>Дистанция</dt><dd id="contact-distance">—</dd></div>
+          </dl>
+        </div>
+        <div class="contact-actions">
+          <button id="contact-dev-route" type="button">DEV: маршрут на перехват</button>
+          <p>QA-пресет выберет ближайший город. Разрешение боя появится в GAME-005.</p>
+        </div>
+      </section>
+
       <section class="route-editor" aria-labelledby="route-editor-title">
         <div class="route-editor__heading">
           <div>
@@ -159,7 +189,7 @@
               name="speed"
               type="number"
               min="0.1"
-              step="0.1"
+              step="0.000001"
               value="5"
               required
             />

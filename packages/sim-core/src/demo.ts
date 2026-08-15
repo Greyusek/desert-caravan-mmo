@@ -8,6 +8,7 @@ import {
   discoverStaticObjectsAlongRoute,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
+  findFirstExpeditionMonsterContact,
   findFirstMovingEncounter,
   greatCircleDistance,
   generateSeededWorld,
@@ -32,7 +33,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 15 demo");
+console.log("Desert Caravan MMO — Checkpoint 16 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -242,4 +243,22 @@ console.log(
   `  same paths with 100 s delay: ${delayedEncounter === null ? "no encounter" : "encounter"}`,
 );
 
-console.log("\nGAME-003 outcome UI: npm run debug-map -> http://127.0.0.1:4173");
+const expeditionContact = findFirstExpeditionMonsterContact(
+  encounterCaravan,
+  {
+    id: "demo-monster",
+    kind: "wandering-monster",
+    power: 90,
+    visionRadiusMeters: 300,
+    interactionRadiusMeters: 500,
+    patrolRoute: encounterPatrol,
+  },
+);
+console.log("\nGAME-004 expedition contact:");
+console.log(
+  expeditionContact
+    ? `  ${expeditionContact.monsterId}: pause at T=${expeditionContact.expeditionElapsedSeconds.toFixed(6)} s, separation=${expeditionContact.separationMeters.toFixed(3)} m, power=${expeditionContact.monsterPower}`
+    : "  no contact",
+);
+
+console.log("\nCheckpoint 16 UI: npm run debug-map -> http://127.0.0.1:4173");

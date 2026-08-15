@@ -9,7 +9,9 @@ import {
   discoverStaticObjectsAlongRoute,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
+  findFirstExpeditionMonsterContact,
   generateSeededWorld,
+  greatCircleDistance,
   kilometers,
   positionAtTime,
   projectSupplies,
@@ -42,7 +44,7 @@ const RUMOR_MAP_PIXELS_PER_METER = 0.0022;
 const RUMOR_SECTOR_SAMPLE_COUNT = 16;
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "search-missed" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "monster-contact" | "search-missed" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -56,6 +58,9 @@ const RUMOR_SECTOR_SAMPLE_COUNT = 16;
  * @property {number} order
  * @property {import("../sim-core/dist/src/index.js").StaticWorldObjectKind} [objectKind]
  * @property {import("../sim-core/dist/src/index.js").StaticObjectDiscoveryDoctrine} [doctrine]
+ * @property {string} [monsterId]
+ * @property {number} [monsterPower]
+ * @property {number} [separationMeters]
  */
 
 /**
@@ -168,8 +173,114 @@ export function createDebugMapSnapshot(seed, elapsedSeconds = 0) {
         position: evaluated.coordinate,
         point: projectCoordinate(evaluated.coordinate),
         patrolPaths: splitPathAtAntimeridian(patrolCoordinates),
+        authoritativeMonster: monster,
       };
     }),
+  };
+}
+
+/**
+ * GAME-004 exposes the first finite-caravan/cyclic-patrol SIM-008 contact to
+ * the browser without moving encounter authority into the UI.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
+ */
+export function createMonsterContactSnapshot(route, monster) {
+  const contact = findFirstExpeditionMonsterContact(
+    route.authoritativeRoute,
+    monster.authoritativeMonster,
+  );
+
+  if (!contact) {
+    return {
+      status: /** @type {const} */ ("clear"),
+      evaluatedAtSeconds: Math.min(
+        route.position.elapsedSeconds,
+        route.totalDurationSeconds,
+      ),
+      contact: null,
+    };
+  }
+
+  const routePosition = positionAtTime(
+    route.authoritativeRoute,
+    contact.expeditionElapsedSeconds,
+  );
+  const evaluatedAtSeconds = Math.min(
+    route.position.elapsedSeconds,
+    route.totalDurationSeconds,
+  );
+
+  return {
+    status:
+      evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
+      contact.expeditionElapsedSeconds
+        ? /** @type {const} */ ("contact")
+        : /** @type {const} */ ("forecast"),
+    evaluatedAtSeconds,
+    contact: {
+      ...contact,
+      segmentIndex: routePosition.segmentIndex,
+      routeDistanceKilometers:
+        routePosition.traveledDistanceMeters / 1_000,
+      caravanPoint: projectCoordinate(contact.caravanPosition),
+      monsterPoint: projectCoordinate(contact.monsterPosition),
+    },
+  };
+}
+
+/**
+ * Creates a deterministic QA preset that reaches the patrol start after a
+ * whole number of monster cycles, guaranteeing a SIM-008 contact on the way.
+ * @param {WorldCoordinate} start
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
+ * @param {number} [targetSpeedKilometersPerHour]
+ */
+export function createMonsterInterceptRoutePreset(
+  start,
+  monster,
+  targetSpeedKilometersPerHour = 5,
+) {
+  assertPositiveFinite(
+    targetSpeedKilometersPerHour,
+    "targetSpeedKilometersPerHour",
+  );
+  const patrolRoute = monster.authoritativeMonster.patrolRoute;
+  const distanceMeters = greatCircleDistance(
+    start,
+    patrolRoute.start,
+    patrolRoute.planetRadiusMeters,
+  );
+  if (distanceMeters === 0) {
+    throw new RangeError("intercept start must differ from patrol start");
+  }
+
+  const targetSpeedMetersPerSecond =
+    (targetSpeedKilometersPerHour * 1_000) / 3_600;
+  const cycleCount = Math.max(
+    1,
+    Math.round(
+      distanceMeters /
+        (targetSpeedMetersPerSecond * patrolRoute.totalDurationSeconds),
+    ),
+  );
+  const durationSeconds = cycleCount * patrolRoute.totalDurationSeconds;
+  const speedKilometersPerHour =
+    (distanceMeters / durationSeconds) * 3.6;
+
+  return {
+    speedKilometersPerHour,
+    cycleCount,
+    durationSeconds,
+    commands: [
+      {
+        bearingDeg: initialBearingDegrees(start, patrolRoute.start),
+        distanceKilometers: distanceMeters / 1_000,
+      },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
   };
 }
 
@@ -390,22 +501,39 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
 }
 
 /**
- * GAME-003 composes route ETA, moving supplies and an optional GAME-002 STOP
- * into one authoritative execution outcome.
+ * GAME-004 composes route ETA, moving supplies, an optional GAME-002 STOP and
+ * the first moving-monster contact into one authoritative execution outcome.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
+ * @param {ReturnType<typeof createMonsterContactSnapshot> | null} [monsterContact]
  */
 export function createExpeditionOutcomeSnapshot(
   route,
   initialSupplies,
   consumptionProfile,
   doctrine = null,
+  monsterContact = null,
 ) {
-  const pausedAtSeconds =
+  const doctrinePauseAtSeconds =
     doctrine?.status === "stopped"
       ? doctrine.decision?.decidedAtSeconds ?? null
+      : null;
+  const monsterPauseAtSeconds =
+    monsterContact?.contact?.expeditionElapsedSeconds ?? null;
+  const monsterPauseWins =
+    monsterPauseAtSeconds !== null &&
+    (doctrinePauseAtSeconds === null ||
+      monsterPauseAtSeconds <=
+        doctrinePauseAtSeconds + EVENT_TIME_EPSILON_SECONDS);
+  const pausedAtSeconds = monsterPauseWins
+    ? monsterPauseAtSeconds
+    : doctrinePauseAtSeconds;
+  const selectedInterruptionCause = monsterPauseWins
+    ? /** @type {const} */ ("monster-contact")
+    : doctrinePauseAtSeconds !== null
+      ? /** @type {const} */ ("doctrine-stop")
       : null;
   const evaluation = evaluateExpeditionOutcome(
     route.authoritativeRoute,
@@ -421,6 +549,14 @@ export function createExpeditionOutcomeSnapshot(
 
   return {
     ...evaluation,
+    interruptionCause:
+      evaluation.planned.status === "paused"
+        ? selectedInterruptionCause
+        : null,
+    monsterContact:
+      evaluation.planned.status === "paused" && monsterPauseWins
+        ? monsterContact?.contact ?? null
+        : null,
     planned: {
       ...evaluation.planned,
       segmentIndex: boundaryPosition.segmentIndex,
@@ -614,6 +750,21 @@ export function createExpeditionEventLogSnapshot(
     route.totalDurationSeconds,
   );
 
+  if (outcome?.interruptionCause === "monster-contact" && outcome.monsterContact) {
+    events.push({
+      id: `monster-contact-${outcome.monsterContact.monsterId}`,
+      kind: "monster-contact",
+      atSeconds: outcome.monsterContact.expeditionElapsedSeconds,
+      segmentIndex: outcome.planned.segmentIndex,
+      cause: null,
+      distanceKilometers: outcome.planned.routeDistanceKilometers,
+      monsterId: outcome.monsterContact.monsterId,
+      monsterPower: outcome.monsterContact.monsterPower,
+      separationMeters: outcome.monsterContact.separationMeters,
+      order: 17,
+    });
+  }
+
   if (
     firstDepletion.atSeconds !== null &&
     firstDepletion.atSeconds <=
@@ -693,6 +844,9 @@ export function createExpeditionEventLogSnapshot(
     cause: event.cause,
     objectKind: event.objectKind ?? null,
     doctrine: event.doctrine ?? null,
+    monsterId: event.monsterId ?? null,
+    monsterPower: event.monsterPower ?? null,
+    separationMeters: event.separationMeters ?? null,
     distanceKilometers: event.distanceKilometers,
     occurred: index <= activeEventIndex,
     active: index === activeEventIndex,
@@ -953,6 +1107,22 @@ function projectLocalCoordinate(origin, coordinate, planetRadiusMeters) {
     x: RUMOR_MAP_ORIGIN.x + eastMeters * RUMOR_MAP_PIXELS_PER_METER,
     y: RUMOR_MAP_ORIGIN.y - northMeters * RUMOR_MAP_PIXELS_PER_METER,
   };
+}
+
+/** @param {WorldCoordinate} start @param {WorldCoordinate} end */
+function initialBearingDegrees(start, end) {
+  const degreesToRadians = Math.PI / 180;
+  const latitudeStart = start.latitudeDeg * degreesToRadians;
+  const latitudeEnd = end.latitudeDeg * degreesToRadians;
+  const longitudeDelta =
+    (end.longitudeDeg - start.longitudeDeg) * degreesToRadians;
+  const y = Math.sin(longitudeDelta) * Math.cos(latitudeEnd);
+  const x =
+    Math.cos(latitudeStart) * Math.sin(latitudeEnd) -
+    Math.sin(latitudeStart) *
+      Math.cos(latitudeEnd) *
+      Math.cos(longitudeDelta);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
 /**

@@ -11,6 +11,8 @@ import {
   createExpeditionEventLogSnapshot,
   createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
+  createMonsterContactSnapshot,
+  createMonsterInterceptRoutePreset,
   createRumorSearchSnapshot,
   projectCoordinate,
   splitPathAtAntimeridian,
@@ -1073,4 +1075,162 @@ test("GAME-003: depletion before discovery suppresses the impossible doctrine de
   assert.equal(executedSearch.status, "searching");
   assert.equal(effectiveDoctrine.status, "pending");
   assert.equal(effectiveDoctrine.decision, null);
+});
+
+function monsterInterceptAt(elapsedSeconds = 0) {
+  const world = createDebugMapSnapshot("checkpoint-04", elapsedSeconds);
+  const monster = world.monsters[0];
+  assert.ok(monster);
+  const candidates = world.cities.map((city) => ({
+    city,
+    preset: createMonsterInterceptRoutePreset(city.position, monster),
+  }));
+  candidates.sort(
+    (left, right) =>
+      left.preset.commands[0].distanceKilometers -
+        right.preset.commands[0].distanceKilometers ||
+      left.city.id.localeCompare(right.city.id),
+  );
+  const selected = candidates[0];
+  assert.ok(selected);
+  const route = createFourSegmentRouteSnapshot(
+    selected.city.position,
+    selected.preset.commands,
+    selected.preset.speedKilometersPerHour,
+    elapsedSeconds,
+  );
+  return {
+    world,
+    monster,
+    city: selected.city,
+    preset: selected.preset,
+    route,
+    contact: createMonsterContactSnapshot(route, monster),
+  };
+}
+
+test("GAME-004: QA intercept preset is deterministic and guarantees contact", () => {
+  const first = monsterInterceptAt();
+  const second = monsterInterceptAt();
+
+  assert.deepEqual(first.preset, second.preset);
+  assert.equal(first.preset.commands.length, 4);
+  assert.ok(first.preset.cycleCount > 0);
+  assert.ok(first.contact.contact);
+  assert.equal(first.contact.status, "forecast");
+  assert.ok(
+    Math.abs(
+      first.contact.contact.separationMeters -
+        first.contact.contact.interactionRadiusMeters,
+    ) < 0.001,
+  );
+  assert.ok(
+    first.contact.contact.expeditionElapsedSeconds <
+      first.route.totalDurationSeconds,
+  );
+});
+
+test("GAME-004: first moving contact becomes a non-terminal pause and timeline event", () => {
+  const planned = monsterInterceptAt();
+  const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const selected = monsterInterceptAt(contactAt);
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    searchSupplies,
+    searchConsumption,
+    null,
+    selected.contact,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected.route, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    searchSupplies,
+    searchConsumption,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "paused");
+  assert.equal(outcome.terminal, false);
+  assert.equal(outcome.interruptionCause, "monster-contact");
+  assert.equal(outcome.monsterContact?.monsterId, selected.monster.id);
+  approx(executed.position.elapsedSeconds, contactAt, 1e-6);
+  assert.equal(log.executionStatus, "paused");
+  assert.equal(log.events.at(-1)?.kind, "monster-contact");
+  assert.equal(log.events.at(-1)?.monsterPower, selected.monster.power);
+  assert.equal(log.events.some((event) => event.kind === "arrival"), false);
+});
+
+test("GAME-004: fatal depletion before contact suppresses the encounter boundary", () => {
+  const planned = monsterInterceptAt(10 * 3_600);
+  const outcome = createExpeditionOutcomeSnapshot(
+    planned.route,
+    { foodUnits: 1, waterUnits: 1 },
+    consumption,
+    null,
+    planned.contact,
+  );
+  const executed = applyExpeditionOutcomeToRoute(planned.route, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    { foodUnits: 1, waterUnits: 1 },
+    consumption,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.interruptionCause, null);
+  assert.equal(outcome.monsterContact, null);
+  assert.equal(
+    log.events.some((event) => event.kind === "monster-contact"),
+    false,
+  );
+});
+
+test("GAME-004: fatal depletion wins an exact tie with monster contact", () => {
+  const planned = monsterInterceptAt();
+  const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const stockAtTie = contactAt / 3_600;
+  const tieProfile = {
+    moving: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+    idle: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+  };
+  const outcome = createExpeditionOutcomeSnapshot(
+    planned.route,
+    { foodUnits: stockAtTie, waterUnits: stockAtTie },
+    tieProfile,
+    null,
+    planned.contact,
+  );
+
+  assert.equal(outcome.planned.status, "failed");
+  assert.equal(outcome.planned.failureCause, "both");
+  assert.equal(outcome.interruptionCause, null);
+});
+
+test("GAME-004: an earlier discovery STOP remains the first pause", () => {
+  const planned = monsterInterceptAt();
+  const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const earlierDoctrine = {
+    status: "stopped",
+    decision: { decidedAtSeconds: contactAt - 60 },
+  };
+  const outcome = createExpeditionOutcomeSnapshot(
+    planned.route,
+    searchSupplies,
+    searchConsumption,
+    earlierDoctrine,
+    planned.contact,
+  );
+
+  assert.equal(outcome.planned.status, "paused");
+  assert.equal(outcome.planned.atSeconds, contactAt - 60);
+  assert.equal(outcome.interruptionCause, "doctrine-stop");
+  assert.equal(outcome.monsterContact, null);
 });
