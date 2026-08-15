@@ -237,4 +237,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-001` — rumor scenario.
 - [x] `GAME-002` — simple doctrine.
 - [x] `GAME-003` — expedition completion/death.
-- [ ] `GAME-004` — expedition monster encounter event.
+- [x] `GAME-004` — expedition monster encounter event.
+- [ ] `GAME-005` — pre-combat Power-stub contact resolution.

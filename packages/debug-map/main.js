@@ -10,6 +10,8 @@ import {
   createExpeditionEventLogSnapshot,
   createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
+  createMonsterContactSnapshot,
+  createMonsterInterceptRoutePreset,
   createRumorSearchSnapshot,
   projectCoordinate,
 } from "./map-model.js";
@@ -93,6 +95,15 @@ const doctrineMarkAndContinue = requireElement(
 );
 const rumorDevRoute = requireElement("rumor-dev-route", HTMLButtonElement);
 const rumorMap = requireElement("rumor-map", SVGSVGElement);
+const contactPanel = requireElement("contact-panel", HTMLElement);
+const contactState = requireElement("contact-state", HTMLParagraphElement);
+const contactTitle = requireElement("contact-title", HTMLHeadingElement);
+const contactDetail = requireElement("contact-detail", HTMLParagraphElement);
+const contactTime = requireElement("contact-time", HTMLElement);
+const contactMonster = requireElement("contact-monster", HTMLElement);
+const contactPosition = requireElement("contact-position", HTMLElement);
+const contactDistance = requireElement("contact-distance", HTMLElement);
+const contactDevRoute = requireElement("contact-dev-route", HTMLButtonElement);
 
 let elapsedSeconds = 0;
 let supplySettings = readSupplySettings();
@@ -100,6 +111,8 @@ let supplySettings = readSupplySettings();
 let activeRumorSearch = null;
 /** @type {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} */
 let activeOutcome = null;
+/** @type {ReturnType<typeof createDebugMapSnapshot> | null} */
+let activeSnapshot = null;
 
 seedForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -157,6 +170,37 @@ rumorDevRoute.addEventListener("click", () => {
   render();
 });
 
+contactDevRoute.addEventListener("click", () => {
+  const monster = activeSnapshot?.monsters[0];
+  if (!activeSnapshot || !monster) return;
+
+  const candidates = activeSnapshot.cities.map((city) => ({
+    city,
+    preset: createMonsterInterceptRoutePreset(city.position, monster),
+  }));
+  candidates.sort(
+    (left, right) =>
+      left.preset.commands[0].distanceKilometers -
+        right.preset.commands[0].distanceKilometers ||
+      left.city.id.localeCompare(right.city.id),
+  );
+  const selected = candidates[0];
+  if (!selected) return;
+
+  routeStartCity.value = selected.city.id;
+  routeSpeed.value = selected.preset.speedKilometersPerHour.toFixed(6);
+  routeBearingInputs.forEach((input, index) => {
+    input.value = selected.preset.commands[index]?.bearingDeg.toFixed(6) ?? "0";
+  });
+  routeDistanceInputs.forEach((input, index) => {
+    input.value =
+      selected.preset.commands[index]?.distanceKilometers.toFixed(6) ?? "0";
+  });
+  elapsedSeconds = 0;
+  timeSlider.value = "0";
+  render();
+});
+
 worldMap.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
   const marker = event.target.closest("[data-detail-title]");
@@ -197,11 +241,16 @@ function render() {
       plannedRumorSearch,
       readDiscoveryDoctrine(),
     );
+    const firstMonster = snapshot.monsters[0];
+    const monsterContact = firstMonster
+      ? createMonsterContactSnapshot(plannedRoute, firstMonster)
+      : null;
     const outcome = createExpeditionOutcomeSnapshot(
       plannedRoute,
       supplySettings.initial,
       supplySettings.profile,
       proposedDoctrine,
+      monsterContact,
     );
     const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
     const rumorSearch = createRumorSearchSnapshot(
@@ -223,6 +272,7 @@ function render() {
     );
     activeRumorSearch = rumorSearch;
     activeOutcome = outcome;
+    activeSnapshot = snapshot;
     const eventLog = createExpeditionEventLogSnapshot(
       route,
       supplySettings.initial,
@@ -231,7 +281,6 @@ function render() {
       doctrine,
       outcome,
     );
-    const firstMonster = snapshot.monsters[0];
     const maximumElapsedSeconds =
       outcome.status !== "in-progress"
         ? outcome.planned.atSeconds
@@ -257,18 +306,83 @@ function render() {
     renderRumorSearch(rumorSearch, doctrine);
     renderCaravanStatus(caravanStatus);
     renderExpeditionOutcome(outcome);
+    renderMonsterContact(monsterContact, outcome);
     renderEventLog(eventLog, route);
 
     timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
     timeSlider.value = String(elapsedSeconds);
 
-    drawSnapshot(snapshot, route, rumorSearch, doctrine, outcome);
+    drawSnapshot(
+      snapshot,
+      route,
+      rumorSearch,
+      doctrine,
+      outcome,
+      monsterContact,
+    );
   } catch (error) {
     activeRumorSearch = null;
     activeOutcome = null;
+    activeSnapshot = null;
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
   }
+}
+
+/**
+ * @param {ReturnType<typeof createMonsterContactSnapshot> | null} snapshot
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
+ */
+function renderMonsterContact(snapshot, outcome) {
+  const contact = snapshot?.contact ?? null;
+  if (!contact) {
+    contactPanel.dataset.state = "clear";
+    contactState.textContent = "Чистый маршрут";
+    contactTitle.textContent = "Контакта на маршруте нет";
+    contactDetail.textContent =
+      "SIM-008 не нашёл сближения с патрулём внутри радиуса взаимодействия.";
+    contactTime.textContent = "—";
+    contactMonster.textContent = "—";
+    contactPosition.textContent = "—";
+    contactDistance.textContent = "—";
+    return;
+  }
+
+  contactTime.textContent = formatElapsed(contact.atSeconds);
+  contactMonster.textContent = `${contact.monsterId} · PWR ${contact.monsterPower}`;
+  contactPosition.textContent =
+    contact.segmentIndex === null
+      ? `Финиш · ${formatNumber(contact.routeDistanceKilometers, 1)} км`
+      : `Сегмент ${contact.segmentIndex + 1} · ${formatNumber(contact.routeDistanceKilometers, 1)} км`;
+  contactDistance.textContent = `${formatNumber(contact.separationMeters, 1)} м / ${formatNumber(contact.interactionRadiusMeters, 0)} м`;
+
+  if (outcome.interruptionCause !== "monster-contact") {
+    contactPanel.dataset.state = "bypassed";
+    contactState.textContent = "Не исполнится";
+    contactTitle.textContent = "Перехват есть в плане, но не в исполнении";
+    contactDetail.textContent =
+      outcome.planned.status === "failed"
+        ? "Караван погибнет от истощения раньше рассчитанного контакта."
+        : outcome.planned.status === "paused"
+          ? "Доктрина STOP остановит караван раньше рассчитанного контакта."
+          : "Сближение приходится на границу прибытия и не прерывает маршрут.";
+    return;
+  }
+
+  if (outcome.status === "paused") {
+    contactPanel.dataset.state = "contact";
+    contactState.textContent = "Контакт";
+    contactTitle.textContent = "Караван встретил патруль";
+    contactDetail.textContent =
+      "Движение остановлено на первой точной границе 500 м. Бой ещё не разрешается.";
+    return;
+  }
+
+  contactPanel.dataset.state = "forecast";
+  contactState.textContent = "Перехват впереди";
+  contactTitle.textContent = "На маршруте рассчитан контакт";
+  contactDetail.textContent =
+    "SIM-008 непрерывно свёл конечный маршрут каравана и циклический патруль монстра.";
 }
 
 /**
@@ -281,7 +395,9 @@ function renderEventLog(log, route) {
   eventLogNext.textContent = nextEvent
     ? `Следующее: ${eventTitle(nextEvent)} · ${formatElapsed(nextEvent.atSeconds)}`
     : log.executionStatus === "stopped" || log.executionStatus === "paused"
-      ? "Маршрут поставлен на паузу доктриной"
+      ? activeOutcome?.interruptionCause === "monster-contact"
+        ? "Маршрут остановлен контактом с монстром"
+        : "Маршрут поставлен на паузу доктриной"
       : log.executionStatus === "failed"
         ? "Экспедиция завершена гибелью каравана"
         : log.executionStatus === "completed"
@@ -348,6 +464,9 @@ function eventTitle(event) {
       ? "Доктрина: остановиться у цели"
       : "Доктрина: отметить и продолжить";
   }
+  if (event.kind === "monster-contact") {
+    return `Контакт с ${event.monsterId ?? "монстром"}`;
+  }
   if (event.kind === "search-missed") {
     return "Поиск завершён без находки";
   }
@@ -378,6 +497,9 @@ function eventDetail(event, route) {
     return event.doctrine === "STOP"
       ? "Движение поставлено на паузу в точке обнаружения"
       : "Цель добавлена в знания экспедиции; курс не изменён";
+  }
+  if (event.kind === "monster-contact") {
+    return `PWR ${event.monsterPower ?? "—"} · ${formatNumber(event.separationMeters ?? 0, 1)} м · движение остановлено`;
   }
   if (event.kind === "search-missed") {
     return `Караван не вошёл в радиус 150 м от цели слуха`;
@@ -549,14 +671,16 @@ function drawRumorMap(search) {
 function renderCaravanStatus(status) {
   const outcomeFailed = status.outcome?.status === "failed";
   const outcomeCompleted = status.outcome?.status === "completed";
-  const doctrineStopped = status.outcome?.status === "paused";
+  const paused = status.outcome?.status === "paused";
+  const monsterContactPause =
+    paused && status.outcome?.interruptionCause === "monster-contact";
   const doctrineContinues =
     status.doctrine?.status === "marked-and-continuing";
   const panelState = outcomeFailed
     ? "depleted"
     : outcomeCompleted
       ? "completed"
-    : doctrineStopped
+    : paused
       ? "stopped"
     : status.forecast.canFinish
       ? "safe"
@@ -567,8 +691,10 @@ function renderCaravanStatus(status) {
       ? "Экспедиция потеряна"
       : outcomeCompleted
         ? "Экспедиция завершена"
-      : doctrineStopped
-        ? "Остановлен у цели"
+      : paused
+        ? monsterContactPause
+          ? "Контакт с монстром"
+          : "Остановлен у цели"
         : doctrineContinues
           ? "Цель отмечена · в пути"
       : panelState === "risk"
@@ -580,8 +706,8 @@ function renderCaravanStatus(status) {
       ? `Погиб · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
       : outcomeCompleted
         ? "Прибыл · маршрут завершён"
-      : doctrineStopped
-      ? `Стоянка · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
+      : paused
+      ? `${monsterContactPause ? "Контакт" : "Стоянка"} · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
       : status.route.status === "arrived"
       ? "Прибыл · маршрут завершён"
       : `В пути · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`;
@@ -592,8 +718,8 @@ function renderCaravanStatus(status) {
     ? `${Math.round(status.route.progress * 100)}% · ГИБЕЛЬ ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
     : outcomeCompleted
       ? `100% · ФИНИШ ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
-      : doctrineStopped
-        ? `${Math.round(status.route.progress * 100)}% · STOP ${formatElapsed(status.doctrine?.decision?.decidedAtSeconds ?? 0)}`
+      : paused
+        ? `${Math.round(status.route.progress * 100)}% · ${monsterContactPause ? "КОНТАКТ" : "STOP"} ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
         : `${Math.round(status.route.progress * 100)}% · ETA ${formatDuration(status.route.totalDurationSeconds)}`;
 
   renderSupply(
@@ -623,9 +749,11 @@ function renderCaravanStatus(status) {
   } else if (outcomeCompleted) {
     forecastTitle.textContent = "Экспедиция завершена";
     forecastDetail.textContent = `Финиш: еда ${formatNumber(status.supplies.foodRemaining, 1)} · вода ${formatNumber(status.supplies.waterRemaining, 1)}`;
-  } else if (doctrineStopped) {
+  } else if (paused) {
     forecastTitle.textContent = "Маршрут поставлен на паузу";
-    forecastDetail.textContent = "Караван ждёт у найденной цели; это не финальный исход.";
+    forecastDetail.textContent = monsterContactPause
+      ? "Караван встретил патруль; разрешение контакта появится в GAME-005."
+      : "Караван ждёт у найденной цели; это не финальный исход.";
   } else if (status.forecast.canFinish) {
     forecastTitle.textContent = "Запасов хватит до финиша";
     forecastDetail.textContent = `На финише: еда ${formatNumber(status.forecast.foodAtArrival, 1)} · вода ${formatNumber(status.forecast.waterAtArrival, 1)}`;
@@ -657,9 +785,13 @@ function renderExpeditionOutcome(outcome) {
         outcome.planned.failureCause,
       );
     } else if (outcome.planned.status === "paused") {
-      outcomeDetail.textContent =
-        "Следующая граница исполнения — автоматическая остановка у найденной цели.";
-      outcomeCause.textContent = "Доктрина STOP";
+      const monsterContact = outcome.interruptionCause === "monster-contact";
+      outcomeDetail.textContent = monsterContact
+        ? "Следующая граница исполнения — контакт движущегося каравана с патрулём."
+        : "Следующая граница исполнения — автоматическая остановка у найденной цели.";
+      outcomeCause.textContent = monsterContact
+        ? "Контакт с монстром"
+        : "Доктрина STOP";
     } else {
       outcomeDetail.textContent =
         "Маршрут и запас провизии позволяют добраться до конечной точки.";
@@ -682,11 +814,17 @@ function renderExpeditionOutcome(outcome) {
       "Караван достиг конечной точки маршрута и сохранил оставшиеся запасы.";
     outcomeCause.textContent = "Прибытие";
   } else {
+    const monsterContact = outcome.interruptionCause === "monster-contact";
     outcomeState.textContent = "Пауза";
-    outcomeTitle.textContent = "Караван остановлен у цели";
-    outcomeDetail.textContent =
-      "Доктрина STOP прервала движение, но экспедиция не считается завершённой.";
-    outcomeCause.textContent = "Доктрина STOP";
+    outcomeTitle.textContent = monsterContact
+      ? "Караван встретил патруль"
+      : "Караван остановлен у цели";
+    outcomeDetail.textContent = monsterContact
+      ? "Первый контакт прервал движение; боевой исход пока не разрешается."
+      : "Доктрина STOP прервала движение, но экспедиция не считается завершённой.";
+    outcomeCause.textContent = monsterContact
+      ? "Контакт с монстром"
+      : "Доктрина STOP";
   }
 }
 
@@ -747,8 +885,16 @@ function readDiscoveryDoctrine() {
  * @param {ReturnType<typeof createRumorSearchSnapshot>} rumorSearch
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot>} doctrine
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
+ * @param {ReturnType<typeof createMonsterContactSnapshot> | null} monsterContact
  */
-function drawSnapshot(snapshot, route, rumorSearch, doctrine, outcome) {
+function drawSnapshot(
+  snapshot,
+  route,
+  rumorSearch,
+  doctrine,
+  outcome,
+  monsterContact,
+) {
   worldMap.replaceChildren();
   drawGrid();
 
@@ -874,6 +1020,33 @@ function drawSnapshot(snapshot, route, rumorSearch, doctrine, outcome) {
   });
   rumorTargetLabel.textContent = "RUMOR TARGET";
   worldMap.append(rumorTargetMarker, rumorTargetLabel);
+
+  if (monsterContact?.contact) {
+    const contact = monsterContact.contact;
+    const marker = svgElement("circle", {
+      class: "contact-world-marker",
+      cx: contact.caravanPoint.x,
+      cy: contact.caravanPoint.y,
+      r: 12,
+      "data-detail-title": `Контакт · ${contact.monsterId}`,
+      "data-detail-rows": JSON.stringify([
+        ["Время", formatElapsed(contact.atSeconds)],
+        ["Монстр", contact.monsterId],
+        ["Power", String(contact.monsterPower)],
+        ["Радиус", `${contact.interactionRadiusMeters} м`],
+        ["Разделение", `${contact.separationMeters.toFixed(3)} м`],
+        ["Путь", `${contact.routeDistanceKilometers.toFixed(1)} км`],
+      ]),
+    });
+    const label = svgElement("text", {
+      class: "contact-world-label",
+      x: contact.caravanPoint.x + 15,
+      y: contact.caravanPoint.y - 11,
+    });
+    label.textContent = "CONTACT";
+    marker.append(svgTitle(`Первый контакт с ${contact.monsterId}`));
+    worldMap.append(marker, label);
+  }
 
   for (const monster of snapshot.monsters) {
     const marker = svgElement("polygon", {
