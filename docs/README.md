@@ -13,6 +13,7 @@
 - `CHECKPOINT_06.md` — первый точный вход маршрута в радиус скрытого объекта.
 - `CHECKPOINT_07.md` — детерминированный блуждающий монстр и замкнутый patrol-loop.
 - `CHECKPOINT_08.md` — time-aware встреча двух движущихся сущностей.
+- `CHECKPOINT_09.md` — dependency-free north-up debug-карта seeded-мира.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008` и `WORLD-001..WORLD-004` покрыты 78 simulation-тестами; вместе с 3 tooling-регрессиями GitHub Actions запускает 81 тест в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004` и `UI-001` покрыты 86 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 91 тест в pull request.

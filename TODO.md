@@ -14,10 +14,11 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `DEVX-002`: make local acceptance launch npm reliably on Windows.
 - [x] `WORLD-004`: add deterministic wandering monsters with cyclic patrol routes.
 - [x] `SIM-008`: detect encounters between two moving entities in overlapping time windows.
+- [x] `UI-001`: add a dependency-free north-up developer debug map.
 
 ## Next
 
-- [ ] `UI-001`: choose the minimal browser shell and add a north-up debug map.
+- [ ] `UI-002`: add a four-segment caravan route editor to the debug map.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Maintenance rules

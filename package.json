@@ -1,17 +1,20 @@
 {
   "name": "desert-caravan-mmo",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p packages/sim-core/tsconfig.json",
+    "build": "npm run build:sim && npm run build:debug-map",
+    "build:sim": "tsc -p packages/sim-core/tsconfig.json",
+    "build:debug-map": "tsc -p packages/debug-map/tsconfig.json",
     "test": "npm run build && npm run test:compiled",
-    "test:compiled": "node --test packages/sim-core/tests/*.test.mjs scripts/*.test.mjs",
+    "test:compiled": "node --test packages/sim-core/tests/*.test.mjs packages/debug-map/tests/*.test.mjs scripts/*.test.mjs",
     "demo": "npm run build && npm run demo:compiled",
     "demo:compiled": "node packages/sim-core/dist/src/demo.js",
     "verify": "npm run build && npm run test:compiled",
     "verify:local": "npm run verify && npm run demo:compiled",
-    "accept:main": "node scripts/accept-main.mjs"
+    "accept:main": "node scripts/accept-main.mjs",
+    "debug-map": "npm run build && node scripts/serve-debug-map.mjs"
   },
   "devDependencies": {
     "typescript": "5.8.3"
