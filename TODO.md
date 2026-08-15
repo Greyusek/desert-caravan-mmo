@@ -17,10 +17,11 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `UI-001`: add a dependency-free north-up developer debug map.
 - [x] `UI-002`: add a four-segment caravan route editor to the debug map.
 - [x] `UI-003`: add a persistent caravan status and supplies panel.
+- [x] `UI-004`: add a compact deterministic expedition event log.
 
 ## Next
 
-- [ ] `UI-004`: add a compact deterministic expedition event log.
+- [ ] `GAME-001`: add the first deterministic rumor-driven search scenario.
 - [ ] UX (deferred): add local map/time zoom so short monster patrol loops remain readable beside long caravan routes.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 

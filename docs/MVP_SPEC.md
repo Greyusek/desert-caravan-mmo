@@ -232,7 +232,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `UI-001` — debug map.
 - [x] `UI-002` — route editor.
 - [x] `UI-003` — caravan panel.
-- [ ] `UI-004` — event log.
+- [x] `UI-004` — event log.
 - [ ] `GAME-001` — rumor scenario.
 - [ ] `GAME-002` — simple doctrine.
 - [ ] `GAME-003` — expedition completion/death.
