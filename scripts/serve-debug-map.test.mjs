@@ -1,14 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   contentTypeForDebugMap,
   resolveDebugMapAsset,
 } from "./serve-debug-map.mjs";
 
 const repositoryRoot = path.resolve("test-repository-root");
+const actualRepositoryRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
-test("UI-001 tooling: static server exposes only debug-map and compiled sim assets", () => {
+test("UI-001 tooling: root document references only routable debug-map assets", async () => {
   assert.equal(
     resolveDebugMapAsset(repositoryRoot, "/"),
     path.join(repositoryRoot, "packages", "debug-map", "index.html"),
@@ -26,6 +32,22 @@ test("UI-001 tooling: static server exposes only debug-map and compiled sim asse
     resolveDebugMapAsset(repositoryRoot, "/packages/debug-map/../../package.json"),
     null,
   );
+
+  const html = await readFile(
+    path.join(actualRepositoryRoot, "packages", "debug-map", "index.html"),
+    "utf8",
+  );
+  const referencedAssets = [...html.matchAll(/(?:href|src)="([^"]+)"/g)].map(
+    (match) => match[1],
+  );
+
+  assert.deepEqual(referencedAssets, [
+    "/packages/debug-map/styles.css",
+    "/packages/debug-map/main.js",
+  ]);
+  for (const asset of referencedAssets) {
+    assert.notEqual(resolveDebugMapAsset(actualRepositoryRoot, asset), null);
+  }
 });
 
 test("UI-001 tooling: server returns browser-safe content types", () => {
