@@ -32,15 +32,32 @@ Not implemented yet (intentionally): object discovery, monsters, UI/server/datab
 - Node.js 22+
 - npm
 
-## Local verification on Windows PowerShell
+## Local verification on Windows 11
 
-Because Windows PowerShell may block `npm.ps1`, use `npm.cmd`:
+After merging a pull request, run the complete acceptance flow with one command:
+
+```bash
+cd /d/dev/newWorld
+npm run accept:main
+```
+
+The command updates `main` with fast-forward only, installs exact dependencies, builds once, runs all tests and the demo, and verifies a clean working tree. On success, send only the generated summary file; keep the full log for failures. Double-click `scripts\accept-main.cmd` for the same workflow.
+
+One-time bootstrap after the pull request that introduces this command:
+
+```bash
+git switch main
+git pull --ff-only origin main
+npm run accept:main
+```
+
+Starting with the next pull request, `npm run accept:main` performs the update itself.
+
+Because Windows PowerShell may block `npm.ps1`, use `npm.cmd` there:
 
 ```powershell
 cd D:\dev\newWorld
-npm.cmd ci
-npm.cmd test
-npm.cmd run demo
+npm.cmd run accept:main
 ```
 
 Expected for Checkpoint 05:
@@ -51,7 +68,7 @@ Expected for Checkpoint 05:
 # fail 0
 ```
 
-GitHub Actions runs installation, TypeScript compilation, and tests for every pull request to `main`. See `docs/CHECKPOINT_05.md` for WORLD-002 details.
+GitHub Actions runs installation, one TypeScript compilation, and all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_05.md` for WORLD-002 details.
 
 ## Project structure
 

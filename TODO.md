@@ -9,6 +9,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `WORLD-001`: generate a deterministic seeded world containing ten initial cities.
 - [x] Open and merge PR #1 after CI succeeds.
 - [x] `WORLD-002`: add deterministic hidden static objects (oasis, mine, ruins, cave).
+- [x] `DEVX-001`: document the CI-gated pre-MVP workflow and add one-command local acceptance.
 
 ## Next
 
@@ -20,4 +21,5 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - Keep tasks small enough for one feature or fix branch and one pull request.
 - Add automated tests for functional work wherever practical.
 - Mark work complete only after the build and test suite pass in CI.
+- Skip routine manual review before MVP, but use the exceptions in [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md).
 - Update this list when a PR changes priorities; do not copy the full roadmap here.
