@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.5 — Checkpoint 05
+
+- Added `WORLD-002`: deterministic hidden static oasis, mine, ruins, and cave objects.
+- Isolated every object kind in a namespaced PRNG stream without changing `WORLD-001` cities.
+- Added configurable per-kind counts, stable IDs, golden regression coverage, and demo output.
+- Designated `WORLD-003` route-and-radius discovery as the next checkpoint.
+
 ## 0.0.4 — Checkpoint 04
 
 - Added GitHub Actions CI for clean installation, TypeScript compilation, and tests.

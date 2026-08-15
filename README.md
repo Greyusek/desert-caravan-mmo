@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 04 — WORLD-001: implemented and covered by automated tests.**
+**Checkpoint 05 — WORLD-002: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -22,9 +22,10 @@ Also implemented:
 - `food`, `water` or simultaneous depletion cause;
 - quick survival check for a given duration;
 - demo linking supply depletion with caravan position on the route.
-- WORLD-001 — deterministic seeded generation of ten initial cities.
+- WORLD-001 — deterministic seeded generation of ten initial cities;
+- WORLD-002 — deterministic hidden oasis, mine, ruins, and cave objects, isolated by PRNG namespace.
 
-Not implemented yet (intentionally): hidden objects, discovery, monsters, UI/server/database.
+Not implemented yet (intentionally): object discovery, monsters, UI/server/database.
 
 ## Requirements
 
@@ -42,15 +43,15 @@ npm.cmd test
 npm.cmd run demo
 ```
 
-Expected for Checkpoint 04:
+Expected for Checkpoint 05:
 
 ```text
-# tests 38
-# pass 38
+# tests 48
+# pass 48
 # fail 0
 ```
 
-GitHub Actions runs installation, TypeScript compilation, and tests for every pull request to `main`. See `docs/CHECKPOINT_04.md` for WORLD-001 details.
+GitHub Actions runs installation, TypeScript compilation, and tests for every pull request to `main`. See `docs/CHECKPOINT_05.md` for WORLD-002 details.
 
 ## Project structure
 
@@ -64,4 +65,4 @@ GitHub Actions runs installation, TypeScript compilation, and tests for every pu
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `WORLD-002`: deterministic hidden static world objects.
+The next functional checkpoint is `WORLD-003`: discover objects when a caravan's real route enters the detection radius.

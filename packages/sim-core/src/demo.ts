@@ -89,3 +89,9 @@ for (const city of world.cities) {
     `  ${city.id} ${city.name}: ${city.position.latitudeDeg.toFixed(6)}, ${city.position.longitudeDeg.toFixed(6)}`,
   );
 }
+console.log(`WORLD-002 hidden static objects: ${world.staticObjects.length}`);
+for (const object of world.staticObjects) {
+  console.log(
+    `  ${object.id} ${object.kind}: ${object.position.latitudeDeg.toFixed(6)}, ${object.position.longitudeDeg.toFixed(6)}`,
+  );
+}
