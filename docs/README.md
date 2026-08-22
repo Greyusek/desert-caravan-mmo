@@ -1,8 +1,9 @@
 # Desert Caravan MMO — Project Docs
 
-Обновлено: 15 августа 2026
+Обновлено: 22 августа 2026
 
-- `Desert_Caravan_MMO_GDD_v0.2.docx` — основной Game Design Document.
+- `Desert_Caravan_MMO_GDD_v0.3.docx` — актуальный Game Design Document; v0.3 фиксирует практически необозримый production-мир и физическую экономику карт/библиотек.
+- `Desert_Caravan_MMO_GDD_v0.2.docx` — архивная исходная версия GDD.
 - `ROADMAP.md` — этапы разработки и критерии выхода.
 - `MVP_SPEC.md` — спецификация MVP-0 и актуальный backlog.
 - `CHECKPOINT_01.md` — координаты и сферическая геометрия.

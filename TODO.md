@@ -23,6 +23,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-003`: add explicit completion, pause and fatal-depletion expedition outcomes.
 - [x] `GAME-004`: connect SIM-008 moving monster encounters to the expedition and event timeline without combat.
 - [x] `GAME-005`: resolve contacts with the transparent Player Power 100 / monster Power 90 or 110 pre-combat stub.
+- [x] `DESIGN-001`: consolidate GDD v0.3 and MVP_SPEC v0.3 around production world scale and the physical map/library information economy.
 
 ## Next
 
