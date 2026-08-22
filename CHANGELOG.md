@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Design consolidation
+
+- Integrated the previously unmerged world-bible history into the repository without changing runtime code or package version.
+- Added canonical chapters for world history, magic, bestiary, ecology, System 256 and presentation direction.
+- Published GDD v0.4 as the cross-document entry point and preserved GDD v0.2/v0.3 as archives.
+- Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
+- Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
+
 ## 0.0.17 — Checkpoint 17
 
 - Added `GAME-005`: a public deterministic Player Power 100 versus monster Power contact resolver with explicit route dispositions.
