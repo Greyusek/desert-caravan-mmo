@@ -10,4 +10,5 @@ export * from "./discovery.js";
 export * from "./monster.js";
 export * from "./encounter.js";
 export * from "./expedition-contact.js";
+export * from "./flee.js";
 export * from "./power-contact.js";

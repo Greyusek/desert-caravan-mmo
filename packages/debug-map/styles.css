@@ -402,7 +402,8 @@ input[type="range"] {
   text-transform: uppercase;
 }
 
-.contact-monster-field select {
+.contact-monster-field select,
+.contact-monster-field input {
   width: 100%;
   padding: 9px 10px;
   border: 1px solid rgba(236, 203, 148, 0.22);

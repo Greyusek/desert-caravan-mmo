@@ -16,6 +16,7 @@ test("GAME-005: default Player Power 100 defeats Monster Power 90", () => {
     doctrine: null,
     status: "monster-defeated",
     routeDisposition: "continue",
+    fleeResolution: null,
     monsterDefeated: true,
     expeditionDefeated: false,
     terminal: false,
@@ -29,6 +30,37 @@ test("GAME-005: FLEE pauses against Monster Power 110 without inventing escape o
   assert.equal(result.status, "flee-required");
   assert.equal(result.routeDisposition, "pause");
   assert.equal(result.terminal, false);
+  assert.equal(result.fleeResolution, null);
+});
+
+test("GAME-006: strong-monster FLEE composes a successful movement result", () => {
+  const result = resolveMonsterPowerContact(110, "FLEE", 100, {
+    caravanSpeedMetersPerSecond: 2,
+    monsterSpeedMetersPerSecond: 1.5,
+    contactSeparationMeters: 500,
+    safeSeparationMeters: 1_000,
+  });
+
+  assert.equal(result.status, "flee-succeeded");
+  assert.equal(result.routeDisposition, "continue");
+  assert.equal(result.fleeResolution?.secondsToSafeSeparation, 1_000);
+  assert.equal(result.expeditionDefeated, false);
+  assert.equal(result.terminal, false);
+});
+
+test("GAME-006: strong-monster FLEE composes a failed movement result", () => {
+  const result = resolveMonsterPowerContact(110, "FLEE", 100, {
+    caravanSpeedMetersPerSecond: 1.5,
+    monsterSpeedMetersPerSecond: 1.5,
+    contactSeparationMeters: 500,
+    safeSeparationMeters: 1_000,
+  });
+
+  assert.equal(result.status, "flee-failed");
+  assert.equal(result.routeDisposition, "fail");
+  assert.equal(result.fleeResolution?.secondsToSafeSeparation, null);
+  assert.equal(result.expeditionDefeated, true);
+  assert.equal(result.terminal, true);
 });
 
 test("GAME-005: ACCEPT_FIGHT against Monster Power 110 is fatal for MVP", () => {

@@ -108,9 +108,15 @@ const contactPowerComparison = requireElement(
   "contact-power-comparison",
   HTMLElement,
 );
+const contactMonsterSpeed = requireElement("contact-monster-speed", HTMLElement);
+const contactFleeResult = requireElement("contact-flee-result", HTMLElement);
 const contactMonsterSelect = requireElement(
   "contact-monster-select",
   HTMLSelectElement,
+);
+const contactFleeSpeed = requireElement(
+  "contact-flee-speed",
+  HTMLInputElement,
 );
 const contactDoctrineFlee = requireElement(
   "contact-doctrine-flee",
@@ -167,6 +173,7 @@ contactMonsterSelect.addEventListener("change", () => {
 });
 contactDoctrineFlee.addEventListener("change", render);
 contactDoctrineFight.addEventListener("change", render);
+contactFleeSpeed.addEventListener("change", render);
 
 outcomeAction.addEventListener("click", () => {
   if (!activeOutcome) return;
@@ -285,6 +292,7 @@ function render() {
       proposedDoctrine,
       monsterContact,
       readStrongMonsterDoctrine(),
+      contactFleeSpeed.valueAsNumber / 3.6,
     );
     const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
     const rumorSearch = createRumorSearchSnapshot(
@@ -381,6 +389,8 @@ function renderMonsterContact(snapshot, outcome) {
     contactDistance.textContent = "—";
     contactPlayerPower.textContent = "100";
     contactPowerComparison.textContent = "—";
+    contactMonsterSpeed.textContent = "—";
+    contactFleeResult.textContent = "—";
     return;
   }
 
@@ -400,6 +410,18 @@ function renderMonsterContact(snapshot, outcome) {
       ? "<"
       : "=";
   contactPowerComparison.textContent = `${playerPower} ${comparison} ${contact.monsterPower}`;
+  contactMonsterSpeed.textContent = `${formatNumber(contact.monsterSpeedMetersPerSecond * 3.6, 1)} км/ч`;
+  contactFleeResult.textContent = !resolution
+    ? "Не исполнится"
+    : resolution.status === "monster-defeated"
+      ? "Не требуется"
+      : resolution.status === "flee-succeeded"
+        ? "Успех"
+        : resolution.status === "flee-failed"
+          ? "Провал"
+          : resolution.status === "flee-required"
+            ? "Ожидает данных"
+            : "Не выбран";
 
   if (!outcome.monsterContact || !resolution) {
     contactPanel.dataset.state = "bypassed";
@@ -435,8 +457,34 @@ function renderMonsterContact(snapshot, outcome) {
       ? "Караван выбрал FLEE"
       : "Патруль сильнее каравана";
     contactDetail.textContent = occurred
-      ? "Маршрут поставлен на паузу: шанс успешного бегства появится отдельным следующим слоем."
-      : "На границе контакта будет применена доктрина FLEE без выдуманной вероятности успеха.";
+      ? "Маршрут поставлен на паузу: для разрешения FLEE не переданы явные скорости."
+      : "На границе контакта FLEE потребует явных скоростей каравана и патруля.";
+    return;
+  }
+
+  if (resolution.status === "flee-succeeded") {
+    const flee = resolution.fleeResolution;
+    contactPanel.dataset.state = occurred ? "victory" : "forecast";
+    contactState.textContent = occurred ? "Отход успешен" : "Отход рассчитан";
+    contactTitle.textContent = occurred
+      ? "Караван разорвал дистанцию"
+      : "Караван быстрее патруля";
+    contactDetail.textContent = flee
+      ? `${formatNumber(flee.caravanSpeedMetersPerSecond * 3.6, 1)} км/ч против ${formatNumber(flee.monsterSpeedMetersPerSecond * 3.6, 1)} км/ч: безопасная дистанция ${formatNumber(flee.safeSeparationMeters, 0)} м будет достигнута за ${formatDuration(flee.secondsToSafeSeparation ?? 0)}; исходный маршрут продолжается.`
+      : "FLEE разрешён успешно; исходный маршрут продолжается.";
+    return;
+  }
+
+  if (resolution.status === "flee-failed") {
+    const flee = resolution.fleeResolution;
+    contactPanel.dataset.state = occurred ? "defeat" : "danger";
+    contactState.textContent = occurred ? "Поражение" : "Побег невозможен";
+    contactTitle.textContent = occurred
+      ? "Патруль настиг караван"
+      : "Караван не быстрее патруля";
+    contactDetail.textContent = flee
+      ? `${formatNumber(flee.caravanSpeedMetersPerSecond * 3.6, 1)} км/ч против ${formatNumber(flee.monsterSpeedMetersPerSecond * 3.6, 1)} км/ч: дистанция не растёт, поэтому FLEE завершит экспедицию на границе контакта.`
+      : "FLEE завершится поражением на границе контакта.";
     return;
   }
 
@@ -535,6 +583,12 @@ function eventTitle(event) {
     if (event.powerResolutionStatus === "monster-defeated") {
       return `Победа над ${event.monsterId ?? "монстром"}`;
     }
+    if (event.powerResolutionStatus === "flee-succeeded") {
+      return `Успешный отход от ${event.monsterId ?? "монстра"}`;
+    }
+    if (event.powerResolutionStatus === "flee-failed") {
+      return `Неудачный отход от ${event.monsterId ?? "монстра"}`;
+    }
     if (event.powerResolutionStatus === "flee-required") {
       return `FLEE от ${event.monsterId ?? "монстра"}`;
     }
@@ -575,6 +629,12 @@ function eventDetail(event, route) {
     const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
     if (event.powerResolutionStatus === "monster-defeated") {
       return `${comparison} · монстр погиб, маршрут продолжается`;
+    }
+    if (event.powerResolutionStatus === "flee-succeeded") {
+      return `${comparison} · ${formatNumber((event.fleeSpeedMetersPerSecond ?? 0) * 3.6, 1)} > ${formatNumber((event.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч · безопасная дистанция за ${formatDuration(event.secondsToSafeSeparation ?? 0)}`;
+    }
+    if (event.powerResolutionStatus === "flee-failed") {
+      return `${comparison} · ${formatNumber((event.fleeSpeedMetersPerSecond ?? 0) * 3.6, 1)} ≤ ${formatNumber((event.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч · экспедиция погибла`;
     }
     if (event.powerResolutionStatus === "flee-required") {
       return `${comparison} · отход выбран, маршрут на паузе`;
@@ -754,10 +814,18 @@ function renderCaravanStatus(status) {
   const paused = status.outcome?.status === "paused";
   const monsterDefeat =
     outcomeFailed && status.outcome?.failureReason === "monster";
+  const fleeFailed =
+    monsterDefeat &&
+    status.outcome?.monsterContactResolution?.status === "flee-failed";
   const monsterContactPause =
     paused && status.outcome?.interruptionCause === "monster-contact";
   const monsterVictoryOccurred =
     status.outcome?.monsterContactResolution?.status === "monster-defeated" &&
+    status.outcome.monsterContact !== null &&
+    status.route.evaluatedAtSeconds + 1e-9 >=
+      status.outcome.monsterContact.expeditionElapsedSeconds;
+  const fleeSucceededOccurred =
+    status.outcome?.monsterContactResolution?.status === "flee-succeeded" &&
     status.outcome.monsterContact !== null &&
     status.route.evaluatedAtSeconds + 1e-9 >=
       status.outcome.monsterContact.expeditionElapsedSeconds;
@@ -788,6 +856,8 @@ function renderCaravanStatus(status) {
           ? "Цель отмечена · в пути"
         : monsterVictoryOccurred
           ? "Патруль побеждён · в пути"
+        : fleeSucceededOccurred
+          ? "Отход успешен · в пути"
       : panelState === "risk"
         ? "Риск истощения"
         : "Готов к пути";
@@ -836,10 +906,14 @@ function renderCaravanStatus(status) {
 
   if (outcomeFailed) {
     forecastTitle.textContent = monsterDefeat
-      ? "Караван уничтожен"
+      ? fleeFailed
+        ? "Побег не удался"
+        : "Караван уничтожен"
       : "Караван погиб";
     forecastDetail.textContent = monsterDefeat
-      ? `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} < Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; ACCEPT_FIGHT завершил экспедицию.`
+      ? fleeFailed
+        ? `Скорость отхода ${formatNumber((status.outcome?.monsterContactResolution?.fleeResolution?.caravanSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч не выше скорости патруля ${formatNumber((status.outcome?.monsterContactResolution?.fleeResolution?.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч.`
+        : `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} < Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; ACCEPT_FIGHT завершил экспедицию.`
       : `${formatDepletionCause(status.outcome?.failureCause ?? null)} исчерпаны на ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}.`;
   } else if (outcomeCompleted) {
     forecastTitle.textContent = "Экспедиция завершена";
@@ -849,11 +923,14 @@ function renderCaravanStatus(status) {
       ? "Выбран FLEE"
       : "Маршрут поставлен на паузу";
     forecastDetail.textContent = monsterContactPause
-      ? "Сильный патруль остановил маршрут; формула побега появится в следующем checkpoint."
+      ? "Сильный патруль остановил маршрут: для FLEE не переданы явные скорости."
       : "Караван ждёт у найденной цели; это не финальный исход.";
   } else if (monsterVictoryOccurred) {
     forecastTitle.textContent = "Слабый патруль уничтожен";
     forecastDetail.textContent = `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} > Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; караван продолжает маршрут.`;
+  } else if (fleeSucceededOccurred) {
+    forecastTitle.textContent = "Отход выполнен";
+    forecastDetail.textContent = `Караван открыл безопасную дистанцию за ${formatDuration(status.outcome?.monsterContactResolution?.fleeResolution?.secondsToSafeSeparation ?? 0)} и продолжает исходный маршрут.`;
   } else if (status.forecast.canFinish) {
     forecastTitle.textContent = "Запасов хватит до финиша";
     forecastDetail.textContent = `На финише: еда ${formatNumber(status.forecast.foodAtArrival, 1)} · вода ${formatNumber(status.forecast.waterAtArrival, 1)}`;
@@ -880,11 +957,17 @@ function renderExpeditionOutcome(outcome) {
     outcomeAction.textContent = "DEV: к исходу";
     if (outcome.planned.status === "failed") {
       const monsterDefeat = outcome.failureReason === "monster";
+      const fleeFailed =
+        outcome.monsterContactResolution?.status === "flee-failed";
       outcomeDetail.textContent = monsterDefeat
-        ? "Выбран ACCEPT_FIGHT против более сильного монстра; контакт станет терминальной границей."
+        ? fleeFailed
+          ? "Скорость отхода не выше скорости патруля; FLEE станет терминальной границей."
+          : "Выбран ACCEPT_FIGHT против более сильного монстра; контакт станет терминальной границей."
         : "Если план не изменить, критические запасы закончатся раньше финиша.";
       outcomeCause.textContent = monsterDefeat
-        ? "Сильный монстр · ACCEPT_FIGHT"
+        ? fleeFailed
+          ? "Сильный монстр · FLEE не удался"
+          : "Сильный монстр · ACCEPT_FIGHT"
         : formatDepletionCause(outcome.planned.failureCause);
     } else if (outcome.planned.status === "paused") {
       const monsterContact = outcome.interruptionCause === "monster-contact";
@@ -905,15 +988,23 @@ function renderExpeditionOutcome(outcome) {
   outcomeAction.textContent = "Повторить экспедицию";
   if (outcome.status === "failed") {
     const monsterDefeat = outcome.failureReason === "monster";
+    const fleeFailed =
+      outcome.monsterContactResolution?.status === "flee-failed";
     outcomeState.textContent = "Поражение";
     outcomeTitle.textContent = monsterDefeat
-      ? "Караван уничтожен сильным патрулём"
+      ? fleeFailed
+        ? "Патруль настиг караван"
+        : "Караван уничтожен сильным патрулём"
       : "Караван погиб в пути";
     outcomeDetail.textContent = monsterDefeat
-      ? "ACCEPT_FIGHT против превосходящего Power завершил экспедицию на границе контакта."
+      ? fleeFailed
+        ? "FLEE не открыл дистанцию: равная или меньшая скорость завершила экспедицию на границе контакта."
+        : "ACCEPT_FIGHT против превосходящего Power завершил экспедицию на границе контакта."
       : "Фатальное истощение остановило движение; будущие этапы и прибытие отменены.";
     outcomeCause.textContent = monsterDefeat
-      ? `PWR ${outcome.monsterContactResolution?.playerPower ?? "—"} < ${outcome.monsterContactResolution?.monsterPower ?? "—"}`
+      ? fleeFailed
+        ? `${formatNumber((outcome.monsterContactResolution?.fleeResolution?.caravanSpeedMetersPerSecond ?? 0) * 3.6, 1)} ≤ ${formatNumber((outcome.monsterContactResolution?.fleeResolution?.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч`
+        : `PWR ${outcome.monsterContactResolution?.playerPower ?? "—"} < ${outcome.monsterContactResolution?.monsterPower ?? "—"}`
       : formatDepletionCause(outcome.failureCause);
   } else if (outcome.status === "completed") {
     outcomeState.textContent = "Успех";
@@ -928,7 +1019,7 @@ function renderExpeditionOutcome(outcome) {
       ? "Караван встретил патруль"
       : "Караван остановлен у цели";
     outcomeDetail.textContent = monsterContact
-      ? "Выбран FLEE; маршрут ждёт отдельную детерминированную формулу побега."
+      ? "FLEE ожидает явных входных скоростей; это резервное состояние API."
       : "Доктрина STOP прервала движение, но экспедиция не считается завершённой.";
     outcomeCause.textContent = monsterContact
       ? "Сильный монстр · FLEE"
@@ -1143,6 +1234,10 @@ function drawSnapshot(
     const contactResultLabel =
       contactResolution?.status === "monster-defeated"
         ? "VICTORY"
+        : contactResolution?.status === "flee-succeeded"
+          ? "FLEE OK"
+          : contactResolution?.status === "flee-failed"
+            ? "FLEE FAIL"
         : contactResolution?.status === "flee-required"
           ? "FLEE"
           : contactResolution?.status === "expedition-defeated"
@@ -1161,6 +1256,23 @@ function drawSnapshot(
         ["Monster Power", String(contact.monsterPower)],
         ["Разрешение", contactResolution?.status ?? "Не исполнится"],
         ["Доктрина", contactResolution?.doctrine ?? "AUTO"],
+        ["Скорость монстра", `${(contact.monsterSpeedMetersPerSecond * 3.6).toFixed(1)} км/ч`],
+        [
+          "Скорость отхода",
+          contactResolution?.fleeResolution
+            ? `${(contactResolution.fleeResolution.caravanSpeedMetersPerSecond * 3.6).toFixed(1)} км/ч`
+            : "—",
+        ],
+        [
+          "До безопасной дистанции",
+          contactResolution?.fleeResolution?.secondsToSafeSeparation === null ||
+          contactResolution?.fleeResolution === null ||
+          contactResolution?.fleeResolution === undefined
+            ? "—"
+            : formatDuration(
+                contactResolution.fleeResolution.secondsToSafeSeparation,
+              ),
+        ],
         ["Радиус", `${contact.interactionRadiusMeters} м`],
         ["Разделение", `${contact.separationMeters.toFixed(3)} м`],
         ["Путь", `${contact.routeDistanceKilometers.toFixed(1)} км`],

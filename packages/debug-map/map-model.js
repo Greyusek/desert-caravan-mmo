@@ -2,6 +2,8 @@
 
 import {
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
+  DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
+  DEFAULT_PLAYER_POWER,
   canSurviveDuration,
   createRoutePlan,
   createRumorSearchScenario,
@@ -66,6 +68,11 @@ const RUMOR_SECTOR_SAMPLE_COUNT = 16;
  * @property {number} [powerDelta]
  * @property {import("../sim-core/dist/src/index.js").PowerContactResolutionStatus} [powerResolutionStatus]
  * @property {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine | null} [contactDoctrine]
+ * @property {number} [monsterSpeedMetersPerSecond]
+ * @property {number} [fleeSpeedMetersPerSecond]
+ * @property {number} [safeSeparationMeters]
+ * @property {number} [relativeSpeedMetersPerSecond]
+ * @property {number | null} [secondsToSafeSeparation]
  */
 
 /**
@@ -511,15 +518,17 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
 }
 
 /**
- * GAME-005 composes route ETA, supplies, discovery STOP and the first moving
- * contact with the transparent Power stub. A weak-monster victory continues
- * the route, FLEE pauses, and ACCEPT_FIGHT against a stronger monster fails.
+ * GAME-006 composes route ETA, supplies, discovery STOP and the first moving
+ * contact with Power plus an explicit movement-based FLEE resolution. A weak
+ * monster is defeated automatically; against a stronger monster a strictly
+ * faster caravan escapes and continues, while an equal/slower caravan fails.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
  * @param {ReturnType<typeof createMonsterContactSnapshot> | null} [monsterContact]
  * @param {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine} [strongMonsterDoctrine]
+ * @param {number} [fleeSpeedMetersPerSecond]
  */
 export function createExpeditionOutcomeSnapshot(
   route,
@@ -528,6 +537,7 @@ export function createExpeditionOutcomeSnapshot(
   doctrine = null,
   monsterContact = null,
   strongMonsterDoctrine = "FLEE",
+  fleeSpeedMetersPerSecond = route.authoritativeRoute.speedMetersPerSecond,
 ) {
   const doctrinePauseAtSeconds =
     doctrine?.status === "stopped"
@@ -542,10 +552,24 @@ export function createExpeditionOutcomeSnapshot(
     route.position.elapsedSeconds,
     doctrinePauseAtSeconds,
   );
-  const contactResolution = monsterContact?.contact
+  const contact = monsterContact?.contact ?? null;
+  const fleeAttempt =
+    contact && strongMonsterDoctrine === "FLEE"
+      ? {
+          caravanSpeedMetersPerSecond: fleeSpeedMetersPerSecond,
+          monsterSpeedMetersPerSecond: contact.monsterSpeedMetersPerSecond,
+          contactSeparationMeters: contact.separationMeters,
+          safeSeparationMeters:
+            contact.interactionRadiusMeters *
+            DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
+        }
+      : null;
+  const contactResolution = contact
     ? resolveMonsterPowerContact(
-        monsterContact.contact.monsterPower,
+        contact.monsterPower,
         strongMonsterDoctrine,
+        DEFAULT_PLAYER_POWER,
+        fleeAttempt,
       )
     : null;
   const contactExecutes =
@@ -825,6 +849,20 @@ export function createExpeditionEventLogSnapshot(
       powerDelta: outcome.monsterContactResolution.powerDelta,
       powerResolutionStatus: outcome.monsterContactResolution.status,
       contactDoctrine: outcome.monsterContactResolution.doctrine,
+      monsterSpeedMetersPerSecond:
+        outcome.monsterContact.monsterSpeedMetersPerSecond,
+      fleeSpeedMetersPerSecond:
+        outcome.monsterContactResolution.fleeResolution
+          ?.caravanSpeedMetersPerSecond,
+      safeSeparationMeters:
+        outcome.monsterContactResolution.fleeResolution
+          ?.safeSeparationMeters,
+      relativeSpeedMetersPerSecond:
+        outcome.monsterContactResolution.fleeResolution
+          ?.relativeSpeedMetersPerSecond,
+      secondsToSafeSeparation:
+        outcome.monsterContactResolution.fleeResolution
+          ?.secondsToSafeSeparation,
       order: 17,
     });
   }
@@ -915,6 +953,13 @@ export function createExpeditionEventLogSnapshot(
     powerDelta: event.powerDelta ?? null,
     powerResolutionStatus: event.powerResolutionStatus ?? null,
     contactDoctrine: event.contactDoctrine ?? null,
+    monsterSpeedMetersPerSecond:
+      event.monsterSpeedMetersPerSecond ?? null,
+    fleeSpeedMetersPerSecond: event.fleeSpeedMetersPerSecond ?? null,
+    safeSeparationMeters: event.safeSeparationMeters ?? null,
+    relativeSpeedMetersPerSecond:
+      event.relativeSpeedMetersPerSecond ?? null,
+    secondsToSafeSeparation: event.secondsToSafeSeparation ?? null,
     distanceKilometers: event.distanceKilometers,
     occurred: index <= activeEventIndex,
     active: index === activeEventIndex,
