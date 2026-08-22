@@ -1,3 +1,9 @@
+import {
+  resolveFleeAttempt,
+  type FleeAttemptInput,
+  type FleeResolution,
+} from "./flee.js";
+
 export const DEFAULT_PLAYER_POWER = 100;
 
 export type StrongMonsterContactDoctrine = "FLEE" | "ACCEPT_FIGHT";
@@ -5,6 +11,8 @@ export type StrongMonsterContactDoctrine = "FLEE" | "ACCEPT_FIGHT";
 export type PowerContactResolutionStatus =
   | "monster-defeated"
   | "flee-required"
+  | "flee-succeeded"
+  | "flee-failed"
   | "expedition-defeated";
 
 export type PowerContactRouteDisposition = "continue" | "pause" | "fail";
@@ -16,6 +24,7 @@ export interface PowerContactResolution {
   readonly doctrine: StrongMonsterContactDoctrine | null;
   readonly status: PowerContactResolutionStatus;
   readonly routeDisposition: PowerContactRouteDisposition;
+  readonly fleeResolution: FleeResolution | null;
   readonly monsterDefeated: boolean;
   readonly expeditionDefeated: boolean;
   readonly terminal: boolean;
@@ -25,12 +34,14 @@ export interface PowerContactResolution {
  * GAME-005 — resolves a moving-monster contact with the transparent MVP Power
  * stub. A stronger caravan defeats the monster and continues immediately. A
  * stronger or equal monster requires the explicit pre-combat doctrine: FLEE
- * pauses until a later escape solver exists, while ACCEPT_FIGHT is fatal.
+ * uses GAME-006 movement inputs when supplied (or preserves the GAME-005 pause
+ * when they are omitted), while ACCEPT_FIGHT is fatal.
  */
 export function resolveMonsterPowerContact(
   monsterPower: number,
   doctrine: StrongMonsterContactDoctrine = "FLEE",
   playerPower: number = DEFAULT_PLAYER_POWER,
+  fleeAttempt: FleeAttemptInput | null = null,
 ): PowerContactResolution {
   assertPositiveFinite(playerPower, "playerPower");
   assertPositiveFinite(monsterPower, "monsterPower");
@@ -45,6 +56,7 @@ export function resolveMonsterPowerContact(
       doctrine: null,
       status: "monster-defeated",
       routeDisposition: "continue",
+      fleeResolution: null,
       monsterDefeated: true,
       expeditionDefeated: false,
       terminal: false,
@@ -52,6 +64,22 @@ export function resolveMonsterPowerContact(
   }
 
   if (doctrine === "FLEE") {
+    if (fleeAttempt !== null) {
+      const fleeResolution = resolveFleeAttempt(fleeAttempt);
+      return {
+        playerPower,
+        monsterPower,
+        powerDelta,
+        doctrine,
+        status: fleeResolution.status,
+        routeDisposition: fleeResolution.routeDisposition,
+        fleeResolution,
+        monsterDefeated: false,
+        expeditionDefeated: fleeResolution.expeditionDefeated,
+        terminal: fleeResolution.terminal,
+      };
+    }
+
     return {
       playerPower,
       monsterPower,
@@ -59,6 +87,7 @@ export function resolveMonsterPowerContact(
       doctrine,
       status: "flee-required",
       routeDisposition: "pause",
+      fleeResolution: null,
       monsterDefeated: false,
       expeditionDefeated: false,
       terminal: false,
@@ -72,6 +101,7 @@ export function resolveMonsterPowerContact(
     doctrine,
     status: "expedition-defeated",
     routeDisposition: "fail",
+    fleeResolution: null,
     monsterDefeated: false,
     expeditionDefeated: true,
     terminal: true,

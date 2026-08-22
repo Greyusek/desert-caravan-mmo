@@ -1,11 +1,16 @@
 import { findFirstMovingEncounter } from "./encounter.js";
 import type { WanderingMonster } from "./monster.js";
-import type { DurationSeconds, RoutePlan } from "./route.js";
+import type {
+  DurationSeconds,
+  RoutePlan,
+  SpeedMetersPerSecond,
+} from "./route.js";
 import type { DistanceMeters, WorldCoordinate } from "./types.js";
 
 export interface ExpeditionMonsterContact {
   readonly monsterId: string;
   readonly monsterPower: number;
+  readonly monsterSpeedMetersPerSecond: SpeedMetersPerSecond;
   readonly atSeconds: DurationSeconds;
   readonly expeditionElapsedSeconds: DurationSeconds;
   readonly monsterPatrolElapsedSeconds: DurationSeconds;
@@ -55,6 +60,7 @@ export function findFirstExpeditionMonsterContact(
   return {
     monsterId: monster.id,
     monsterPower: monster.power,
+    monsterSpeedMetersPerSecond: monster.patrolRoute.speedMetersPerSecond,
     atSeconds: encounter.atSeconds,
     expeditionElapsedSeconds: encounter.firstRouteElapsedSeconds,
     monsterPatrolElapsedSeconds: encounter.secondRouteElapsedSeconds,

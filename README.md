@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 17 — GAME-005: implemented and covered by automated tests.**
+**Checkpoint 18 — GAME-006: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -36,8 +36,9 @@ Also implemented:
 - GAME-003 — explicit in-progress, paused, completed and failed expedition outcomes resolved at the first authoritative STOP, fatal depletion or arrival boundary.
 - GAME-004 — first continuous-time contact between the finite caravan route and cyclic monster patrol, composed into expedition pause, map state and timeline through SIM-008.
 - GAME-005 — transparent Player Power 100 contact resolution: weaker monsters are defeated automatically, while stronger or equal monsters follow the explicit `FLEE | ACCEPT_FIGHT` doctrine.
+- GAME-006 — deterministic FLEE resolution from explicit movement inputs: a strictly faster caravan opens a safe gap and continues, while an equal or slower caravan is defeated.
 
-Not implemented yet (intentionally): deterministic escape resolution after `FLEE`, persistent player discovery state, post-stop resume/idle lifecycle, rewards and expedition persistence, production player map and fog of war, server/database, and tactical combat.
+Not implemented yet (intentionally): pursuit route replanning, persistent player discovery state, post-stop resume/idle lifecycle, rewards and expedition persistence, production player map and fog of war, server/database, and tactical combat.
 
 ## Requirements
 
@@ -72,17 +73,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 17:
+Expected for Checkpoint 18:
 
 ```text
-# tests 164
-# pass 164
+# tests 173
+# pass 173
 # fail 0
 ```
 
-This total contains 159 simulation/UI tests and 5 tooling regression tests.
+This total contains 168 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_17.md` for GAME-005 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_18.md` for GAME-006 details.
 
 ## Developer debug map
 
@@ -92,7 +93,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power resolution. Select the QA patrol (`PWR 90` or `PWR 110`) and use `DEV: маршрут на перехват` for a deterministic contact route. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power/FLEE resolution. Select the `PWR 110` QA patrol and use `DEV: маршрут на перехват`: flee speed 6 km/h succeeds against its 5.4 km/h patrol speed, while 5 km/h fails. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -107,4 +108,4 @@ Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay:
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `GAME-006`: resolve `FLEE` deterministically from explicit movement inputs without adding tactical combat.
+The next functional checkpoint is `GAME-007`: make a real city the authoritative expedition destination and complete the first return-to-city loop.

@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 17 · GAME-005</p>
+          <p class="eyebrow">Checkpoint 18 · GAME-006</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -142,7 +142,7 @@
         aria-labelledby="contact-title"
       >
         <div class="contact-copy">
-          <p class="section-kicker">GAME-005 · Power resolution</p>
+          <p class="section-kicker">GAME-006 · Deterministic flee</p>
           <div class="contact-heading">
             <div>
               <h2 id="contact-title">Контакта на маршруте нет</h2>
@@ -159,12 +159,25 @@
             <div><dt>Дистанция</dt><dd id="contact-distance">—</dd></div>
             <div><dt>Player Power</dt><dd id="contact-player-power">100</dd></div>
             <div><dt>Сравнение</dt><dd id="contact-power-comparison">—</dd></div>
+            <div><dt>Скорость монстра</dt><dd id="contact-monster-speed">—</dd></div>
+            <div><dt>Исход FLEE</dt><dd id="contact-flee-result">—</dd></div>
           </dl>
         </div>
         <div class="contact-actions">
           <label class="contact-monster-field" for="contact-monster-select">
             <span>QA-противник</span>
             <select id="contact-monster-select"></select>
+          </label>
+          <label class="contact-monster-field" for="contact-flee-speed">
+            <span>Скорость отхода, км/ч</span>
+            <input
+              id="contact-flee-speed"
+              type="number"
+              min="0.1"
+              step="0.1"
+              value="6"
+              required
+            />
           </label>
           <fieldset class="contact-doctrine">
             <legend>Если монстр сильнее</legend>
@@ -176,7 +189,7 @@
                 value="FLEE"
                 checked
               />
-              <span>Отступить <small>FLEE · пауза до формулы побега</small></span>
+              <span>Отступить <small>FLEE · скорость определяет исход</small></span>
             </label>
             <label>
               <input
@@ -189,7 +202,7 @@
             </label>
           </fieldset>
           <button id="contact-dev-route" type="button">DEV: маршрут на перехват</button>
-          <p>PWR 90 погибает автоматически. Против PWR 110 выбранная доктрина применяется на точной границе контакта.</p>
+          <p>PWR 90 погибает автоматически. Против PWR 110 скорость 6 км/ч даёт отход от патруля 5,4 км/ч; 5 км/ч — поражение.</p>
         </div>
       </section>
 

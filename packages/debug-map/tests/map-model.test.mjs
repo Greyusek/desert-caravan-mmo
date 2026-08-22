@@ -1128,6 +1128,7 @@ test("GAME-004: QA intercept preset is deterministic and guarantees contact", ()
     first.contact.contact.expeditionElapsedSeconds <
       first.route.totalDurationSeconds,
   );
+  assert.equal(first.contact.contact.monsterSpeedMetersPerSecond, 1.5);
 });
 
 test("GAME-005: weak contact defeats the monster and route execution continues", () => {
@@ -1178,11 +1179,11 @@ test("GAME-005: debug QA exposes deterministic weak and strong patrols", () => {
   assert.deepEqual(first.monsters.map((monster) => monster.power), [90, 110]);
 });
 
-test("GAME-005: FLEE against PWR 110 remains a non-terminal contact pause", () => {
+test("GAME-006: a faster FLEE against PWR 110 succeeds and route execution continues", () => {
   const planned = monsterInterceptAt(0, 1);
   const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
   assert.ok(contactAt);
-  const selected = monsterInterceptAt(contactAt, 1);
+  const selected = monsterInterceptAt(contactAt + 60, 1);
   const outcome = createExpeditionOutcomeSnapshot(
     selected.route,
     searchSupplies,
@@ -1190,6 +1191,7 @@ test("GAME-005: FLEE against PWR 110 remains a non-terminal contact pause", () =
     null,
     selected.contact,
     "FLEE",
+    6 / 3.6,
   );
   const executed = applyExpeditionOutcomeToRoute(selected.route, outcome);
   const log = createExpeditionEventLogSnapshot(
@@ -1201,14 +1203,68 @@ test("GAME-005: FLEE against PWR 110 remains a non-terminal contact pause", () =
     outcome,
   );
 
-  assert.equal(outcome.status, "paused");
+  assert.equal(outcome.status, "in-progress");
   assert.equal(outcome.terminal, false);
-  assert.equal(outcome.interruptionCause, "monster-contact");
+  assert.equal(outcome.interruptionCause, null);
   assert.equal(outcome.failureReason, null);
-  assert.equal(outcome.monsterContactResolution?.status, "flee-required");
+  assert.equal(outcome.monsterContactResolution?.status, "flee-succeeded");
+  assert.equal(
+    outcome.monsterContactResolution?.fleeResolution
+      ?.safeSeparationMeters,
+    1_000,
+  );
+  assert.ok(
+    (outcome.monsterContactResolution?.fleeResolution
+      ?.secondsToSafeSeparation ?? 0) > 0,
+  );
+  assert.ok(executed.position.elapsedSeconds > contactAt);
+  assert.equal(log.executionStatus, "running");
+  const contactEvent = log.events.find((event) => event.kind === "monster-contact");
+  assert.equal(contactEvent?.occurred, true);
+  assert.equal(contactEvent?.powerResolutionStatus, "flee-succeeded");
+  assert.equal(contactEvent?.fleeSpeedMetersPerSecond, 6 / 3.6);
+  assert.equal(contactEvent?.monsterSpeedMetersPerSecond, 1.5);
+  assert.equal(log.events.some((event) => event.kind === "arrival"), true);
+});
+
+test("GAME-006: an equal or slower FLEE against PWR 110 is terminal", () => {
+  const planned = monsterInterceptAt(0, 1);
+  const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const selected = monsterInterceptAt(contactAt, 1);
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    searchSupplies,
+    searchConsumption,
+    null,
+    selected.contact,
+    "FLEE",
+    5 / 3.6,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected.route, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    searchSupplies,
+    searchConsumption,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.terminal, true);
+  assert.equal(outcome.failureReason, "monster");
+  assert.equal(outcome.interruptionCause, "monster-defeat");
+  assert.equal(outcome.monsterContactResolution?.status, "flee-failed");
+  assert.equal(
+    outcome.monsterContactResolution?.fleeResolution
+      ?.secondsToSafeSeparation,
+    null,
+  );
   approx(executed.position.elapsedSeconds, contactAt, 1e-6);
-  assert.equal(log.executionStatus, "paused");
-  assert.equal(log.events.at(-1)?.powerResolutionStatus, "flee-required");
+  assert.equal(log.executionStatus, "failed");
+  assert.equal(log.events.at(-1)?.powerResolutionStatus, "flee-failed");
+  assert.equal(log.events.some((event) => event.kind === "arrival"), false);
 });
 
 test("GAME-005: ACCEPT_FIGHT against PWR 110 is a terminal expedition defeat", () => {
@@ -1297,6 +1353,32 @@ test("GAME-004: fatal depletion wins an exact tie with monster contact", () => {
   assert.equal(outcome.planned.status, "failed");
   assert.equal(outcome.planned.failureCause, "both");
   assert.equal(outcome.interruptionCause, null);
+});
+
+test("GAME-006: fatal depletion wins an exact tie with a successful FLEE", () => {
+  const planned = monsterInterceptAt(0, 1);
+  const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const stockAtTie = contactAt / 3_600;
+  const tieProfile = {
+    moving: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+    idle: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+  };
+  const outcome = createExpeditionOutcomeSnapshot(
+    planned.route,
+    { foodUnits: stockAtTie, waterUnits: stockAtTie },
+    tieProfile,
+    null,
+    planned.contact,
+    "FLEE",
+    6 / 3.6,
+  );
+
+  assert.equal(outcome.planned.status, "failed");
+  assert.equal(outcome.planned.failureCause, "both");
+  assert.equal(outcome.interruptionCause, null);
+  assert.equal(outcome.monsterContact, null);
+  assert.equal(outcome.monsterContactResolution, null);
 });
 
 test("GAME-004: an earlier discovery STOP remains the first pause", () => {

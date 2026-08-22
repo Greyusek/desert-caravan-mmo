@@ -8,6 +8,16 @@
 - Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
 - Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
 
+## 0.0.18 — Checkpoint 18
+
+- Added `GAME-006`: a public deterministic FLEE resolver driven by explicit caravan speed, monster speed, contact separation and safe separation.
+- Made a strictly faster caravan escape a stronger patrol, calculate the exact time needed to open the safe gap and continue its original route.
+- Made equal or lower flee speed a terminal expedition defeat at the authoritative contact boundary, without random rolls or tactical combat.
+- Preserved first-boundary semantics: earlier STOP or fatal depletion suppresses FLEE, and fatal depletion still wins an exact-time tie.
+- Added editable flee speed, patrol speed, flee outcome, route state and timeline metadata to the debug map; 6 km/h succeeds against the 5.4 km/h QA patrol while 5 km/h fails.
+- Added nine GAME-006 regressions; repository verification now runs 173 tests.
+- Designated `GAME-007`, authoritative arrival at a real destination city and completion of the first return loop, as the next checkpoint.
+
 ## 0.0.17 — Checkpoint 17
 
 - Added `GAME-005`: a public deterministic Player Power 100 versus monster Power contact resolver with explicit route dispositions.

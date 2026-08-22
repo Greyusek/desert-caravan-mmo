@@ -34,7 +34,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 17 demo");
+console.log("Desert Caravan MMO — Checkpoint 18 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -258,7 +258,7 @@ const expeditionContact = findFirstExpeditionMonsterContact(
 console.log("\nGAME-004 expedition contact:");
 console.log(
   expeditionContact
-    ? `  ${expeditionContact.monsterId}: pause at T=${expeditionContact.expeditionElapsedSeconds.toFixed(6)} s, separation=${expeditionContact.separationMeters.toFixed(3)} m, power=${expeditionContact.monsterPower}`
+    ? `  ${expeditionContact.monsterId}: contact at T=${expeditionContact.expeditionElapsedSeconds.toFixed(6)} s, separation=${expeditionContact.separationMeters.toFixed(3)} m, power=${expeditionContact.monsterPower}`
     : "  no contact",
 );
 
@@ -274,4 +274,17 @@ for (const [monsterPower, doctrine] of [
   );
 }
 
-console.log("\nCheckpoint 17 UI: npm run debug-map -> http://127.0.0.1:4173");
+console.log("\nGAME-006 deterministic FLEE:");
+for (const fleeSpeedKilometersPerHour of [6, 5]) {
+  const resolution = resolveMonsterPowerContact(110, "FLEE", 100, {
+    caravanSpeedMetersPerSecond: fleeSpeedKilometersPerHour / 3.6,
+    monsterSpeedMetersPerSecond: 5.4 / 3.6,
+    contactSeparationMeters: 500,
+    safeSeparationMeters: 1_000,
+  });
+  console.log(
+    `  caravan=${fleeSpeedKilometersPerHour.toFixed(1)} km/h vs monster=5.4 km/h: ${resolution.status}, safe-gap=${resolution.fleeResolution?.secondsToSafeSeparation?.toFixed(3) ?? "unreachable"} s, route=${resolution.routeDisposition}`,
+  );
+}
+
+console.log("\nCheckpoint 18 UI: npm run debug-map -> http://127.0.0.1:4173");
