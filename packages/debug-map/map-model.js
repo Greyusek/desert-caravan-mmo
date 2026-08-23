@@ -39,6 +39,14 @@ export const DEBUG_MAP_HEIGHT = 500;
 export const SIMULATION_CLOCK_SPEED_MULTIPLIERS = Object.freeze([
   1, 10, 100, 1_000,
 ]);
+export const CONTACT_ZOOM_WIDTH = 480;
+export const CONTACT_ZOOM_HEIGHT = 260;
+export const CONTACT_ZOOM_SPATIAL_RADII_METERS = Object.freeze([
+  1_000, 5_000, 25_000,
+]);
+export const CONTACT_ZOOM_TIME_RADII_SECONDS = Object.freeze([
+  5 * 60, 30 * 60, 3 * 3_600,
+]);
 const ROUTE_SAMPLE_TARGET_METERS = 100_000;
 const MAX_ROUTE_SAMPLES_PER_SEGMENT = 64;
 const LOCAL_ROUTE_SAMPLE_TARGET_METERS = 1_000;
@@ -50,6 +58,8 @@ export const RUMOR_MAP_HEIGHT = 220;
 const RUMOR_MAP_ORIGIN = { x: 260, y: 160 };
 const RUMOR_MAP_PIXELS_PER_METER = 0.0022;
 const RUMOR_SECTOR_SAMPLE_COUNT = 16;
+const CONTACT_ZOOM_PADDING_PIXELS = 20;
+const CONTACT_ZOOM_TIME_SAMPLE_COUNT = 64;
 
 /**
  * Converts elapsed wall-clock time into authoritative simulation time. The
@@ -293,6 +303,125 @@ export function createMonsterContactSnapshot(route, monster) {
         routePosition.traveledDistanceMeters / 1_000,
       caravanPoint: projectCoordinate(contact.caravanPosition),
       monsterPoint: projectCoordinate(contact.monsterPosition),
+    },
+  };
+}
+
+/**
+ * Builds a deterministic north-up local view around a planned contact or, if
+ * no contact exists, around the selected patrol at the current route time.
+ * Spatial and temporal zoom affect presentation samples only.
+ *
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
+ * @param {ReturnType<typeof createMonsterContactSnapshot> | null} [contactSnapshot]
+ * @param {number} [spatialRadiusMeters]
+ * @param {number} [timeRadiusSeconds]
+ */
+export function createContactZoomSnapshot(
+  route,
+  monster,
+  contactSnapshot = null,
+  spatialRadiusMeters = 25_000,
+  timeRadiusSeconds = 3 * 3_600,
+) {
+  if (!CONTACT_ZOOM_SPATIAL_RADII_METERS.includes(spatialRadiusMeters)) {
+    throw new RangeError(
+      "spatialRadiusMeters must be one of 1000, 5000 or 25000",
+    );
+  }
+  if (!CONTACT_ZOOM_TIME_RADII_SECONDS.includes(timeRadiusSeconds)) {
+    throw new RangeError(
+      "timeRadiusSeconds must be one of 300, 1800 or 10800",
+    );
+  }
+
+  const contact = contactSnapshot?.contact ?? null;
+  if (contact && contact.monsterId !== monster.id) {
+    throw new RangeError("contactSnapshot must belong to the selected monster");
+  }
+
+  const focusAtSeconds = contact
+    ? contact.atSeconds
+    : Math.min(route.position.elapsedSeconds, route.totalDurationSeconds);
+  const evaluatedCaravan = positionAtTime(
+    route.authoritativeRoute,
+    focusAtSeconds,
+  );
+  const evaluatedMonster = wanderingMonsterPositionAtTime(
+    monster.authoritativeMonster,
+    focusAtSeconds,
+  );
+  const focusCaravanCoordinate = contact?.caravanPosition ??
+    evaluatedCaravan.coordinate;
+  const focusMonsterCoordinate = contact?.monsterPosition ??
+    evaluatedMonster.coordinate;
+  const centerCoordinate = contact
+    ? focusCaravanCoordinate
+    : focusMonsterCoordinate;
+  const usableRadiusPixels =
+    CONTACT_ZOOM_HEIGHT / 2 - CONTACT_ZOOM_PADDING_PIXELS;
+  const metersPerPixel = spatialRadiusMeters / usableRadiusPixels;
+  /** @param {WorldCoordinate} coordinate */
+  const project = (coordinate) =>
+    projectContactZoomCoordinate(
+      centerCoordinate,
+      coordinate,
+      route.authoritativeRoute.planetRadiusMeters,
+      metersPerPixel,
+    );
+  const windowStartSeconds = Math.max(0, focusAtSeconds - timeRadiusSeconds);
+  const windowEndSeconds = Math.min(
+    route.totalDurationSeconds,
+    focusAtSeconds + timeRadiusSeconds,
+  );
+  const sampleTimes = sampleTimeRange(
+    windowStartSeconds,
+    windowEndSeconds,
+    CONTACT_ZOOM_TIME_SAMPLE_COUNT,
+  );
+
+  return {
+    focusKind: contact
+      ? /** @type {const} */ ("contact")
+      : /** @type {const} */ ("monster"),
+    focusAtSeconds,
+    centerCoordinate,
+    spatialRadiusMeters,
+    timeRadiusSeconds,
+    windowStartSeconds,
+    windowEndSeconds,
+    metersPerPixel,
+    interactionRadiusMeters:
+      monster.authoritativeMonster.interactionRadiusMeters,
+    interactionRadiusPixels:
+      monster.authoritativeMonster.interactionRadiusMeters / metersPerPixel,
+    caravanPath: sampleTimes.map((atSeconds) => {
+      const position = positionAtTime(route.authoritativeRoute, atSeconds);
+      return {
+        atSeconds,
+        coordinate: position.coordinate,
+        point: project(position.coordinate),
+      };
+    }),
+    monsterPath: sampleTimes.map((atSeconds) => {
+      const position = wanderingMonsterPositionAtTime(
+        monster.authoritativeMonster,
+        atSeconds,
+      );
+      return {
+        atSeconds,
+        coordinate: position.coordinate,
+        point: project(position.coordinate),
+      };
+    }),
+    focusCaravan: {
+      coordinate: focusCaravanCoordinate,
+      point: project(focusCaravanCoordinate),
+    },
+    focusMonster: {
+      coordinate: focusMonsterCoordinate,
+      point: project(focusMonsterCoordinate),
     },
   };
 }
@@ -1458,6 +1587,48 @@ function initialBearingDegrees(start, end) {
       Math.cos(latitudeEnd) *
       Math.cos(longitudeDelta);
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+/**
+ * @param {WorldCoordinate} center
+ * @param {WorldCoordinate} coordinate
+ * @param {number} planetRadiusMeters
+ * @param {number} metersPerPixel
+ */
+function projectContactZoomCoordinate(
+  center,
+  coordinate,
+  planetRadiusMeters,
+  metersPerPixel,
+) {
+  const distanceMeters = greatCircleDistance(
+    center,
+    coordinate,
+    planetRadiusMeters,
+  );
+  const bearingRadians =
+    (initialBearingDegrees(center, coordinate) * Math.PI) / 180;
+  const distancePixels = distanceMeters / metersPerPixel;
+  return {
+    x:
+      CONTACT_ZOOM_WIDTH / 2 +
+      Math.sin(bearingRadians) * distancePixels,
+    y:
+      CONTACT_ZOOM_HEIGHT / 2 -
+      Math.cos(bearingRadians) * distancePixels,
+  };
+}
+
+/**
+ * @param {number} startSeconds
+ * @param {number} endSeconds
+ * @param {number} sampleCount
+ */
+function sampleTimeRange(startSeconds, endSeconds, sampleCount) {
+  if (startSeconds === endSeconds) return [startSeconds];
+  return Array.from({ length: sampleCount + 1 }, (_, index) =>
+    startSeconds + ((endSeconds - startSeconds) * index) / sampleCount,
+  );
 }
 
 /**

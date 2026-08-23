@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 20 · UI-005</p>
+          <p class="eyebrow">Checkpoint 21 · UI-006</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -232,6 +232,50 @@
           <button id="contact-dev-route" type="button">DEV: маршрут на перехват</button>
           <p>PWR 90 погибает автоматически. Против PWR 110 скорость 6 км/ч даёт отход от патруля 5,4 км/ч; 5 км/ч — поражение.</p>
         </div>
+        <article class="contact-zoom-card" aria-labelledby="contact-zoom-title">
+          <div class="contact-zoom-heading">
+            <div>
+              <p class="section-kicker">UI-006 · Local encounter zoom</p>
+              <h3 id="contact-zoom-title">Окно патруля и контакта</h3>
+            </div>
+            <div class="contact-zoom-controls">
+              <label for="contact-spatial-zoom">
+                <span>Пространство</span>
+                <select id="contact-spatial-zoom">
+                  <option value="1000">±1 км</option>
+                  <option value="5000">±5 км</option>
+                  <option value="25000" selected>±25 км</option>
+                </select>
+              </label>
+              <label for="contact-time-zoom">
+                <span>Время</span>
+                <select id="contact-time-zoom">
+                  <option value="300">±5 мин</option>
+                  <option value="1800">±30 мин</option>
+                  <option value="10800" selected>±3 ч</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="contact-zoom-frame">
+            <svg
+              id="contact-zoom-map"
+              viewBox="0 0 480 260"
+              role="img"
+              aria-label="Локальная north-up карта траекторий каравана и выбранного патруля"
+            ></svg>
+          </div>
+          <div class="contact-zoom-footer">
+            <ul class="contact-zoom-legend" aria-label="Легенда локальной карты">
+              <li><span class="contact-zoom-key contact-zoom-key--caravan"></span>Караван</li>
+              <li><span class="contact-zoom-key contact-zoom-key--monster"></span>Патруль</li>
+              <li><span class="contact-zoom-key contact-zoom-key--radius"></span>Interaction radius</li>
+            </ul>
+            <p id="contact-zoom-caption" class="contact-zoom-caption" aria-live="polite">
+              Локальное окно рассчитывается из server truth.
+            </p>
+          </div>
+        </article>
       </section>
 
       <section class="route-editor" aria-labelledby="route-editor-title">

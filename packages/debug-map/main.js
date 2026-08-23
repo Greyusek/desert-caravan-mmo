@@ -1,6 +1,8 @@
 // @ts-check
 
 import {
+  CONTACT_ZOOM_HEIGHT,
+  CONTACT_ZOOM_WIDTH,
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
   SIMULATION_CLOCK_SPEED_MULTIPLIERS,
@@ -9,6 +11,7 @@ import {
   createCaravanStatusSnapshot,
   createCityArrivalRoutePreset,
   createCityArrivalSnapshot,
+  createContactZoomSnapshot,
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
   createExpeditionEventLogSnapshot,
@@ -141,6 +144,16 @@ const contactDoctrineFight = requireElement(
   HTMLInputElement,
 );
 const contactDevRoute = requireElement("contact-dev-route", HTMLButtonElement);
+const contactSpatialZoom = requireElement(
+  "contact-spatial-zoom",
+  HTMLSelectElement,
+);
+const contactTimeZoom = requireElement("contact-time-zoom", HTMLSelectElement);
+const contactZoomMap = requireElement("contact-zoom-map", SVGSVGElement);
+const contactZoomCaption = requireElement(
+  "contact-zoom-caption",
+  HTMLParagraphElement,
+);
 
 let elapsedSeconds = 0;
 let clockRunning = false;
@@ -220,6 +233,8 @@ contactMonsterSelect.addEventListener("change", () => {
 contactDoctrineFlee.addEventListener("change", pauseClockAndRender);
 contactDoctrineFight.addEventListener("change", pauseClockAndRender);
 contactFleeSpeed.addEventListener("change", pauseClockAndRender);
+contactSpatialZoom.addEventListener("change", render);
+contactTimeZoom.addEventListener("change", render);
 
 outcomeAction.addEventListener("click", () => {
   if (!activeOutcome) return;
@@ -428,6 +443,7 @@ function render() {
     renderCaravanStatus(caravanStatus);
     renderExpeditionOutcome(outcome);
     renderMonsterContact(monsterContact, outcome);
+    renderContactZoom(route, selectedMonster ?? null, monsterContact);
     renderEventLog(eventLog, route);
 
     timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
@@ -446,6 +462,8 @@ function render() {
     activeRumorSearch = null;
     activeOutcome = null;
     activeSnapshot = null;
+    contactZoomMap.replaceChildren();
+    contactZoomCaption.textContent = "Локальное окно недоступно.";
     pauseSimulationClock();
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
@@ -574,6 +592,137 @@ function updateClockControls() {
         ? "Граница достигнута"
         : "Остановлено"
   } · x${clockSpeedMultiplier}`;
+}
+
+/**
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number] | null} monster
+ * @param {ReturnType<typeof createMonsterContactSnapshot> | null} contact
+ */
+function renderContactZoom(route, monster, contact) {
+  contactZoomMap.replaceChildren();
+  if (!monster) {
+    contactZoomCaption.textContent = "Выберите патруль для локального окна.";
+    return;
+  }
+
+  const snapshot = createContactZoomSnapshot(
+    route,
+    monster,
+    contact,
+    Number(contactSpatialZoom.value),
+    Number(contactTimeZoom.value),
+  );
+  const centerX = CONTACT_ZOOM_WIDTH / 2;
+  const centerY = CONTACT_ZOOM_HEIGHT / 2;
+  const maximumRingPixels = snapshot.spatialRadiusMeters / snapshot.metersPerPixel;
+
+  contactZoomMap.append(
+    svgElement("line", {
+      class: "contact-zoom-crosshair",
+      x1: 0,
+      x2: CONTACT_ZOOM_WIDTH,
+      y1: centerY,
+      y2: centerY,
+    }),
+    svgElement("line", {
+      class: "contact-zoom-crosshair",
+      x1: centerX,
+      x2: centerX,
+      y1: 0,
+      y2: CONTACT_ZOOM_HEIGHT,
+    }),
+  );
+
+  for (const ratio of [0.5, 1]) {
+    contactZoomMap.append(
+      svgElement("circle", {
+        class: "contact-zoom-grid",
+        cx: centerX,
+        cy: centerY,
+        r: maximumRingPixels * ratio,
+      }),
+    );
+    const label = svgElement("text", {
+      class: "contact-zoom-label",
+      x: centerX + 6,
+      y: centerY - maximumRingPixels * ratio + 12,
+    });
+    label.textContent = `${formatNumber(
+      (snapshot.spatialRadiusMeters * ratio) / 1_000,
+      1,
+    )} км`;
+    contactZoomMap.append(label);
+  }
+
+  const caravanPath = svgElement("polyline", {
+    class: "contact-zoom-caravan-path",
+    points: snapshot.caravanPath
+      .map(({ point }) => `${point.x},${point.y}`)
+      .join(" "),
+  });
+  caravanPath.append(svgTitle("Траектория каравана во временном окне"));
+  const monsterPath = svgElement("polyline", {
+    class: "contact-zoom-monster-path",
+    points: snapshot.monsterPath
+      .map(({ point }) => `${point.x},${point.y}`)
+      .join(" "),
+  });
+  monsterPath.append(svgTitle("Траектория циклического патруля во временном окне"));
+  const interactionRadius = svgElement("circle", {
+    class: "contact-zoom-interaction-radius",
+    cx: snapshot.focusMonster.point.x,
+    cy: snapshot.focusMonster.point.y,
+    r: snapshot.interactionRadiusPixels,
+  });
+  interactionRadius.append(
+    svgTitle(`Interaction radius ${snapshot.interactionRadiusMeters} м`),
+  );
+  contactZoomMap.append(caravanPath, monsterPath, interactionRadius);
+
+  const caravanMarker = svgElement("circle", {
+    class: "contact-zoom-caravan-marker",
+    cx: snapshot.focusCaravan.point.x,
+    cy: snapshot.focusCaravan.point.y,
+    r: 6,
+  });
+  caravanMarker.append(svgTitle(`Караван · ${formatElapsed(snapshot.focusAtSeconds)}`));
+  const monsterMarker = svgElement("polygon", {
+    class: "contact-zoom-monster-marker",
+    points: `${snapshot.focusMonster.point.x},${snapshot.focusMonster.point.y - 7} ${snapshot.focusMonster.point.x + 7},${snapshot.focusMonster.point.y + 6} ${snapshot.focusMonster.point.x - 7},${snapshot.focusMonster.point.y + 6}`,
+  });
+  monsterMarker.append(
+    svgTitle(`${monster.id} · PWR ${monster.power} · ${formatElapsed(snapshot.focusAtSeconds)}`),
+  );
+  contactZoomMap.append(caravanMarker, monsterMarker);
+
+  const northLabel = svgElement("text", {
+    class: "contact-zoom-label",
+    x: 12,
+    y: 19,
+  });
+  northLabel.textContent = "↑ N";
+  const focusLabel = svgElement("text", {
+    class: "contact-zoom-label",
+    x: 12,
+    y: CONTACT_ZOOM_HEIGHT - 12,
+  });
+  focusLabel.textContent =
+    snapshot.focusKind === "contact" ? "FOCUS: CONTACT" : "FOCUS: PATROL";
+  contactZoomMap.append(northLabel, focusLabel);
+
+  const spatialLabel = formatNumber(snapshot.spatialRadiusMeters / 1_000, 0);
+  const timeLabel =
+    snapshot.timeRadiusSeconds >= 3_600
+      ? `${formatNumber(snapshot.timeRadiusSeconds / 3_600, 0)} ч`
+      : `${formatNumber(snapshot.timeRadiusSeconds / 60, 0)} мин`;
+  contactZoomCaption.textContent = `${
+    snapshot.focusKind === "contact" ? "Плановый контакт" : "Текущий патруль"
+  } · ${formatElapsed(snapshot.focusAtSeconds)} · пространство ±${spatialLabel} км · время ±${timeLabel} (${formatElapsed(snapshot.windowStartSeconds)} — ${formatElapsed(snapshot.windowEndSeconds)}).`;
+  contactZoomMap.setAttribute(
+    "aria-label",
+    `Локальная карта ${snapshot.focusKind === "contact" ? "планового контакта" : "текущего патруля"} в ${formatElapsed(snapshot.focusAtSeconds)}`,
+  );
 }
 
 /**
