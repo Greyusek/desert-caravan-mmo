@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 18 · GAME-006</p>
+          <p class="eyebrow">Checkpoint 20 · UI-005</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -42,6 +42,34 @@
             <output id="time-output" for="time-slider">T+00:00:00</output>
           </div>
           <input id="time-slider" type="range" min="0" max="1" step="1" value="0" />
+          <div class="clock-controls" aria-label="Управление часами симуляции">
+            <button
+              id="clock-toggle"
+              class="clock-toggle"
+              type="button"
+              aria-pressed="false"
+            >
+              <span id="clock-toggle-icon" aria-hidden="true">▶</span>
+              <span id="clock-toggle-label">Запустить</span>
+            </button>
+            <label class="clock-speed-control" for="clock-speed">
+              <span>Скорость</span>
+              <select id="clock-speed">
+                <option value="1">x1</option>
+                <option value="10">x10</option>
+                <option value="100">x100</option>
+                <option value="1000" selected>x1000</option>
+              </select>
+            </label>
+            <output
+              id="clock-status"
+              class="clock-status"
+              for="clock-toggle clock-speed"
+              aria-live="polite"
+            >
+              Остановлено · x1000
+            </output>
+          </div>
         </div>
       </section>
 

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
+  SIMULATION_CLOCK_SPEED_MULTIPLIERS,
+  advanceSimulationClock,
   applyDiscoveryDoctrineToRoute,
   applyExpeditionOutcomeToRoute,
   createCaravanStatusSnapshot,
@@ -26,6 +28,77 @@ function approx(actual, expected, tolerance = 1e-9) {
     `expected ${actual} to be within ${tolerance} of ${expected}`,
   );
 }
+
+test("UI-005: simulation clock exposes exactly the four development speeds", () => {
+  assert.deepEqual([...SIMULATION_CLOCK_SPEED_MULTIPLIERS], [1, 10, 100, 1_000]);
+  assert.equal(Object.isFrozen(SIMULATION_CLOCK_SPEED_MULTIPLIERS), true);
+});
+
+test("UI-005: every speed maps wall time to simulation time transparently", () => {
+  for (const speedMultiplier of SIMULATION_CLOCK_SPEED_MULTIPLIERS) {
+    const advanced = advanceSimulationClock(
+      120,
+      2.5,
+      speedMultiplier,
+      10_000,
+    );
+    assert.equal(advanced.elapsedSeconds, 120 + 2.5 * speedMultiplier);
+    assert.equal(advanced.reachedBoundary, false);
+  }
+});
+
+test("UI-005: one stable play anchor is independent from frame sampling", () => {
+  const sparseFrame = advanceSimulationClock(400, 1.75, 100, 10_000);
+  const denseFrame = advanceSimulationClock(
+    400,
+    0.25 + 0.5 + 1,
+    100,
+    10_000,
+  );
+
+  assert.deepEqual(sparseFrame, denseFrame);
+  assert.equal(sparseFrame.elapsedSeconds, 575);
+});
+
+test("UI-005: playback clamps exactly to the first expedition boundary", () => {
+  const advanced = advanceSimulationClock(300, 1, 1_000, 712.345);
+
+  assert.equal(advanced.elapsedSeconds, 712.345);
+  assert.equal(advanced.reachedBoundary, true);
+});
+
+test("UI-005: playback remains active before the expedition boundary", () => {
+  assert.deepEqual(advanceSimulationClock(300, 0.4, 1_000, 712.345), {
+    elapsedSeconds: 700,
+    reachedBoundary: false,
+  });
+});
+
+test("UI-005: zero wall time preserves the paused simulation instant", () => {
+  assert.deepEqual(advanceSimulationClock(123.456, 0, 10, 500), {
+    elapsedSeconds: 123.456,
+    reachedBoundary: false,
+  });
+});
+
+test("UI-005: clock inputs and speed choices are validated", () => {
+  assert.throws(
+    () => advanceSimulationClock(-1, 1, 1, 10),
+    /elapsedSeconds must be a non-negative finite number/,
+  );
+  assert.throws(
+    () => advanceSimulationClock(0, Number.NaN, 1, 10),
+    /realElapsedSeconds must be a non-negative finite number/,
+  );
+  assert.throws(
+    () => advanceSimulationClock(0, 1, 5, 10),
+    /speedMultiplier must be one of 1, 10, 100 or 1000/,
+  );
+  assert.throws(
+    () => advanceSimulationClock(11, 1, 10, 10),
+    /stopAtSeconds must be greater than or equal to elapsedSeconds/,
+  );
+});
 
 test("UI-001: north-up projection places cardinal bounds and equator exactly", () => {
   assert.deepEqual(projectCoordinate({ latitudeDeg: 90, longitudeDeg: -180 }), {

@@ -36,6 +36,9 @@ import {
 
 export const DEBUG_MAP_WIDTH = 1_000;
 export const DEBUG_MAP_HEIGHT = 500;
+export const SIMULATION_CLOCK_SPEED_MULTIPLIERS = Object.freeze([
+  1, 10, 100, 1_000,
+]);
 const ROUTE_SAMPLE_TARGET_METERS = 100_000;
 const MAX_ROUTE_SAMPLES_PER_SEGMENT = 64;
 const LOCAL_ROUTE_SAMPLE_TARGET_METERS = 1_000;
@@ -47,6 +50,47 @@ export const RUMOR_MAP_HEIGHT = 220;
 const RUMOR_MAP_ORIGIN = { x: 260, y: 160 };
 const RUMOR_MAP_PIXELS_PER_METER = 0.0022;
 const RUMOR_SECTOR_SAMPLE_COUNT = 16;
+
+/**
+ * Converts elapsed wall-clock time into authoritative simulation time. The
+ * browser supplies a single elapsed value to the simulation core, while the
+ * first expedition boundary remains an exact hard stop.
+ *
+ * @param {number} elapsedSeconds
+ * @param {number} realElapsedSeconds
+ * @param {number} speedMultiplier
+ * @param {number} stopAtSeconds
+ */
+export function advanceSimulationClock(
+  elapsedSeconds,
+  realElapsedSeconds,
+  speedMultiplier,
+  stopAtSeconds,
+) {
+  assertNonNegativeFinite(elapsedSeconds, "elapsedSeconds");
+  assertNonNegativeFinite(realElapsedSeconds, "realElapsedSeconds");
+  assertNonNegativeFinite(stopAtSeconds, "stopAtSeconds");
+  if (!SIMULATION_CLOCK_SPEED_MULTIPLIERS.includes(speedMultiplier)) {
+    throw new RangeError(
+      "speedMultiplier must be one of 1, 10, 100 or 1000",
+    );
+  }
+  if (stopAtSeconds < elapsedSeconds) {
+    throw new RangeError(
+      "stopAtSeconds must be greater than or equal to elapsedSeconds",
+    );
+  }
+
+  const nextElapsedSeconds = Math.min(
+    stopAtSeconds,
+    elapsedSeconds + realElapsedSeconds * speedMultiplier,
+  );
+
+  return {
+    elapsedSeconds: nextElapsedSeconds,
+    reachedBoundary: nextElapsedSeconds === stopAtSeconds,
+  };
+}
 
 /**
  * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
