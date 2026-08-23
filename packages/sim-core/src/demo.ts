@@ -36,7 +36,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 19 demo");
+console.log("Desert Caravan MMO — Checkpoint 20 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -311,4 +311,6 @@ console.log(
     : "  return route missed the city",
 );
 
-console.log("\nCheckpoint 19 UI: npm run debug-map -> http://127.0.0.1:4173");
+console.log(
+  "\nCheckpoint 20 UI clock: npm run debug-map -> http://127.0.0.1:4173",
+);

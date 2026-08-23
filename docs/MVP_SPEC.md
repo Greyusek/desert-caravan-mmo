@@ -215,7 +215,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - [ ] увидеть стартовый город;
 - [x] получить слух;
 - [x] построить минимум 4-сегментный маршрут;
-- [ ] запустить симуляцию;
+- [x] запустить симуляцию;
 - [x] наблюдать изменение позиции и запасов;
 - [x] найти объект при попадании в радиус обзора;
 - [x] пройти мимо объекта, если радиус обзора не задел его;
@@ -251,4 +251,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-005` — pre-combat Power-stub contact resolution.
 - [x] `GAME-006` — deterministic `FLEE` resolution without tactical combat.
 - [x] `GAME-007` — authoritative destination-city arrival and first return loop.
-- [ ] `UI-005` — deterministic play/pause clock with x1 / x10 / x100 / x1000 development speeds.
+- [x] `UI-005` — deterministic play/pause clock with x1 / x10 / x100 / x1000 development speeds.
+- [ ] `UI-006` — local spatial/time zoom for short patrol loops and close encounters.

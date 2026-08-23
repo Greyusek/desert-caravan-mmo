@@ -3,6 +3,8 @@
 import {
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
+  SIMULATION_CLOCK_SPEED_MULTIPLIERS,
+  advanceSimulationClock,
   applyExpeditionOutcomeToRoute,
   createCaravanStatusSnapshot,
   createCityArrivalRoutePreset,
@@ -30,6 +32,11 @@ const seedForm = requireElement("seed-form", HTMLFormElement);
 const seedInput = requireElement("seed-input", HTMLInputElement);
 const timeSlider = requireElement("time-slider", HTMLInputElement);
 const timeOutput = requireElement("time-output", HTMLOutputElement);
+const clockToggle = requireElement("clock-toggle", HTMLButtonElement);
+const clockToggleIcon = requireElement("clock-toggle-icon", HTMLSpanElement);
+const clockToggleLabel = requireElement("clock-toggle-label", HTMLSpanElement);
+const clockSpeed = requireElement("clock-speed", HTMLSelectElement);
+const clockStatus = requireElement("clock-status", HTMLOutputElement);
 const worldMap = requireElement("world-map", SVGSVGElement);
 const errorMessage = requireElement("error-message", HTMLParagraphElement);
 const mapTitle = requireElement("map-title", HTMLHeadingElement);
@@ -136,6 +143,13 @@ const contactDoctrineFight = requireElement(
 const contactDevRoute = requireElement("contact-dev-route", HTMLButtonElement);
 
 let elapsedSeconds = 0;
+let clockRunning = false;
+let clockSpeedMultiplier = readClockSpeedMultiplier();
+/** @type {number | null} */
+let clockFrameId = null;
+/** @type {number | null} */
+let clockAnchorTimestampMilliseconds = null;
+let clockAnchorElapsedSeconds = 0;
 let supplySettings = readSupplySettings();
 /** @type {ReturnType<typeof createRumorSearchSnapshot> | null} */
 let activeRumorSearch = null;
@@ -146,44 +160,70 @@ let activeSnapshot = null;
 
 seedForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  elapsedSeconds = 0;
-  timeSlider.value = "0";
+  resetSimulationClock();
   render();
 });
 
 timeSlider.addEventListener("input", () => {
+  pauseSimulationClock();
   elapsedSeconds = Number(timeSlider.value);
   render();
 });
 
+clockToggle.addEventListener("click", () => {
+  if (clockRunning) {
+    synchronizeSimulationClock(performance.now());
+    pauseSimulationClock();
+    return;
+  }
+
+  startSimulationClock();
+});
+
+clockSpeed.addEventListener("change", () => {
+  const nextMultiplier = readClockSpeedMultiplier();
+  if (clockRunning) {
+    const timestampMilliseconds = performance.now();
+    const reachedBoundary = synchronizeSimulationClock(timestampMilliseconds);
+    clockSpeedMultiplier = nextMultiplier;
+    if (reachedBoundary) {
+      pauseSimulationClock();
+      return;
+    }
+    clockAnchorElapsedSeconds = elapsedSeconds;
+    clockAnchorTimestampMilliseconds = timestampMilliseconds;
+  } else {
+    clockSpeedMultiplier = nextMultiplier;
+  }
+  updateClockControls();
+});
+
 routeForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  elapsedSeconds = 0;
-  timeSlider.value = "0";
+  resetSimulationClock();
   render();
 });
 
 supplyForm.addEventListener("submit", (event) => {
   event.preventDefault();
   supplySettings = readSupplySettings();
-  elapsedSeconds = 0;
-  timeSlider.value = "0";
+  resetSimulationClock();
   render();
 });
 
-doctrineStop.addEventListener("change", render);
-doctrineMarkAndContinue.addEventListener("change", render);
+doctrineStop.addEventListener("change", pauseClockAndRender);
+doctrineMarkAndContinue.addEventListener("change", pauseClockAndRender);
 contactMonsterSelect.addEventListener("change", () => {
-  elapsedSeconds = 0;
-  timeSlider.value = "0";
+  resetSimulationClock();
   render();
 });
-contactDoctrineFlee.addEventListener("change", render);
-contactDoctrineFight.addEventListener("change", render);
-contactFleeSpeed.addEventListener("change", render);
+contactDoctrineFlee.addEventListener("change", pauseClockAndRender);
+contactDoctrineFight.addEventListener("change", pauseClockAndRender);
+contactFleeSpeed.addEventListener("change", pauseClockAndRender);
 
 outcomeAction.addEventListener("click", () => {
   if (!activeOutcome) return;
+  pauseSimulationClock();
   elapsedSeconds =
     activeOutcome.status === "in-progress"
       ? activeOutcome.planned.atSeconds
@@ -203,8 +243,7 @@ rumorDevRoute.addEventListener("click", () => {
   routeDistanceInputs.forEach((input, index) => {
     input.value = index === 0 ? exactDistanceKilometers.toFixed(6) : "0";
   });
-  elapsedSeconds = 0;
-  timeSlider.value = "0";
+  resetSimulationClock();
   render();
 });
 
@@ -236,8 +275,7 @@ contactDevRoute.addEventListener("click", () => {
     input.value =
       selected.preset.commands[index]?.distanceKilometers.toFixed(6) ?? "0";
   });
-  elapsedSeconds = 0;
-  timeSlider.value = "0";
+  resetSimulationClock();
   render();
 });
 
@@ -266,8 +304,7 @@ cityDevRoute.addEventListener("click", () => {
     (monster) => monster.power < 100,
   );
   if (weakMonster) contactMonsterSelect.value = weakMonster.id;
-  elapsedSeconds = 0;
-  timeSlider.value = "0";
+  resetSimulationClock();
   render();
 });
 
@@ -395,6 +432,7 @@ function render() {
 
     timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
     timeSlider.value = String(elapsedSeconds);
+    updateClockControls();
 
     drawSnapshot(
       snapshot,
@@ -408,9 +446,134 @@ function render() {
     activeRumorSearch = null;
     activeOutcome = null;
     activeSnapshot = null;
+    pauseSimulationClock();
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
   }
+}
+
+/** @returns {void} */
+function startSimulationClock() {
+  if (!activeOutcome || activeOutcome.status !== "in-progress") {
+    updateClockControls();
+    return;
+  }
+
+  clockRunning = true;
+  clockAnchorElapsedSeconds = elapsedSeconds;
+  clockAnchorTimestampMilliseconds = performance.now();
+  clockFrameId = requestAnimationFrame(runSimulationClockFrame);
+  updateClockControls();
+}
+
+/** @param {number} timestampMilliseconds @returns {void} */
+function runSimulationClockFrame(timestampMilliseconds) {
+  clockFrameId = null;
+  if (!clockRunning) return;
+
+  const reachedBoundary = synchronizeSimulationClock(timestampMilliseconds);
+  if (
+    reachedBoundary ||
+    !activeOutcome ||
+    activeOutcome.status !== "in-progress"
+  ) {
+    pauseSimulationClock();
+    return;
+  }
+
+  clockFrameId = requestAnimationFrame(runSimulationClockFrame);
+}
+
+/**
+ * Re-evaluates elapsed simulation time from one stable play anchor, making the
+ * result independent from animation-frame partitioning.
+ * @param {number} timestampMilliseconds
+ * @returns {boolean}
+ */
+function synchronizeSimulationClock(timestampMilliseconds) {
+  if (
+    !clockRunning ||
+    !activeOutcome ||
+    clockAnchorTimestampMilliseconds === null
+  ) {
+    return false;
+  }
+
+  const realElapsedSeconds = Math.max(
+    0,
+    (timestampMilliseconds - clockAnchorTimestampMilliseconds) / 1_000,
+  );
+  const advanced = advanceSimulationClock(
+    clockAnchorElapsedSeconds,
+    realElapsedSeconds,
+    clockSpeedMultiplier,
+    activeOutcome.planned.atSeconds,
+  );
+  elapsedSeconds = advanced.elapsedSeconds;
+  timeSlider.value = String(elapsedSeconds);
+  render();
+  return (
+    advanced.reachedBoundary ||
+    !activeOutcome ||
+    activeOutcome.status !== "in-progress"
+  );
+}
+
+/** @returns {void} */
+function pauseSimulationClock() {
+  clockRunning = false;
+  clockAnchorTimestampMilliseconds = null;
+  clockAnchorElapsedSeconds = elapsedSeconds;
+  if (clockFrameId !== null) {
+    cancelAnimationFrame(clockFrameId);
+    clockFrameId = null;
+  }
+  updateClockControls();
+}
+
+/** @returns {void} */
+function resetSimulationClock() {
+  pauseSimulationClock();
+  elapsedSeconds = 0;
+  timeSlider.value = "0";
+}
+
+/** @returns {void} */
+function pauseClockAndRender() {
+  pauseSimulationClock();
+  render();
+}
+
+/** @returns {number} */
+function readClockSpeedMultiplier() {
+  const speedMultiplier = Number(clockSpeed.value);
+  if (!SIMULATION_CLOCK_SPEED_MULTIPLIERS.includes(speedMultiplier)) {
+    throw new RangeError("Выберите скорость x1, x10, x100 или x1000");
+  }
+  return speedMultiplier;
+}
+
+/** @returns {void} */
+function updateClockControls() {
+  const canRun = activeOutcome?.status === "in-progress";
+  clockToggle.disabled = !canRun;
+  clockToggle.setAttribute("aria-pressed", String(clockRunning));
+  clockToggleIcon.textContent = clockRunning ? "❚❚" : "▶";
+  clockToggleLabel.textContent = clockRunning ? "Пауза" : "Запустить";
+
+  const state = clockRunning
+    ? "running"
+    : activeOutcome && activeOutcome.status !== "in-progress"
+      ? "boundary"
+      : "paused";
+  clockStatus.dataset.state = state;
+  clockStatus.textContent = `${
+    state === "running"
+      ? "Идёт"
+      : state === "boundary"
+        ? "Граница достигнута"
+        : "Остановлено"
+  } · x${clockSpeedMultiplier}`;
 }
 
 /**
