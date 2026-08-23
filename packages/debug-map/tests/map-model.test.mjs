@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  CONTACT_ZOOM_HEIGHT,
+  CONTACT_ZOOM_SPATIAL_RADII_METERS,
+  CONTACT_ZOOM_TIME_RADII_SECONDS,
+  CONTACT_ZOOM_WIDTH,
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
   SIMULATION_CLOCK_SPEED_MULTIPLIERS,
@@ -10,6 +14,7 @@ import {
   createCaravanStatusSnapshot,
   createCityArrivalRoutePreset,
   createCityArrivalSnapshot,
+  createContactZoomSnapshot,
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
   createExpeditionEventLogSnapshot,
@@ -98,6 +103,15 @@ test("UI-005: clock inputs and speed choices are validated", () => {
     () => advanceSimulationClock(11, 1, 10, 10),
     /stopAtSeconds must be greater than or equal to elapsedSeconds/,
   );
+});
+
+test("UI-006: contact zoom exposes only the three spatial and time windows", () => {
+  assert.equal(CONTACT_ZOOM_WIDTH, 480);
+  assert.equal(CONTACT_ZOOM_HEIGHT, 260);
+  assert.deepEqual([...CONTACT_ZOOM_SPATIAL_RADII_METERS], [1_000, 5_000, 25_000]);
+  assert.deepEqual([...CONTACT_ZOOM_TIME_RADII_SECONDS], [300, 1_800, 10_800]);
+  assert.equal(Object.isFrozen(CONTACT_ZOOM_SPATIAL_RADII_METERS), true);
+  assert.equal(Object.isFrozen(CONTACT_ZOOM_TIME_RADII_SECONDS), true);
 });
 
 test("UI-001: north-up projection places cardinal bounds and equator exactly", () => {
@@ -1183,6 +1197,172 @@ function monsterInterceptAt(elapsedSeconds = 0, monsterIndex = 0) {
     contact: createMonsterContactSnapshot(route, monster),
   };
 }
+
+test("UI-006: planned contact becomes the exact local focus", () => {
+  const planned = monsterInterceptAt();
+  const contact = planned.contact.contact;
+  assert.ok(contact);
+  const zoom = createContactZoomSnapshot(
+    planned.route,
+    planned.monster,
+    planned.contact,
+  );
+  const focusSeparationPixels = Math.hypot(
+    zoom.focusCaravan.point.x - zoom.focusMonster.point.x,
+    zoom.focusCaravan.point.y - zoom.focusMonster.point.y,
+  );
+
+  assert.equal(zoom.focusKind, "contact");
+  assert.equal(zoom.focusAtSeconds, contact.atSeconds);
+  approx(zoom.focusCaravan.point.x, CONTACT_ZOOM_WIDTH / 2);
+  approx(zoom.focusCaravan.point.y, CONTACT_ZOOM_HEIGHT / 2);
+  approx(
+    focusSeparationPixels * zoom.metersPerPixel,
+    contact.separationMeters,
+    1e-3,
+  );
+  approx(
+    zoom.interactionRadiusPixels * zoom.metersPerPixel,
+    contact.interactionRadiusMeters,
+  );
+  assert.equal(zoom.caravanPath.length, 65);
+  assert.equal(zoom.monsterPath.length, 65);
+});
+
+test("UI-006: spatial zoom changes pixels without changing server distance", () => {
+  const planned = monsterInterceptAt();
+  const close = createContactZoomSnapshot(
+    planned.route,
+    planned.monster,
+    planned.contact,
+    1_000,
+    300,
+  );
+  const wide = createContactZoomSnapshot(
+    planned.route,
+    planned.monster,
+    planned.contact,
+    25_000,
+    300,
+  );
+  const separationPixels = (snapshot) =>
+    Math.hypot(
+      snapshot.focusCaravan.point.x - snapshot.focusMonster.point.x,
+      snapshot.focusCaravan.point.y - snapshot.focusMonster.point.y,
+    );
+
+  assert.equal(close.focusAtSeconds, wide.focusAtSeconds);
+  approx(close.metersPerPixel * 25, wide.metersPerPixel);
+  approx(separationPixels(close) / separationPixels(wide), 25, 1e-6);
+});
+
+test("UI-006: time zoom changes trace window without moving its focus", () => {
+  const planned = monsterInterceptAt();
+  const narrow = createContactZoomSnapshot(
+    planned.route,
+    planned.monster,
+    planned.contact,
+    5_000,
+    300,
+  );
+  const wide = createContactZoomSnapshot(
+    planned.route,
+    planned.monster,
+    planned.contact,
+    5_000,
+    10_800,
+  );
+
+  assert.equal(narrow.focusAtSeconds, wide.focusAtSeconds);
+  assert.deepEqual(narrow.focusCaravan, wide.focusCaravan);
+  assert.deepEqual(narrow.focusMonster, wide.focusMonster);
+  assert.ok(wide.windowStartSeconds < narrow.windowStartSeconds);
+  assert.ok(wide.windowEndSeconds >= narrow.windowEndSeconds);
+  assert.equal(narrow.caravanPath.length, 65);
+  assert.equal(wide.caravanPath.length, 65);
+  assert.notDeepEqual(narrow.caravanPath, wide.caravanPath);
+});
+
+test("UI-006: no-contact view follows the selected patrol at current time", () => {
+  const selected = monsterInterceptAt(1_234);
+  const first = createContactZoomSnapshot(
+    selected.route,
+    selected.monster,
+    null,
+    5_000,
+    1_800,
+  );
+  const second = createContactZoomSnapshot(
+    selected.route,
+    selected.monster,
+    null,
+    5_000,
+    1_800,
+  );
+
+  assert.deepEqual(first, second);
+  assert.equal(first.focusKind, "monster");
+  assert.equal(first.focusAtSeconds, 1_234);
+  approx(first.focusMonster.point.x, CONTACT_ZOOM_WIDTH / 2);
+  approx(first.focusMonster.point.y, CONTACT_ZOOM_HEIGHT / 2);
+});
+
+test("UI-006: local time trace is clipped to the finite expedition", () => {
+  const selected = monsterInterceptAt(0);
+  const zoom = createContactZoomSnapshot(
+    selected.route,
+    selected.monster,
+    null,
+    25_000,
+    10_800,
+  );
+
+  assert.equal(zoom.windowStartSeconds, 0);
+  assert.equal(
+    zoom.windowEndSeconds,
+    Math.min(selected.route.totalDurationSeconds, 10_800),
+  );
+  assert.equal(zoom.caravanPath[0]?.atSeconds, 0);
+  assert.equal(zoom.monsterPath[0]?.atSeconds, 0);
+});
+
+test("UI-006: zoom presets and selected contact identity are validated", () => {
+  const planned = monsterInterceptAt();
+  const otherMonster = planned.world.monsters[1];
+  assert.ok(otherMonster);
+
+  assert.throws(
+    () =>
+      createContactZoomSnapshot(
+        planned.route,
+        planned.monster,
+        planned.contact,
+        2_000,
+        300,
+      ),
+    /spatialRadiusMeters must be one of 1000, 5000 or 25000/,
+  );
+  assert.throws(
+    () =>
+      createContactZoomSnapshot(
+        planned.route,
+        planned.monster,
+        planned.contact,
+        1_000,
+        600,
+      ),
+    /timeRadiusSeconds must be one of 300, 1800 or 10800/,
+  );
+  assert.throws(
+    () =>
+      createContactZoomSnapshot(
+        planned.route,
+        otherMonster,
+        planned.contact,
+      ),
+    /contactSnapshot must belong to the selected monster/,
+  );
+});
 
 test("GAME-004: QA intercept preset is deterministic and guarantees contact", () => {
   const first = monsterInterceptAt();

@@ -41,6 +41,7 @@
 - `CHECKPOINT_18.md` — детерминированный исход FLEE из скоростей и безопасной дистанции без tactical combat.
 - `CHECKPOINT_19.md` — авторитетное прибытие в выбранный город и первый реальный цикл возвращения.
 - `CHECKPOINT_20.md` — детерминированные play/pause-часы и четыре скорости запуска симуляции.
+- `CHECKPOINT_21.md` — локальный пространственный/временной zoom траекторий каравана и патруля.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-005` и `GAME-001..GAME-007` покрыты 193 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 198 тестов в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006` и `GAME-001..GAME-007` покрыты 200 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 205 тестов в pull request.
