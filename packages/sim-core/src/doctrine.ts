@@ -29,6 +29,25 @@ export interface StaticObjectDoctrineEvaluation {
   readonly decision: StaticObjectDoctrineDecision | null;
 }
 
+export interface StaticObjectDoctrineResumeDecision {
+  readonly objectId: string;
+  readonly objectKind: StaticWorldObjectKind;
+  readonly resumedAtSeconds: DurationSeconds;
+  readonly segmentIndex: number;
+  readonly routeDistanceMeters: DistanceMeters;
+  readonly caravanPosition: WorldCoordinate;
+}
+
+export interface StaticObjectDoctrineResumeEvaluation {
+  readonly doctrine: "STOP";
+  readonly status: "resumed-and-continuing";
+  readonly evaluatedAtSeconds: DurationSeconds;
+  /** Route time reopens from the exact STOP boundary without adding idle time. */
+  readonly movementElapsedSeconds: DurationSeconds;
+  readonly decision: StaticObjectDoctrineDecision;
+  readonly resumeDecision: StaticObjectDoctrineResumeDecision;
+}
+
 const TIME_EPSILON_SECONDS = 1e-9;
 
 /**
@@ -77,6 +96,48 @@ export function evaluateStaticObjectDiscoveryDoctrine(
       routeDistanceMeters: discovery.routeDistanceMeters,
       caravanPosition: discovery.caravanPosition,
       continuesRoute,
+    },
+  };
+}
+
+/**
+ * GAME-008 — explicitly reopens a route after an executed discovery STOP.
+ *
+ * The resumed object identity must match the authoritative STOP decision. The
+ * resume instant is the same exact route-time boundary as discovery; modelling
+ * a later departure and idle supply consumption remains a separate lifecycle.
+ * Re-evaluating this result at a later route time therefore continues movement
+ * without creating another discovery or doctrine decision.
+ */
+export function resumeStaticObjectDiscoveryDoctrine(
+  evaluation: StaticObjectDoctrineEvaluation,
+  objectId: string,
+): StaticObjectDoctrineResumeEvaluation {
+  if (
+    evaluation.status !== "stopped" ||
+    evaluation.doctrine !== "STOP" ||
+    evaluation.decision === null ||
+    evaluation.decision.doctrine !== "STOP"
+  ) {
+    throw new RangeError("only an executed STOP discovery can be resumed");
+  }
+  if (objectId !== evaluation.decision.objectId) {
+    throw new RangeError("objectId must match the stopped discovery");
+  }
+
+  return {
+    doctrine: "STOP",
+    status: "resumed-and-continuing",
+    evaluatedAtSeconds: evaluation.evaluatedAtSeconds,
+    movementElapsedSeconds: evaluation.evaluatedAtSeconds,
+    decision: evaluation.decision,
+    resumeDecision: {
+      objectId: evaluation.decision.objectId,
+      objectKind: evaluation.decision.objectKind,
+      resumedAtSeconds: evaluation.decision.decidedAtSeconds,
+      segmentIndex: evaluation.decision.segmentIndex,
+      routeDistanceMeters: evaluation.decision.routeDistanceMeters,
+      caravanPosition: evaluation.decision.caravanPosition,
     },
   };
 }

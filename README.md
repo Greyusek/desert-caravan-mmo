@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 21 — UI-006: implemented and covered by automated tests.**
+**Checkpoint 22 — GAME-008: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -38,10 +38,11 @@ Also implemented:
 - GAME-005 — transparent Player Power 100 contact resolution: weaker monsters are defeated automatically, while stronger or equal monsters follow the explicit `FLEE | ACCEPT_FIGHT` doctrine.
 - GAME-006 — deterministic FLEE resolution from explicit movement inputs: a strictly faster caravan opens a safe gap and continues, while an equal or slower caravan is defeated.
 - GAME-007 — a selected generated city is the authoritative destination: the expedition completes on exact radius entry, a return to the origin requires exit and re-entry, and a route ending outside the city is not a success.
+- GAME-008 — an executed discovery `STOP` can be explicitly resumed at its exact authoritative coordinate; the acknowledged object remains marked and cannot trigger the same stop again.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
-Not implemented yet (intentionally): pursuit route replanning, persistent player discovery state, post-stop resume/idle lifecycle, rewards and expedition persistence, production player map and fog of war, server/database, and tactical combat.
+Not implemented yet (intentionally): pursuit route replanning, persistent player discovery state, elapsed idle time and supply use during a STOP, rewards and expedition persistence, production player map and fog of war, server/database, and tactical combat.
 
 ## Requirements
 
@@ -76,17 +77,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 21:
+Expected for Checkpoint 22:
 
 ```text
-# tests 205
-# pass 205
+# tests 214
+# pass 214
 # fail 0
 ```
 
-This total contains 200 simulation/UI tests and 5 tooling regression tests.
+This total contains 209 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_21.md` for UI-006 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_22.md` for GAME-008 details.
 
 ## Developer debug map
 
@@ -96,7 +97,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power/FLEE resolution. Select start and destination cities, then use `DEV: маршрут в город`; choosing the start city as destination creates a real exit-and-return scenario. Use Play/Pause and x1, x10, x100 or x1000 to run it without dragging the time slider. `DEV: маршрут на перехват` remains available for the PWR/FLEE checks; its local inset can switch between ±1/±5/±25 km and ±5 min/±30 min/±3 h without changing simulation state. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power/FLEE resolution. Select `STOP`, press `DEV: маршрут к цели`, advance to discovery and use `Продолжить маршрут` to reopen the exact route without a second discovery. Select start and destination cities, then use `DEV: маршрут в город`; choosing the start city as destination creates a real exit-and-return scenario. Use Play/Pause and x1, x10, x100 or x1000 to run it without dragging the time slider. `DEV: маршрут на перехват` remains available for the PWR/FLEE checks; its local inset can switch between ±1/±5/±25 km and ±5 min/±30 min/±3 h without changing simulation state. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -111,4 +112,4 @@ Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay:
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `GAME-008`: resume a discovery-STOP expedition from its exact authoritative pause without rediscovering the same target.
+The next functional checkpoint is `GAME-009`: account for explicit time spent at a discovery STOP with SIM-006 idle consumption before resume.

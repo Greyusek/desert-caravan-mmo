@@ -19,6 +19,7 @@ import {
   positionAtTime,
   projectSupplies,
   resolveMonsterPowerContact,
+  resumeStaticObjectDiscoveryDoctrine,
   timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
 } from "./index.js";
@@ -36,7 +37,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 21 demo");
+console.log("Desert Caravan MMO — Checkpoint 22 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -170,6 +171,18 @@ if (rumorOrigin) {
         `  ${doctrine}: status=${evaluation.status}, route-time=${(evaluation.movementElapsedSeconds / 3_600).toFixed(6)} h, continues=${evaluation.decision?.continuesRoute ?? false}`,
       );
     }
+    const stopped = evaluateStaticObjectDiscoveryDoctrine(
+      rumorDiscovery,
+      "STOP",
+      rumorDiscovery.elapsedSeconds + 3_600,
+    );
+    const resumed = resumeStaticObjectDiscoveryDoctrine(
+      stopped,
+      rumorDiscovery.object.id,
+    );
+    console.log(
+      `GAME-008 resume: object=${resumed.resumeDecision.objectId}, resumed-at=${(resumed.resumeDecision.resumedAtSeconds / 3_600).toFixed(6)} h, route-time=${(resumed.movementElapsedSeconds / 3_600).toFixed(6)} h`,
+    );
   }
 }
 
@@ -312,5 +325,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 21 local contact zoom: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 22 STOP resume: npm run debug-map -> http://127.0.0.1:4173",
 );
