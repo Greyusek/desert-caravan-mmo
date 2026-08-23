@@ -5,6 +5,8 @@ import {
   DEBUG_MAP_WIDTH,
   applyExpeditionOutcomeToRoute,
   createCaravanStatusSnapshot,
+  createCityArrivalRoutePreset,
+  createCityArrivalSnapshot,
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
   createExpeditionEventLogSnapshot,
@@ -38,7 +40,12 @@ const detailTitle = requireElement("detail-title", HTMLParagraphElement);
 const detailList = requireElement("detail-list", HTMLDListElement);
 const routeForm = requireElement("route-form", HTMLFormElement);
 const routeStartCity = requireElement("route-start-city", HTMLSelectElement);
+const routeDestinationCity = requireElement(
+  "route-destination-city",
+  HTMLSelectElement,
+);
 const routeSpeed = requireElement("route-speed", HTMLInputElement);
+const cityDevRoute = requireElement("city-dev-route", HTMLButtonElement);
 const routeSummary = requireElement("route-summary", HTMLOutputElement);
 const routeBearingInputs = [1, 2, 3, 4].map((index) =>
   requireElement(`route-bearing-${index}`, HTMLInputElement),
@@ -234,6 +241,36 @@ contactDevRoute.addEventListener("click", () => {
   render();
 });
 
+cityDevRoute.addEventListener("click", () => {
+  const startCity = activeSnapshot?.cities.find(
+    (city) => city.id === routeStartCity.value,
+  );
+  const destinationCity = activeSnapshot?.cities.find(
+    (city) => city.id === routeDestinationCity.value,
+  );
+  if (!startCity || !destinationCity) return;
+
+  const preset = createCityArrivalRoutePreset(
+    startCity.position,
+    destinationCity,
+  );
+  routeBearingInputs.forEach((input, index) => {
+    input.value = preset.commands[index]?.bearingDeg.toFixed(6) ?? "0";
+  });
+  routeDistanceInputs.forEach((input, index) => {
+    input.value =
+      preset.commands[index]?.distanceKilometers.toFixed(6) ?? "0";
+  });
+  doctrineMarkAndContinue.checked = true;
+  const weakMonster = activeSnapshot?.monsters.find(
+    (monster) => monster.power < 100,
+  );
+  if (weakMonster) contactMonsterSelect.value = weakMonster.id;
+  elapsedSeconds = 0;
+  timeSlider.value = "0";
+  render();
+});
+
 worldMap.addEventListener("click", (event) => {
   if (!(event.target instanceof Element)) return;
   const marker = event.target.closest("[data-detail-title]");
@@ -256,12 +293,18 @@ function render() {
       elapsedSeconds,
       2,
     );
-    syncStartCityOptions(snapshot.cities);
+    syncCityOptions(snapshot.cities);
     syncContactMonsterOptions(snapshot.monsters);
     const startCity = snapshot.cities.find(
       (city) => city.id === routeStartCity.value,
     );
     if (!startCity) throw new Error("Выберите существующий стартовый город");
+    const destinationCity = snapshot.cities.find(
+      (city) => city.id === routeDestinationCity.value,
+    );
+    if (!destinationCity) {
+      throw new Error("Выберите существующий город назначения");
+    }
 
     const plannedRoute = createFourSegmentRouteSnapshot(
       startCity.position,
@@ -285,6 +328,10 @@ function render() {
     const monsterContact = selectedMonster
       ? createMonsterContactSnapshot(plannedRoute, selectedMonster)
       : null;
+    const cityDestination = createCityArrivalSnapshot(
+      plannedRoute,
+      destinationCity,
+    );
     const outcome = createExpeditionOutcomeSnapshot(
       plannedRoute,
       supplySettings.initial,
@@ -293,6 +340,7 @@ function render() {
       monsterContact,
       readStrongMonsterDoctrine(),
       contactFleeSpeed.valueAsNumber / 3.6,
+      cityDestination,
     );
     const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
     const rumorSearch = createRumorSearchSnapshot(
@@ -323,13 +371,7 @@ function render() {
       doctrine,
       outcome,
     );
-    const maximumElapsedSeconds =
-      outcome.status !== "in-progress"
-        ? outcome.planned.atSeconds
-        : Math.max(
-            route.totalDurationSeconds,
-            selectedMonster?.periodSeconds ?? 0,
-          );
+    const maximumElapsedSeconds = outcome.planned.atSeconds;
 
     if (elapsedSeconds > maximumElapsedSeconds) {
       elapsedSeconds = maximumElapsedSeconds;
@@ -431,7 +473,9 @@ function renderMonsterContact(snapshot, outcome) {
       outcome.planned.status === "failed"
         ? "Караван погибнет от истощения раньше рассчитанного контакта."
         : outcome.planned.status === "paused"
-          ? "Доктрина STOP остановит караван раньше рассчитанного контакта."
+          ? outcome.interruptionCause === "route-end"
+            ? "Маршрут закончится вне города раньше рассчитанного контакта."
+            : "Доктрина STOP остановит караван раньше рассчитанного контакта."
           : "Сближение приходится на границу прибытия и не прерывает маршрут.";
     return;
   }
@@ -508,7 +552,9 @@ function renderEventLog(log, route) {
   eventLogNext.textContent = nextEvent
     ? `Следующее: ${eventTitle(nextEvent)} · ${formatElapsed(nextEvent.atSeconds)}`
     : log.executionStatus === "stopped" || log.executionStatus === "paused"
-      ? activeOutcome?.interruptionCause === "monster-contact"
+      ? activeOutcome?.interruptionCause === "route-end"
+        ? "Маршрут закончился вне выбранного города"
+        : activeOutcome?.interruptionCause === "monster-contact"
         ? "Маршрут остановлен контактом с монстром"
         : "Маршрут поставлен на паузу доктриной"
       : log.executionStatus === "failed"
@@ -597,7 +643,12 @@ function eventTitle(event) {
   if (event.kind === "search-missed") {
     return "Поиск завершён без находки";
   }
-  return "Маршрут достиг финиша";
+  if (event.kind === "route-ended") {
+    return "Маршрут закончился вне города";
+  }
+  return event.cityName
+    ? `Караван прибыл в ${event.cityName}`
+    : "Маршрут достиг финиша";
 }
 
 /**
@@ -643,6 +694,13 @@ function eventDetail(event, route) {
   }
   if (event.kind === "search-missed") {
     return `Караван не вошёл в радиус 150 м от цели слуха`;
+  }
+  if (event.kind === "route-ended") {
+    return `${formatNumber(event.distanceToCityMeters ?? 0, 0)} м до ${event.cityName ?? "города"} · успех не засчитан`;
+  }
+  if (event.kind === "arrival" && event.cityName) {
+    const movement = event.arrivalKind === "reentry" ? "возвращение" : "прибытие";
+    return `${movement} · радиус ${formatNumber(event.cityRadiusMeters ?? 0, 0)} м · ${formatNumber(event.distanceKilometers ?? 0, 1)} км пути`;
   }
   return `${formatNumber(event.distanceKilometers ?? 0, 1)} км · ETA ${formatDuration(route.totalDurationSeconds)}`;
 }
@@ -819,6 +877,8 @@ function renderCaravanStatus(status) {
     status.outcome?.monsterContactResolution?.status === "flee-failed";
   const monsterContactPause =
     paused && status.outcome?.interruptionCause === "monster-contact";
+  const routeEnded =
+    paused && status.outcome?.interruptionCause === "route-end";
   const monsterVictoryOccurred =
     status.outcome?.monsterContactResolution?.status === "monster-defeated" &&
     status.outcome.monsterContact !== null &&
@@ -847,9 +907,11 @@ function renderCaravanStatus(status) {
         ? "Караван уничтожен"
         : "Экспедиция потеряна"
       : outcomeCompleted
-        ? "Экспедиция завершена"
+        ? `Прибыл в ${status.outcome?.destinationCity?.name ?? "город"}`
       : paused
-        ? monsterContactPause
+        ? routeEnded
+          ? "Маршрут вне города"
+          : monsterContactPause
           ? "Контакт с монстром"
           : "Остановлен у цели"
         : doctrineContinues
@@ -866,9 +928,9 @@ function renderCaravanStatus(status) {
     outcomeFailed
       ? `${monsterDefeat ? "Разбит" : "Погиб"} · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
       : outcomeCompleted
-        ? "Прибыл · маршрут завершён"
+        ? `Прибыл · ${status.outcome?.destinationCity?.name ?? "город"}`
       : paused
-      ? `${monsterContactPause ? "Контакт" : "Стоянка"} · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
+      ? `${routeEnded ? "Конец маршрута" : monsterContactPause ? "Контакт" : "Стоянка"} · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
       : status.route.status === "arrived"
       ? "Прибыл · маршрут завершён"
       : `В пути · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`;
@@ -878,9 +940,9 @@ function renderCaravanStatus(status) {
   routeProgressLabel.textContent = outcomeFailed
     ? `${Math.round(status.route.progress * 100)}% · ГИБЕЛЬ ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
     : outcomeCompleted
-      ? `100% · ФИНИШ ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
+      ? `100% · ГОРОД ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
       : paused
-        ? `${Math.round(status.route.progress * 100)}% · ${monsterContactPause ? "КОНТАКТ" : "STOP"} ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
+        ? `${Math.round(status.route.progress * 100)}% · ${routeEnded ? "ВНЕ ГОРОДА" : monsterContactPause ? "КОНТАКТ" : "STOP"} ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
         : `${Math.round(status.route.progress * 100)}% · ETA ${formatDuration(status.route.totalDurationSeconds)}`;
 
   renderSupply(
@@ -916,15 +978,19 @@ function renderCaravanStatus(status) {
         : `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} < Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; ACCEPT_FIGHT завершил экспедицию.`
       : `${formatDepletionCause(status.outcome?.failureCause ?? null)} исчерпаны на ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}.`;
   } else if (outcomeCompleted) {
-    forecastTitle.textContent = "Экспедиция завершена";
-    forecastDetail.textContent = `Финиш: еда ${formatNumber(status.supplies.foodRemaining, 1)} · вода ${formatNumber(status.supplies.waterRemaining, 1)}`;
+    forecastTitle.textContent = `Прибытие в ${status.outcome?.destinationCity?.name ?? "город"}`;
+    forecastDetail.textContent = `В городе: еда ${formatNumber(status.supplies.foodRemaining, 1)} · вода ${formatNumber(status.supplies.waterRemaining, 1)}`;
   } else if (paused) {
-    forecastTitle.textContent = monsterContactPause
-      ? "Выбран FLEE"
-      : "Маршрут поставлен на паузу";
-    forecastDetail.textContent = monsterContactPause
-      ? "Сильный патруль остановил маршрут: для FLEE не переданы явные скорости."
-      : "Караван ждёт у найденной цели; это не финальный исход.";
+    forecastTitle.textContent = routeEnded
+      ? "Город не достигнут"
+      : monsterContactPause
+        ? "Выбран FLEE"
+        : "Маршрут поставлен на паузу";
+    forecastDetail.textContent = routeEnded
+      ? `Линия маршрута закончилась вне радиуса ${formatNumber(status.outcome?.cityArrivalRadiusMeters ?? 0, 0)} м от ${status.outcome?.destinationCity?.name ?? "города"}.`
+      : monsterContactPause
+        ? "Сильный патруль остановил маршрут: для FLEE не переданы явные скорости."
+        : "Караван ждёт у найденной цели; это не финальный исход.";
   } else if (monsterVictoryOccurred) {
     forecastTitle.textContent = "Слабый патруль уничтожен";
     forecastDetail.textContent = `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} > Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; караван продолжает маршрут.`;
@@ -932,8 +998,10 @@ function renderCaravanStatus(status) {
     forecastTitle.textContent = "Отход выполнен";
     forecastDetail.textContent = `Караван открыл безопасную дистанцию за ${formatDuration(status.outcome?.monsterContactResolution?.fleeResolution?.secondsToSafeSeparation ?? 0)} и продолжает исходный маршрут.`;
   } else if (status.forecast.canFinish) {
-    forecastTitle.textContent = "Запасов хватит до финиша";
-    forecastDetail.textContent = `На финише: еда ${formatNumber(status.forecast.foodAtArrival, 1)} · вода ${formatNumber(status.forecast.waterAtArrival, 1)}`;
+    forecastTitle.textContent = status.outcome?.cityArrival
+      ? "Запасов хватит до города"
+      : "Запасов хватит до конца маршрута";
+    forecastDetail.textContent = `${status.outcome?.cityArrival ? "При входе в город" : "В конце линии"}: еда ${formatNumber(status.forecast.foodAtArrival, 1)} · вода ${formatNumber(status.forecast.waterAtArrival, 1)}`;
   } else {
     forecastTitle.textContent = "Запасов не хватит";
     forecastDetail.textContent = `${formatDepletionCause(status.forecast.depletionCause)} закончатся на ${formatElapsed(status.forecast.firstDepletionAtSeconds ?? 0)}`;
@@ -944,6 +1012,8 @@ function renderCaravanStatus(status) {
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
  */
 function renderExpeditionOutcome(outcome) {
+  const destinationName = outcome.destinationCity?.name ?? "город";
+  const routeEnded = outcome.interruptionCause === "route-end";
   outcomePanel.dataset.state = outcome.status;
   outcomeTime.textContent = formatElapsed(outcome.planned.atSeconds);
   outcomePosition.textContent =
@@ -971,16 +1041,20 @@ function renderExpeditionOutcome(outcome) {
         : formatDepletionCause(outcome.planned.failureCause);
     } else if (outcome.planned.status === "paused") {
       const monsterContact = outcome.interruptionCause === "monster-contact";
-      outcomeDetail.textContent = monsterContact
-        ? "Следующая граница исполнения — FLEE от более сильного движущегося патруля."
-        : "Следующая граница исполнения — автоматическая остановка у найденной цели.";
-      outcomeCause.textContent = monsterContact
-        ? "Сильный монстр · FLEE"
-        : "Доктрина STOP";
+      outcomeDetail.textContent = routeEnded
+        ? `Нарисованный маршрут закончится вне радиуса ${formatNumber(outcome.cityArrivalRadiusMeters ?? 0, 0)} м от ${destinationName}; победы не будет.`
+        : monsterContact
+          ? "Следующая граница исполнения — FLEE от более сильного движущегося патруля."
+          : "Следующая граница исполнения — автоматическая остановка у найденной цели.";
+      outcomeCause.textContent = routeEnded
+        ? `Город не достигнут · ${destinationName}`
+        : monsterContact
+          ? "Сильный монстр · FLEE"
+          : "Доктрина STOP";
     } else {
       outcomeDetail.textContent =
-        "Маршрут и запас провизии позволяют добраться до конечной точки.";
-      outcomeCause.textContent = "Прибытие";
+        `Маршрут и запас провизии позволяют войти в радиус города ${destinationName}.`;
+      outcomeCause.textContent = `Прибытие · ${destinationName}`;
     }
     return;
   }
@@ -1008,22 +1082,31 @@ function renderExpeditionOutcome(outcome) {
       : formatDepletionCause(outcome.failureCause);
   } else if (outcome.status === "completed") {
     outcomeState.textContent = "Успех";
-    outcomeTitle.textContent = "Экспедиция завершена";
+    outcomeTitle.textContent =
+      outcome.cityArrival?.kind === "reentry"
+        ? `Караван вернулся в ${destinationName}`
+        : `Караван прибыл в ${destinationName}`;
     outcomeDetail.textContent =
-      "Караван достиг конечной точки маршрута и сохранил оставшиеся запасы.";
-    outcomeCause.textContent = "Прибытие";
+      `Авторитетная граница пересечена на дистанции ${formatNumber(outcome.cityArrivalRadiusMeters ?? 0, 0)} м от центра города.`;
+    outcomeCause.textContent = `Город · ${destinationName}`;
   } else {
     const monsterContact = outcome.interruptionCause === "monster-contact";
     outcomeState.textContent = "Пауза";
-    outcomeTitle.textContent = monsterContact
-      ? "Караван встретил патруль"
-      : "Караван остановлен у цели";
-    outcomeDetail.textContent = monsterContact
-      ? "FLEE ожидает явных входных скоростей; это резервное состояние API."
-      : "Доктрина STOP прервала движение, но экспедиция не считается завершённой.";
-    outcomeCause.textContent = monsterContact
-      ? "Сильный монстр · FLEE"
-      : "Доктрина STOP";
+    outcomeTitle.textContent = routeEnded
+      ? `Маршрут не достиг ${destinationName}`
+      : monsterContact
+        ? "Караван встретил патруль"
+        : "Караван остановлен у цели";
+    outcomeDetail.textContent = routeEnded
+      ? "Караван дошёл до конца заданной линии, но не вошёл в город. Экспедиция остаётся незавершённой."
+      : monsterContact
+        ? "FLEE ожидает явных входных скоростей; это резервное состояние API."
+        : "Доктрина STOP прервала движение, но экспедиция не считается завершённой.";
+    outcomeCause.textContent = routeEnded
+      ? "Конец маршрута вне города"
+      : monsterContact
+        ? "Сильный монстр · FLEE"
+        : "Доктрина STOP";
   }
 }
 
@@ -1150,19 +1233,23 @@ function drawSnapshot(
   }
 
   for (const city of snapshot.cities) {
+    const isDestination = outcome.destinationCity?.id === city.id;
     const group = svgElement("g", {
       "data-detail-title": `${city.name} · ${city.id}`,
       "data-detail-rows": JSON.stringify([
-        ["Тип", "Город"],
+        ["Тип", isDestination ? "Город назначения" : "Город"],
+        ["Радиус прибытия", isDestination ? `${outcome.cityArrivalRadiusMeters ?? 0} м` : "—"],
         ["Широта", city.position.latitudeDeg.toFixed(6)],
         ["Долгота", city.position.longitudeDeg.toFixed(6)],
       ]),
     });
     const marker = svgElement("circle", {
-      class: "city-marker",
+      class: isDestination
+        ? "city-marker city-marker--destination"
+        : "city-marker",
       cx: city.point.x,
       cy: city.point.y,
-      r: 5,
+      r: isDestination ? 7 : 5,
     });
     const label = svgElement("text", {
       class: "city-label",
@@ -1170,7 +1257,13 @@ function drawSnapshot(
       y: city.point.y - 7,
     });
     label.textContent = city.name;
-    group.append(marker, label, svgTitle(`${city.name} (${city.id})`));
+    group.append(
+      marker,
+      label,
+      svgTitle(
+        `${city.name} (${city.id})${isDestination ? " · назначение" : ""}`,
+      ),
+    );
     worldMap.append(group);
   }
 
@@ -1319,7 +1412,9 @@ function drawSnapshot(
     outcome.status === "failed"
       ? `Погиб · сегмент ${(route.position.segmentIndex ?? 0) + 1}`
       : outcome.status === "paused"
-      ? `Остановлен · сегмент ${(route.position.segmentIndex ?? 0) + 1}`
+      ? outcome.interruptionCause === "route-end"
+        ? "Конец маршрута вне города"
+        : `Остановлен · сегмент ${(route.position.segmentIndex ?? 0) + 1}`
       : outcome.status === "completed"
         ? "Экспедиция завершена"
       : route.position.segmentIndex === null
@@ -1354,12 +1449,19 @@ function drawSnapshot(
 /**
  * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
  */
-function syncStartCityOptions(cities) {
-  const currentIds = Array.from(
-    routeStartCity.options,
-    (option) => option.value,
-  );
+function syncCityOptions(cities) {
   const nextIds = cities.map((city) => city.id);
+  syncCitySelect(routeStartCity, cities, nextIds);
+  syncCitySelect(routeDestinationCity, cities, nextIds);
+}
+
+/**
+ * @param {HTMLSelectElement} select
+ * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
+ * @param {readonly string[]} nextIds
+ */
+function syncCitySelect(select, cities, nextIds) {
+  const currentIds = Array.from(select.options, (option) => option.value);
   if (
     currentIds.length === nextIds.length &&
     currentIds.every((id, index) => id === nextIds[index])
@@ -1367,8 +1469,8 @@ function syncStartCityOptions(cities) {
     return;
   }
 
-  const selectedId = routeStartCity.value;
-  routeStartCity.replaceChildren(
+  const selectedId = select.value;
+  select.replaceChildren(
     ...cities.map((city) => {
       const option = document.createElement("option");
       option.value = city.id;
@@ -1376,7 +1478,9 @@ function syncStartCityOptions(cities) {
       return option;
     }),
   );
-  routeStartCity.value = nextIds.includes(selectedId) ? selectedId : (nextIds[0] ?? "");
+  select.value = nextIds.includes(selectedId)
+    ? selectedId
+    : (nextIds[0] ?? "");
 }
 
 /**

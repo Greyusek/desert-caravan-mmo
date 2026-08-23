@@ -223,6 +223,11 @@
             <select id="route-start-city" name="startCity"></select>
           </label>
 
+          <label class="route-field route-field--destination" for="route-destination-city">
+            <span>Город назначения</span>
+            <select id="route-destination-city" name="destinationCity"></select>
+          </label>
+
           <label class="route-field route-field--speed" for="route-speed">
             <span>Скорость, км/ч</span>
             <input
@@ -268,11 +273,14 @@
             <input id="route-distance-4" type="number" min="0" step="0.1" value="20" required />
           </fieldset>
 
-          <button class="route-submit" type="submit">Обновить маршрут</button>
+          <div class="route-actions">
+            <button id="city-dev-route" type="button">DEV: маршрут в город</button>
+            <button class="route-submit" type="submit">Обновить маршрут</button>
+          </div>
         </form>
         <p class="route-note">
-          Старт привязан к авторитетной координате города. Четыре команды передаются
-          в sim-core как азимут и расстояние.
+          Старт и назначение привязаны к реальным городам. Прибытие происходит на
+          точном входе в радиус 500 м; окончание линии вне города не считается успехом.
         </p>
       </section>
 

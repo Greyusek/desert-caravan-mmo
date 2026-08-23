@@ -6,6 +6,8 @@ import {
   applyDiscoveryDoctrineToRoute,
   applyExpeditionOutcomeToRoute,
   createCaravanStatusSnapshot,
+  createCityArrivalRoutePreset,
+  createCityArrivalSnapshot,
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
   createExpeditionEventLogSnapshot,
@@ -1401,4 +1403,212 @@ test("GAME-004: an earlier discovery STOP remains the first pause", () => {
   assert.equal(outcome.planned.atSeconds, contactAt - 60);
   assert.equal(outcome.interruptionCause, "doctrine-stop");
   assert.equal(outcome.monsterContact, null);
+});
+
+const cityArrivalSupplies = { foodUnits: 100, waterUnits: 100 };
+const cityArrivalConsumption = {
+  moving: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+  idle: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+};
+const returnCity = {
+  id: "city-return",
+  name: "Return City",
+  position: { latitudeDeg: 0, longitudeDeg: 0 },
+};
+
+function cityReturnAt(elapsedSeconds = 0) {
+  const preset = createCityArrivalRoutePreset(
+    returnCity.position,
+    returnCity,
+  );
+  const route = createFourSegmentRouteSnapshot(
+    returnCity.position,
+    preset.commands,
+    5,
+    elapsedSeconds,
+  );
+  const destination = createCityArrivalSnapshot(route, returnCity);
+  return { preset, route, destination };
+}
+
+test("GAME-007: QA return preset exits the origin and re-enters its radius", () => {
+  const first = cityReturnAt();
+  const second = cityReturnAt();
+
+  assert.deepEqual(first.preset, second.preset);
+  assert.equal(first.preset.kind, "return");
+  assert.equal(first.preset.commands.length, 4);
+  assert.equal(first.destination.status, "forecast");
+  assert.equal(first.destination.arrival?.kind, "reentry");
+  approx(first.destination.arrival?.routeDistanceKilometers ?? 0, 19.5, 1e-6);
+  approx(first.destination.arrival?.distanceToCityMeters ?? 0, 500, 1e-4);
+});
+
+test("GAME-007: any generated city can become the authoritative destination", () => {
+  const world = createDebugMapSnapshot("checkpoint-04");
+  const startCity = world.cities[0];
+  const destinationCity = world.cities[1];
+  assert.ok(startCity);
+  assert.ok(destinationCity);
+  const preset = createCityArrivalRoutePreset(
+    startCity.position,
+    destinationCity,
+  );
+  const route = createFourSegmentRouteSnapshot(
+    startCity.position,
+    preset.commands,
+    5,
+  );
+  const destination = createCityArrivalSnapshot(route, destinationCity);
+
+  assert.equal(preset.kind, "transfer");
+  assert.equal(destination.arrival?.kind, "entry");
+  assert.equal(destination.arrival?.city.id, destinationCity.id);
+  approx(destination.arrival?.distanceToCityMeters ?? 0, 500, 1e-3);
+});
+
+test("GAME-007: city re-entry completes the expedition and names the city in the log", () => {
+  const planned = cityReturnAt();
+  const arrivalAt = planned.destination.arrival?.atSeconds;
+  assert.ok(arrivalAt);
+  const selected = cityReturnAt(arrivalAt + 60);
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    cityArrivalSupplies,
+    cityArrivalConsumption,
+    null,
+    null,
+    "FLEE",
+    selected.route.authoritativeRoute.speedMetersPerSecond,
+    selected.destination,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected.route, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    cityArrivalSupplies,
+    cityArrivalConsumption,
+    null,
+    null,
+    outcome,
+  );
+  const arrivalEvent = log.events.at(-1);
+
+  assert.equal(outcome.status, "completed");
+  assert.equal(outcome.terminal, true);
+  assert.equal(outcome.destinationCity?.id, returnCity.id);
+  assert.equal(outcome.cityArrival?.kind, "reentry");
+  approx(outcome.endedAtSeconds ?? 0, arrivalAt);
+  approx(executed.position.remainingDistanceMeters, 500, 1e-4);
+  assert.equal(log.executionStatus, "completed");
+  assert.equal(arrivalEvent?.kind, "arrival");
+  assert.equal(arrivalEvent?.cityId, returnCity.id);
+  assert.equal(arrivalEvent?.cityName, returnCity.name);
+  assert.equal(arrivalEvent?.arrivalKind, "reentry");
+  assert.equal(arrivalEvent?.active, true);
+});
+
+test("GAME-007: ending the drawn route outside the city is a pause, not success", () => {
+  const commands = [
+    { bearingDeg: 90, distanceKilometers: 2 },
+    { bearingDeg: 0, distanceKilometers: 0 },
+    { bearingDeg: 0, distanceKilometers: 0 },
+    { bearingDeg: 0, distanceKilometers: 0 },
+  ];
+  const plan = createFourSegmentRouteSnapshot(
+    returnCity.position,
+    commands,
+    5,
+  );
+  const selected = createFourSegmentRouteSnapshot(
+    returnCity.position,
+    commands,
+    5,
+    plan.totalDurationSeconds,
+  );
+  const destination = createCityArrivalSnapshot(selected, returnCity);
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected,
+    cityArrivalSupplies,
+    cityArrivalConsumption,
+    null,
+    null,
+    "FLEE",
+    selected.authoritativeRoute.speedMetersPerSecond,
+    destination,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    cityArrivalSupplies,
+    cityArrivalConsumption,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(destination.arrival, null);
+  assert.equal(outcome.status, "paused");
+  assert.equal(outcome.terminal, false);
+  assert.equal(outcome.interruptionCause, "route-end");
+  assert.equal(log.executionStatus, "paused");
+  assert.equal(log.events.at(-1)?.kind, "route-ended");
+  approx(log.events.at(-1)?.distanceToCityMeters ?? 0, 2_000, 1e-4);
+  assert.equal(log.events.some((event) => event.kind === "arrival"), false);
+});
+
+test("GAME-007: depletion on the exact city-entry second cancels arrival", () => {
+  const planned = cityReturnAt();
+  const arrivalAt = planned.destination.arrival?.atSeconds;
+  assert.ok(arrivalAt);
+  const selected = cityReturnAt(arrivalAt);
+  const stockAtTie = arrivalAt / 3_600;
+  const profile = {
+    moving: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+    idle: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+  };
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    { foodUnits: stockAtTie, waterUnits: stockAtTie },
+    profile,
+    null,
+    null,
+    "FLEE",
+    selected.route.authoritativeRoute.speedMetersPerSecond,
+    selected.destination,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected.route, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    { foodUnits: stockAtTie, waterUnits: stockAtTie },
+    profile,
+    null,
+    null,
+    outcome,
+  );
+
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.failureCause, "both");
+  assert.equal(log.events.at(-1)?.kind, "supplies-depleted");
+  assert.equal(log.events.some((event) => event.kind === "arrival"), false);
+});
+
+test("GAME-007: an earlier STOP still suppresses planned city arrival", () => {
+  const selected = cityReturnAt();
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    cityArrivalSupplies,
+    cityArrivalConsumption,
+    {
+      status: "stopped",
+      decision: { decidedAtSeconds: 1_000 },
+    },
+    null,
+    "FLEE",
+    selected.route.authoritativeRoute.speedMetersPerSecond,
+    selected.destination,
+  );
+
+  assert.equal(outcome.planned.status, "paused");
+  assert.equal(outcome.planned.atSeconds, 1_000);
+  assert.equal(outcome.interruptionCause, "doctrine-stop");
 });

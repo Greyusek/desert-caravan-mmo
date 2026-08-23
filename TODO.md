@@ -24,12 +24,13 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-004`: connect SIM-008 moving monster encounters to the expedition and event timeline without combat.
 - [x] `GAME-005`: resolve contacts with the transparent Player Power 100 / monster Power 90 or 110 pre-combat stub.
 - [x] `GAME-006`: resolve `FLEE` deterministically from explicit movement inputs, preserving the no-tactical-combat MVP scope.
+- [x] `GAME-007`: make a generated city the authoritative expedition destination and complete the first return-to-city loop.
 - [x] `DESIGN-001`: consolidate GDD v0.3 and MVP_SPEC v0.3 around production world scale and the physical map/library information economy.
 - [x] `DESIGN-002`: integrate the world bible, magic, bestiary, ecology, System 256 and presentation canon into GDD v0.4 without changing the GAME-005 implementation.
 
 ## Next
 
-- [ ] `GAME-007`: make a generated city the authoritative expedition destination and complete the first return-to-city loop.
+- [ ] `UI-005`: add deterministic play/pause controls with x1 / x10 / x100 / x1000 development speeds.
 - [ ] UX (deferred): add local map/time zoom so short monster patrol loops remain readable beside long caravan routes.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 

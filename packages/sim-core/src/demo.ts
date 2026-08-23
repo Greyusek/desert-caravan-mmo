@@ -1,4 +1,5 @@
 import {
+  DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
   createRumorSearchScenario,
@@ -8,6 +9,7 @@ import {
   discoverStaticObjectsAlongRoute,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
+  findFirstCityArrival,
   findFirstExpeditionMonsterContact,
   findFirstMovingEncounter,
   greatCircleDistance,
@@ -34,7 +36,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 18 demo");
+console.log("Desert Caravan MMO — Checkpoint 19 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -287,4 +289,26 @@ for (const fleeSpeedKilometersPerHour of [6, 5]) {
   );
 }
 
-console.log("\nCheckpoint 18 UI: npm run debug-map -> http://127.0.0.1:4173");
+const returnCity = {
+  id: "demo-city",
+  name: "Demo City",
+  position: start,
+};
+const cityReturnRoute = createRoutePlan(
+  start,
+  [
+    { bearingDeg: 0, distanceMeters: kilometers(10) },
+    { bearingDeg: 180, distanceMeters: kilometers(10) },
+  ],
+  speedMetersPerSecond,
+);
+const cityArrival = findFirstCityArrival(cityReturnRoute, returnCity);
+
+console.log("\nGAME-007 authoritative city arrival:");
+console.log(
+  cityArrival
+    ? `  ${cityArrival.kind} into ${cityArrival.city.name}: radius=${DEFAULT_CITY_ARRIVAL_RADIUS_METERS} m, route=${(cityArrival.routeDistanceMeters / 1_000).toFixed(3)} km, T=${(cityArrival.elapsedSeconds / 3_600).toFixed(3)} h`
+    : "  return route missed the city",
+);
+
+console.log("\nCheckpoint 19 UI: npm run debug-map -> http://127.0.0.1:4173");
