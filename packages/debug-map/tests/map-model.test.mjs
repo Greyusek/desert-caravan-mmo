@@ -17,6 +17,7 @@ import {
   createContactZoomSnapshot,
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
+  createDiscoveryResumeSnapshot,
   createExpeditionEventLogSnapshot,
   createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
@@ -1864,4 +1865,217 @@ test("GAME-007: an earlier STOP still suppresses planned city arrival", () => {
   assert.equal(outcome.planned.status, "paused");
   assert.equal(outcome.planned.atSeconds, 1_000);
   assert.equal(outcome.interruptionCause, "doctrine-stop");
+});
+
+function game008ScenarioAt(
+  elapsedSeconds,
+  initialSupplies = searchSupplies,
+  profile = searchConsumption,
+) {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const route = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    elapsedSeconds,
+  );
+  const search = createRumorSearchSnapshot("checkpoint-04", origin, route);
+  const doctrine = createDiscoveryDoctrineSnapshot(route, search, "STOP");
+  const resume = createDiscoveryResumeSnapshot(
+    doctrine,
+    search.serverTruth.target.id,
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    route,
+    initialSupplies,
+    profile,
+    resume ?? doctrine,
+  );
+  const executedRoute = applyExpeditionOutcomeToRoute(route, outcome);
+  const executedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    executedRoute,
+  );
+  const executedDoctrine = createDiscoveryDoctrineSnapshot(
+    executedRoute,
+    executedSearch,
+    "STOP",
+  );
+  const executedResume = createDiscoveryResumeSnapshot(
+    executedDoctrine,
+    executedSearch.serverTruth.target.id,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    executedRoute,
+    initialSupplies,
+    profile,
+    executedSearch,
+    executedDoctrine,
+    outcome,
+    executedResume,
+  );
+
+  return {
+    route: executedRoute,
+    search: executedSearch,
+    doctrine: executedDoctrine,
+    resume: executedResume,
+    outcome,
+    log,
+  };
+}
+
+test("GAME-008: explicit resume reopens the route at the exact STOP coordinate", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5);
+  const search = createRumorSearchSnapshot("checkpoint-04", origin, plan);
+  const discoveryAtSeconds = search.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+
+  const scenario = game008ScenarioAt(discoveryAtSeconds);
+
+  assert.equal(scenario.doctrine.status, "stopped");
+  assert.equal(scenario.resume?.status, "resumed-and-continuing");
+  assert.equal(
+    scenario.resume?.resumeDecision.resumedAtSeconds,
+    discoveryAtSeconds,
+  );
+  assert.equal(scenario.route.position.elapsedSeconds, discoveryAtSeconds);
+  approx(
+    scenario.route.position.traveledDistanceMeters,
+    scenario.resume?.resumeDecision.routeDistanceMeters ?? 0,
+    1e-6,
+  );
+  assert.equal(scenario.outcome.status, "in-progress");
+  assert.equal(scenario.outcome.planned.status, "completed");
+  assert.deepEqual(
+    scenario.log.events
+      .filter((event) => event.atSeconds === discoveryAtSeconds)
+      .map(({ id }) => id),
+    [
+      "rumor-target-discovered",
+      "doctrine-stop",
+      "discovery-route-resumed",
+    ],
+  );
+});
+
+test("GAME-008: later route time advances without rediscovering the acknowledged target", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5);
+  const search = createRumorSearchSnapshot("checkpoint-04", origin, plan);
+  const discoveryAtSeconds = search.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+  const elapsedSeconds = discoveryAtSeconds + 30;
+
+  const scenario = game008ScenarioAt(elapsedSeconds);
+  const eventIds = scenario.log.events.map(({ id }) => id);
+
+  assert.equal(scenario.route.position.elapsedSeconds, elapsedSeconds);
+  assert.ok(
+    scenario.route.position.traveledDistanceMeters >
+      (scenario.resume?.resumeDecision.routeDistanceMeters ?? Infinity),
+  );
+  assert.equal(
+    eventIds.filter((id) => id === "rumor-target-discovered").length,
+    1,
+  );
+  assert.equal(eventIds.filter((id) => id === "doctrine-stop").length, 1);
+  assert.equal(
+    eventIds.filter((id) => id === "discovery-route-resumed").length,
+    1,
+  );
+});
+
+test("GAME-008: the resumed expedition can reach its original route completion", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5);
+
+  const scenario = game008ScenarioAt(plan.totalDurationSeconds);
+
+  assert.equal(scenario.outcome.status, "completed");
+  assert.equal(scenario.route.position.status, "arrived");
+  assert.equal(scenario.log.events.at(-1)?.kind, "arrival");
+  assert.equal(scenario.log.events.at(-1)?.active, true);
+});
+
+test("GAME-008: post-resume fatal depletion remains authoritative", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5);
+  const search = createRumorSearchSnapshot("checkpoint-04", origin, plan);
+  const discoveryAtSeconds = search.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+  const depletionAtSeconds =
+    discoveryAtSeconds + (plan.totalDurationSeconds - discoveryAtSeconds) / 2;
+  const profile = {
+    moving: { foodUnitsPerHour: 1, waterUnitsPerHour: 0 },
+    idle: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+  };
+  const scenario = game008ScenarioAt(
+    plan.totalDurationSeconds,
+    { foodUnits: depletionAtSeconds / 3_600, waterUnits: 1 },
+    profile,
+  );
+
+  assert.equal(scenario.outcome.status, "failed");
+  assert.equal(scenario.outcome.failureCause, "food");
+  approx(scenario.outcome.endedAtSeconds ?? 0, depletionAtSeconds, 1e-6);
+  assert.equal(scenario.log.events.at(-1)?.kind, "supplies-depleted");
+  assert.equal(scenario.log.events.some((event) => event.kind === "arrival"), false);
+});
+
+test("GAME-008: a stored resume is dormant before STOP and rejects another target", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5);
+  const plannedSearch = createRumorSearchSnapshot("checkpoint-04", origin, plan);
+  const discoveryAtSeconds = plannedSearch.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+  const beforeRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    discoveryAtSeconds - 1,
+  );
+  const beforeSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    beforeRoute,
+  );
+  const pending = createDiscoveryDoctrineSnapshot(
+    beforeRoute,
+    beforeSearch,
+    "STOP",
+  );
+  assert.equal(
+    createDiscoveryResumeSnapshot(pending, beforeSearch.serverTruth.target.id),
+    null,
+  );
+
+  const stoppedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    discoveryAtSeconds,
+  );
+  const stoppedSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    stoppedRoute,
+  );
+  const stopped = createDiscoveryDoctrineSnapshot(
+    stoppedRoute,
+    stoppedSearch,
+    "STOP",
+  );
+  assert.throws(
+    () => createDiscoveryResumeSnapshot(stopped, "another-target"),
+    /objectId must match the stopped discovery/,
+  );
 });

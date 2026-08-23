@@ -20,6 +20,7 @@ import {
   positionAtTime,
   projectSupplies,
   resolveMonsterPowerContact,
+  resumeStaticObjectDiscoveryDoctrine,
   timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
 } from "../sim-core/dist/src/index.js";
@@ -103,7 +104,7 @@ export function advanceSimulationClock(
 }
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "route-resumed" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -116,6 +117,7 @@ export function advanceSimulationClock(
  * @property {number | null} distanceKilometers
  * @property {number} order
  * @property {import("../sim-core/dist/src/index.js").StaticWorldObjectKind} [objectKind]
+ * @property {string} [objectId]
  * @property {import("../sim-core/dist/src/index.js").StaticObjectDiscoveryDoctrine} [doctrine]
  * @property {string} [monsterId]
  * @property {number} [monsterPower]
@@ -778,6 +780,38 @@ export function createDiscoveryDoctrineSnapshot(route, rumorSearch, doctrine) {
 }
 
 /**
+ * GAME-008 applies one explicit resume command only to the authoritative
+ * object that produced an executed STOP. Before discovery the stored command
+ * is dormant so deterministic timeline inspection can still rewind safely.
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot>} doctrine
+ * @param {string | null} [resumedObjectId]
+ */
+export function createDiscoveryResumeSnapshot(
+  doctrine,
+  resumedObjectId = null,
+) {
+  if (resumedObjectId === null || doctrine.status === "pending") return null;
+
+  const evaluation = resumeStaticObjectDiscoveryDoctrine(
+    doctrine,
+    resumedObjectId,
+  );
+  return {
+    ...evaluation,
+    decision: {
+      ...evaluation.decision,
+      routeDistanceKilometers:
+        evaluation.decision.routeDistanceMeters / 1_000,
+    },
+    resumeDecision: {
+      ...evaluation.resumeDecision,
+      routeDistanceKilometers:
+        evaluation.resumeDecision.routeDistanceMeters / 1_000,
+    },
+  };
+}
+
+/**
  * Re-evaluates only the live route position after doctrine. The original plan,
  * waypoints and ETA remain intact for comparison in the debug overlay.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
@@ -806,7 +840,7 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
- * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | ReturnType<typeof createDiscoveryResumeSnapshot> | null} [doctrine]
  * @param {ReturnType<typeof createMonsterContactSnapshot> | null} [monsterContact]
  * @param {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine} [strongMonsterDoctrine]
  * @param {number} [fleeSpeedMetersPerSecond]
@@ -976,7 +1010,7 @@ export function applyExpeditionOutcomeToRoute(route, outcome) {
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
- * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | ReturnType<typeof createDiscoveryResumeSnapshot> | null} [doctrine]
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} [outcome]
  */
 export function createCaravanStatusSnapshot(
@@ -1085,6 +1119,7 @@ export function createCaravanStatusSnapshot(
  * @param {ReturnType<typeof createRumorSearchSnapshot> | null} [rumorSearch]
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} [outcome]
+ * @param {ReturnType<typeof createDiscoveryResumeSnapshot> | null} [resume]
  */
 export function createExpeditionEventLogSnapshot(
   route,
@@ -1093,6 +1128,7 @@ export function createExpeditionEventLogSnapshot(
   rumorSearch = null,
   doctrine = null,
   outcome = null,
+  resume = null,
 ) {
   const firstDepletion = timeToFirstDepletion(
     initialSupplies,
@@ -1138,6 +1174,7 @@ export function createExpeditionEventLogSnapshot(
     events,
     rumorSearch,
     doctrine,
+    resume,
     route.totalDurationSeconds,
   );
 
@@ -1170,7 +1207,7 @@ export function createExpeditionEventLogSnapshot(
       secondsToSafeSeparation:
         outcome.monsterContactResolution.fleeResolution
           ?.secondsToSafeSeparation,
-      order: 17,
+      order: 18,
     });
   }
 
@@ -1242,7 +1279,7 @@ export function createExpeditionEventLogSnapshot(
     });
   }
   const legacyStopAtSeconds =
-    outcome === null && doctrine?.status === "stopped"
+    outcome === null && doctrine?.status === "stopped" && resume === null
       ? doctrine.decision?.decidedAtSeconds ?? null
       : null;
   const boundaryAtSeconds = outcome?.planned.atSeconds ?? legacyStopAtSeconds;
@@ -1290,6 +1327,7 @@ export function createExpeditionEventLogSnapshot(
     atSeconds: event.atSeconds,
     segmentIndex: event.segmentIndex,
     cause: event.cause,
+    objectId: event.objectId ?? null,
     objectKind: event.objectKind ?? null,
     doctrine: event.doctrine ?? null,
     monsterId: event.monsterId ?? null,
@@ -1337,12 +1375,14 @@ export function createExpeditionEventLogSnapshot(
  * @param {PlannedExpeditionEvent[]} events
  * @param {ReturnType<typeof createRumorSearchSnapshot> | null} rumorSearch
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} doctrine
+ * @param {ReturnType<typeof createDiscoveryResumeSnapshot> | null} resume
  * @param {number} routeDurationSeconds
  */
 function addRumorSearchEvent(
   events,
   rumorSearch,
   doctrine,
+  resume,
   routeDurationSeconds,
 ) {
   if (!rumorSearch) return;
@@ -1373,6 +1413,20 @@ function addRumorSearchEvent(
         objectKind: doctrine.decision.objectKind,
         doctrine: doctrine.decision.doctrine,
         order: 16,
+      });
+    }
+    if (resume?.resumeDecision) {
+      events.push({
+        id: "discovery-route-resumed",
+        kind: "route-resumed",
+        atSeconds: resume.resumeDecision.resumedAtSeconds,
+        segmentIndex: resume.resumeDecision.segmentIndex,
+        cause: null,
+        distanceKilometers:
+          resume.resumeDecision.routeDistanceKilometers,
+        objectId: resume.resumeDecision.objectId,
+        objectKind: resume.resumeDecision.objectKind,
+        order: 17,
       });
     }
     return;

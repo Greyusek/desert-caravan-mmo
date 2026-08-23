@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   createWorldCoordinate,
   evaluateStaticObjectDiscoveryDoctrine,
+  resumeStaticObjectDiscoveryDoctrine,
 } from "../dist/src/index.js";
 
 const discovery = {
@@ -100,5 +101,80 @@ test("GAME-002: invalid doctrine and simulation time are rejected", () => {
   assert.throws(
     () => evaluateStaticObjectDiscoveryDoctrine(discovery, "STOP", -1),
     /elapsedSeconds must be a non-negative finite number/,
+  );
+});
+
+test("GAME-008: an executed STOP resumes at the exact discovery boundary", () => {
+  const stopped = evaluateStaticObjectDiscoveryDoctrine(
+    discovery,
+    "STOP",
+    discovery.elapsedSeconds,
+  );
+  const resumed = resumeStaticObjectDiscoveryDoctrine(
+    stopped,
+    discovery.object.id,
+  );
+
+  assert.equal(resumed.status, "resumed-and-continuing");
+  assert.equal(resumed.movementElapsedSeconds, discovery.elapsedSeconds);
+  assert.equal(resumed.decision, stopped.decision);
+  assert.deepEqual(resumed.resumeDecision, {
+    objectId: discovery.object.id,
+    objectKind: discovery.object.kind,
+    resumedAtSeconds: discovery.elapsedSeconds,
+    segmentIndex: discovery.segmentIndex,
+    routeDistanceMeters: discovery.routeDistanceMeters,
+    caravanPosition: discovery.caravanPosition,
+  });
+});
+
+test("GAME-008: the acknowledged target no longer caps later route time", () => {
+  const evaluatedAtSeconds = discovery.elapsedSeconds + 3_600;
+  const stopped = evaluateStaticObjectDiscoveryDoctrine(
+    discovery,
+    "STOP",
+    evaluatedAtSeconds,
+  );
+  const resumed = resumeStaticObjectDiscoveryDoctrine(
+    stopped,
+    discovery.object.id,
+  );
+
+  assert.equal(resumed.movementElapsedSeconds, evaluatedAtSeconds);
+  assert.equal(resumed.resumeDecision.resumedAtSeconds, discovery.elapsedSeconds);
+});
+
+test("GAME-008: resume is bound to the authoritative discovered object", () => {
+  const stopped = evaluateStaticObjectDiscoveryDoctrine(
+    discovery,
+    "STOP",
+    discovery.elapsedSeconds,
+  );
+
+  assert.throws(
+    () => resumeStaticObjectDiscoveryDoctrine(stopped, "another-object"),
+    /objectId must match the stopped discovery/,
+  );
+});
+
+test("GAME-008: pending or continuing doctrine cannot invent a resume", () => {
+  const pending = evaluateStaticObjectDiscoveryDoctrine(
+    discovery,
+    "STOP",
+    discovery.elapsedSeconds - 1,
+  );
+  const continuing = evaluateStaticObjectDiscoveryDoctrine(
+    discovery,
+    "MARK_AND_CONTINUE",
+    discovery.elapsedSeconds,
+  );
+
+  assert.throws(
+    () => resumeStaticObjectDiscoveryDoctrine(pending, discovery.object.id),
+    /only an executed STOP discovery can be resumed/,
+  );
+  assert.throws(
+    () => resumeStaticObjectDiscoveryDoctrine(continuing, discovery.object.id),
+    /only an executed STOP discovery can be resumed/,
   );
 });

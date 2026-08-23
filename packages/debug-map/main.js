@@ -14,6 +14,7 @@ import {
   createContactZoomSnapshot,
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
+  createDiscoveryResumeSnapshot,
   createExpeditionEventLogSnapshot,
   createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
@@ -164,8 +165,12 @@ let clockFrameId = null;
 let clockAnchorTimestampMilliseconds = null;
 let clockAnchorElapsedSeconds = 0;
 let supplySettings = readSupplySettings();
+/** @type {string | null} */
+let resumedDiscoveryObjectId = null;
 /** @type {ReturnType<typeof createRumorSearchSnapshot> | null} */
 let activeRumorSearch = null;
+/** @type {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} */
+let activeDoctrine = null;
 /** @type {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} */
 let activeOutcome = null;
 /** @type {ReturnType<typeof createDebugMapSnapshot> | null} */
@@ -224,8 +229,11 @@ supplyForm.addEventListener("submit", (event) => {
   render();
 });
 
-doctrineStop.addEventListener("change", pauseClockAndRender);
-doctrineMarkAndContinue.addEventListener("change", pauseClockAndRender);
+doctrineStop.addEventListener("change", clearDiscoveryResumeAndRender);
+doctrineMarkAndContinue.addEventListener(
+  "change",
+  clearDiscoveryResumeAndRender,
+);
 contactMonsterSelect.addEventListener("change", () => {
   resetSimulationClock();
   render();
@@ -239,10 +247,20 @@ contactTimeZoom.addEventListener("change", render);
 outcomeAction.addEventListener("click", () => {
   if (!activeOutcome) return;
   pauseSimulationClock();
-  elapsedSeconds =
-    activeOutcome.status === "in-progress"
-      ? activeOutcome.planned.atSeconds
-      : 0;
+  if (
+    activeOutcome.status === "paused" &&
+    activeOutcome.interruptionCause === "doctrine-stop" &&
+    activeDoctrine?.decision
+  ) {
+    resumedDiscoveryObjectId = activeDoctrine.decision.objectId;
+    render();
+    return;
+  }
+  if (activeOutcome.status === "in-progress") {
+    elapsedSeconds = activeOutcome.planned.atSeconds;
+  } else {
+    resetSimulationClock();
+  }
   timeSlider.value = String(elapsedSeconds);
   render();
 });
@@ -374,6 +392,10 @@ function render() {
       plannedRumorSearch,
       readDiscoveryDoctrine(),
     );
+    const proposedResume = createDiscoveryResumeSnapshot(
+      proposedDoctrine,
+      resumedDiscoveryObjectId,
+    );
     const selectedMonster = snapshot.monsters.find(
       (monster) => monster.id === contactMonsterSelect.value,
     );
@@ -388,7 +410,7 @@ function render() {
       plannedRoute,
       supplySettings.initial,
       supplySettings.profile,
-      proposedDoctrine,
+      proposedResume ?? proposedDoctrine,
       monsterContact,
       readStrongMonsterDoctrine(),
       contactFleeSpeed.valueAsNumber / 3.6,
@@ -405,14 +427,20 @@ function render() {
       rumorSearch,
       readDiscoveryDoctrine(),
     );
+    const resume = createDiscoveryResumeSnapshot(
+      doctrine,
+      resumedDiscoveryObjectId,
+    );
+    const effectiveDoctrine = resume ?? doctrine;
     const caravanStatus = createCaravanStatusSnapshot(
       route,
       supplySettings.initial,
       supplySettings.profile,
-      doctrine,
+      effectiveDoctrine,
       outcome,
     );
     activeRumorSearch = rumorSearch;
+    activeDoctrine = doctrine;
     activeOutcome = outcome;
     activeSnapshot = snapshot;
     const eventLog = createExpeditionEventLogSnapshot(
@@ -422,6 +450,7 @@ function render() {
       rumorSearch,
       doctrine,
       outcome,
+      resume,
     );
     const maximumElapsedSeconds = outcome.planned.atSeconds;
 
@@ -439,7 +468,7 @@ function render() {
     monsterCount.textContent = String(snapshot.monsters.length);
     timeOutput.textContent = formatElapsed(elapsedSeconds);
     routeSummary.textContent = formatRouteSummary(route);
-    renderRumorSearch(rumorSearch, doctrine);
+    renderRumorSearch(rumorSearch, effectiveDoctrine);
     renderCaravanStatus(caravanStatus);
     renderExpeditionOutcome(outcome);
     renderMonsterContact(monsterContact, outcome);
@@ -454,12 +483,13 @@ function render() {
       snapshot,
       route,
       rumorSearch,
-      doctrine,
+      effectiveDoctrine,
       outcome,
       monsterContact,
     );
   } catch (error) {
     activeRumorSearch = null;
+    activeDoctrine = null;
     activeOutcome = null;
     activeSnapshot = null;
     contactZoomMap.replaceChildren();
@@ -553,6 +583,7 @@ function pauseSimulationClock() {
 function resetSimulationClock() {
   pauseSimulationClock();
   elapsedSeconds = 0;
+  resumedDiscoveryObjectId = null;
   timeSlider.value = "0";
 }
 
@@ -560,6 +591,12 @@ function resetSimulationClock() {
 function pauseClockAndRender() {
   pauseSimulationClock();
   render();
+}
+
+/** @returns {void} */
+function clearDiscoveryResumeAndRender() {
+  resumedDiscoveryObjectId = null;
+  pauseClockAndRender();
 }
 
 /** @returns {number} */
@@ -937,6 +974,9 @@ function eventTitle(event) {
       ? "Доктрина: остановиться у цели"
       : "Доктрина: отметить и продолжить";
   }
+  if (event.kind === "route-resumed") {
+    return "Маршрут возобновлён";
+  }
   if (event.kind === "monster-contact") {
     if (event.powerResolutionStatus === "monster-defeated") {
       return `Победа над ${event.monsterId ?? "монстром"}`;
@@ -988,6 +1028,9 @@ function eventDetail(event, route) {
       ? "Движение поставлено на паузу в точке обнаружения"
       : "Цель добавлена в знания экспедиции; курс не изменён";
   }
+  if (event.kind === "route-resumed") {
+    return `${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
+  }
   if (event.kind === "monster-contact") {
     const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
     if (event.powerResolutionStatus === "monster-defeated") {
@@ -1019,13 +1062,16 @@ function eventDetail(event, route) {
 
 /**
  * @param {ReturnType<typeof createRumorSearchSnapshot>} search
- * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot>} doctrine
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | NonNullable<ReturnType<typeof createDiscoveryResumeSnapshot>>} doctrine
  */
 function renderRumorSearch(search, doctrine) {
+  const resumed = doctrine.status === "resumed-and-continuing";
   rumorPanel.dataset.state = search.status;
   rumorState.textContent =
     search.status === "found"
-      ? doctrine.status === "stopped"
+      ? resumed
+        ? "Маршрут возобновлён"
+        : doctrine.status === "stopped"
         ? "Караван остановлен"
         : "Цель отмечена"
       : search.status === "missed"
@@ -1039,7 +1085,9 @@ function renderRumorSearch(search, doctrine) {
   if (search.status === "found" && search.discovery) {
     rumorResult.textContent = `Рудник обнаружен на ${formatElapsed(search.discovery.atSeconds)} · сегмент ${search.discovery.segmentIndex + 1} · ${formatNumber(search.discovery.routeDistanceKilometers, 1)} км пути.`;
     doctrineResult.textContent =
-      doctrine.status === "stopped"
+      resumed
+        ? `STOP исполнена и явно снята: цель уже отмечена, исходный маршрут снова открыт.`
+        : doctrine.status === "stopped"
         ? `STOP выполнена: маршрут поставлен на паузу в точке обнаружения.`
         : `MARK_AND_CONTINUE выполнена: цель отмечена, караван продолжает маршрут.`;
   } else if (search.status === "missed") {
@@ -1201,6 +1249,8 @@ function renderCaravanStatus(status) {
     status.outcome.monsterContact !== null &&
     status.route.evaluatedAtSeconds + 1e-9 >=
       status.outcome.monsterContact.expeditionElapsedSeconds;
+  const doctrineResumed =
+    status.doctrine?.status === "resumed-and-continuing";
   const doctrineContinues =
     status.doctrine?.status === "marked-and-continuing";
   const panelState = outcomeFailed
@@ -1226,6 +1276,8 @@ function renderCaravanStatus(status) {
           : monsterContactPause
           ? "Контакт с монстром"
           : "Остановлен у цели"
+        : doctrineResumed
+          ? "Цель отмечена · маршрут возобновлён"
         : doctrineContinues
           ? "Цель отмечена · в пути"
         : monsterVictoryOccurred
@@ -1303,6 +1355,10 @@ function renderCaravanStatus(status) {
       : monsterContactPause
         ? "Сильный патруль остановил маршрут: для FLEE не переданы явные скорости."
         : "Караван ждёт у найденной цели; это не финальный исход.";
+  } else if (doctrineResumed) {
+    forecastTitle.textContent = "Маршрут возобновлён";
+    forecastDetail.textContent =
+      "Найденная цель уже отмечена и не создаст повторный STOP; следующие границы рассчитываются по исходному маршруту.";
   } else if (monsterVictoryOccurred) {
     forecastTitle.textContent = "Слабый патруль уничтожен";
     forecastDetail.textContent = `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} > Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; караван продолжает маршрут.`;
@@ -1371,7 +1427,12 @@ function renderExpeditionOutcome(outcome) {
     return;
   }
 
-  outcomeAction.textContent = "Повторить экспедицию";
+  const discoveryStop =
+    outcome.status === "paused" &&
+    outcome.interruptionCause === "doctrine-stop";
+  outcomeAction.textContent = discoveryStop
+    ? "Продолжить маршрут"
+    : "Повторить экспедицию";
   if (outcome.status === "failed") {
     const monsterDefeat = outcome.failureReason === "monster";
     const fleeFailed =
@@ -1413,7 +1474,7 @@ function renderExpeditionOutcome(outcome) {
       ? "Караван дошёл до конца заданной линии, но не вошёл в город. Экспедиция остаётся незавершённой."
       : monsterContact
         ? "FLEE ожидает явных входных скоростей; это резервное состояние API."
-        : "Доктрина STOP прервала движение, но экспедиция не считается завершённой.";
+        : "Доктрина STOP прервала движение, но экспедиция не считается завершённой. Явная команда продолжения отметит эту цель и снова откроет исходный маршрут.";
     outcomeCause.textContent = routeEnded
       ? "Конец маршрута вне города"
       : monsterContact
@@ -1482,7 +1543,7 @@ function readStrongMonsterDoctrine() {
  * @param {ReturnType<typeof createDebugMapSnapshot>} snapshot
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {ReturnType<typeof createRumorSearchSnapshot>} rumorSearch
- * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot>} doctrine
+ * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | NonNullable<ReturnType<typeof createDiscoveryResumeSnapshot>>} doctrine
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
  * @param {ReturnType<typeof createMonsterContactSnapshot> | null} monsterContact
  */
@@ -1737,7 +1798,12 @@ function drawSnapshot(
     "data-detail-rows": JSON.stringify([
       ["Статус", caravanSegment],
       ["Исход", outcome.status],
-      ["Доктрина", doctrine.doctrine],
+      [
+        "Доктрина",
+        doctrine.status === "resumed-and-continuing"
+          ? "STOP · RESUMED"
+          : doctrine.doctrine,
+      ],
       ["Скорость", `${route.speedKilometersPerHour.toFixed(1)} км/ч`],
       ["Пройдено", `${(route.position.traveledDistanceMeters / 1_000).toFixed(1)} км`],
       ["Осталось", `${(route.position.remainingDistanceMeters / 1_000).toFixed(1)} км`],
