@@ -12,3 +12,4 @@ export * from "./encounter.js";
 export * from "./expedition-contact.js";
 export * from "./flee.js";
 export * from "./power-contact.js";
+export * from "./city-arrival.js";

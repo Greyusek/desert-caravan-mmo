@@ -833,10 +833,20 @@ input[type="range"] {
 .route-form {
   display: grid;
   grid-template-columns:
-    minmax(180px, 1.3fr) 112px repeat(4, minmax(150px, 1fr))
-    auto;
+    minmax(170px, 1.2fr) minmax(170px, 1.2fr) 112px
+    repeat(4, minmax(145px, 1fr)) minmax(160px, auto);
   align-items: end;
   gap: 10px;
+}
+
+.route-actions {
+  display: grid;
+  gap: 7px;
+}
+
+.route-actions button {
+  width: 100%;
+  white-space: nowrap;
 }
 
 .route-field {
@@ -1619,6 +1629,20 @@ input[type="range"] {
   color: #ff9f91;
 }
 
+.event-log-item[data-kind="route-ended"] .event-log-marker {
+  border-color: var(--accent);
+}
+
+.event-log-item[data-kind="route-ended"][data-state="occurred"] .event-log-marker,
+.event-log-item[data-kind="route-ended"][data-state="active"] .event-log-marker {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(244, 184, 96, 0.5);
+}
+
+.event-log-item[data-kind="route-ended"] .event-log-content strong {
+  color: var(--accent-strong);
+}
+
 .event-log-current {
   position: absolute;
   top: 0;
@@ -1825,6 +1849,12 @@ input[type="range"] {
   stroke-width: 2;
 }
 
+.city-marker--destination {
+  stroke: #f4b860;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 5px rgba(244, 184, 96, 0.72));
+}
+
 .object-marker {
   stroke: rgba(255, 255, 255, 0.72);
   stroke-width: 1.4;
@@ -1950,6 +1980,14 @@ input[type="range"] {
     grid-column: span 2;
   }
 
+  .route-field--destination {
+    grid-column: span 2;
+  }
+
+  .route-actions {
+    grid-column: span 2;
+  }
+
   .supply-form {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -1970,6 +2008,15 @@ input[type="range"] {
 
   .route-field--start {
     grid-column: auto;
+  }
+
+  .route-field--destination {
+    grid-column: auto;
+  }
+
+  .route-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 1fr;
   }
 
   .route-submit {
@@ -2079,6 +2126,11 @@ input[type="range"] {
 
   .route-submit {
     grid-column: auto;
+  }
+
+  .route-actions {
+    grid-column: auto;
+    grid-template-columns: 1fr;
   }
 
   .seed-control,

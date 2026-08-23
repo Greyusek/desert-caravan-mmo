@@ -1,6 +1,7 @@
 // @ts-check
 
 import {
+  DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
   DEFAULT_PLAYER_POWER,
@@ -11,6 +12,7 @@ import {
   discoverStaticObjectsAlongRoute,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
+  findFirstCityArrival,
   findFirstExpeditionMonsterContact,
   generateSeededWorld,
   greatCircleDistance,
@@ -47,7 +49,7 @@ const RUMOR_MAP_PIXELS_PER_METER = 0.0022;
 const RUMOR_SECTOR_SAMPLE_COUNT = 16;
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "monster-contact" | "search-missed" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -73,6 +75,11 @@ const RUMOR_SECTOR_SAMPLE_COUNT = 16;
  * @property {number} [safeSeparationMeters]
  * @property {number} [relativeSpeedMetersPerSecond]
  * @property {number | null} [secondsToSafeSeparation]
+ * @property {string} [cityId]
+ * @property {string} [cityName]
+ * @property {number} [cityRadiusMeters]
+ * @property {number} [distanceToCityMeters]
+ * @property {import("../sim-core/dist/src/index.js").CityArrivalKind} [arrivalKind]
  */
 
 /**
@@ -302,6 +309,63 @@ export function createMonsterInterceptRoutePreset(
 }
 
 /**
+ * GAME-007 creates a reproducible route to the selected city. A destination
+ * that already contains the start point first receives a real outbound leg so
+ * the later radius crossing is a return rather than a T+0 false positive.
+ * @param {WorldCoordinate} start
+ * @param {import("../sim-core/dist/src/index.js").City} destinationCity
+ * @param {number} [cityRadiusMeters]
+ */
+export function createCityArrivalRoutePreset(
+  start,
+  destinationCity,
+  cityRadiusMeters = DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
+) {
+  assertNonNegativeFinite(cityRadiusMeters, "cityRadiusMeters");
+  const distanceToDestinationMeters = greatCircleDistance(
+    start,
+    destinationCity.position,
+  );
+
+  if (distanceToDestinationMeters <= cityRadiusMeters + 1e-7) {
+    const outboundDistanceMeters = Math.max(10_000, cityRadiusMeters * 4);
+    const outboundPoint = destinationPoint(start, 0, outboundDistanceMeters);
+    const returnDistanceMeters = greatCircleDistance(
+      outboundPoint,
+      destinationCity.position,
+    );
+    return {
+      kind: /** @type {const} */ ("return"),
+      commands: [
+        { bearingDeg: 0, distanceKilometers: outboundDistanceMeters / 1_000 },
+        {
+          bearingDeg: initialBearingDegrees(
+            outboundPoint,
+            destinationCity.position,
+          ),
+          distanceKilometers: returnDistanceMeters / 1_000,
+        },
+        { bearingDeg: 0, distanceKilometers: 0 },
+        { bearingDeg: 0, distanceKilometers: 0 },
+      ],
+    };
+  }
+
+  return {
+    kind: /** @type {const} */ ("transfer"),
+    commands: [
+      {
+        bearingDeg: initialBearingDegrees(start, destinationCity.position),
+        distanceKilometers: distanceToDestinationMeters / 1_000,
+      },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+  };
+}
+
+/**
  * Resolves the fixed four-leg UI-002 editor through the public simulation API.
  * The UI keeps kilometers and km/h at its boundary; sim-core continues to
  * receive meters and meters per second.
@@ -362,6 +426,50 @@ export function createFourSegmentRouteSnapshot(
       point: projectCoordinate(evaluated.coordinate),
     },
     authoritativeRoute: route,
+  };
+}
+
+/**
+ * GAME-007 exposes the selected generated city and its first exact route entry.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {import("../sim-core/dist/src/index.js").City} destinationCity
+ * @param {number} [cityRadiusMeters]
+ */
+export function createCityArrivalSnapshot(
+  route,
+  destinationCity,
+  cityRadiusMeters = DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
+) {
+  const arrival = findFirstCityArrival(
+    route.authoritativeRoute,
+    destinationCity,
+    cityRadiusMeters,
+  );
+  const evaluatedAtSeconds = Math.min(
+    route.position.elapsedSeconds,
+    route.totalDurationSeconds,
+  );
+
+  return {
+    city: destinationCity,
+    radiusMeters: cityRadiusMeters,
+    evaluatedAtSeconds,
+    status: arrival
+      ? evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >= arrival.elapsedSeconds
+        ? /** @type {const} */ ("arrived")
+        : /** @type {const} */ ("forecast")
+      : evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
+          route.totalDurationSeconds
+        ? /** @type {const} */ ("missed")
+        : /** @type {const} */ ("unreachable"),
+    arrival: arrival
+      ? {
+          ...arrival,
+          atSeconds: arrival.elapsedSeconds,
+          routeDistanceKilometers: arrival.routeDistanceMeters / 1_000,
+          point: projectCoordinate(arrival.caravanPosition),
+        }
+      : null,
   };
 }
 
@@ -518,7 +626,7 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
 }
 
 /**
- * GAME-006 composes route ETA, supplies, discovery STOP and the first moving
+ * GAME-006/007 composes route ETA, supplies, discovery STOP and the first moving
  * contact with Power plus an explicit movement-based FLEE resolution. A weak
  * monster is defeated automatically; against a stronger monster a strictly
  * faster caravan escapes and continues, while an equal/slower caravan fails.
@@ -529,6 +637,7 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
  * @param {ReturnType<typeof createMonsterContactSnapshot> | null} [monsterContact]
  * @param {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine} [strongMonsterDoctrine]
  * @param {number} [fleeSpeedMetersPerSecond]
+ * @param {ReturnType<typeof createCityArrivalSnapshot> | null} [cityDestination]
  */
 export function createExpeditionOutcomeSnapshot(
   route,
@@ -538,6 +647,7 @@ export function createExpeditionOutcomeSnapshot(
   monsterContact = null,
   strongMonsterDoctrine = "FLEE",
   fleeSpeedMetersPerSecond = route.authoritativeRoute.speedMetersPerSecond,
+  cityDestination = null,
 ) {
   const doctrinePauseAtSeconds =
     doctrine?.status === "stopped"
@@ -545,12 +655,16 @@ export function createExpeditionOutcomeSnapshot(
       : null;
   const monsterPauseAtSeconds =
     monsterContact?.contact?.expeditionElapsedSeconds ?? null;
+  const completionAtSeconds = cityDestination
+    ? cityDestination.arrival?.atSeconds ?? null
+    : route.totalDurationSeconds;
   const baselineEvaluation = evaluateExpeditionOutcome(
     route.authoritativeRoute,
     initialSupplies,
     consumptionProfile,
     route.position.elapsedSeconds,
     doctrinePauseAtSeconds,
+    completionAtSeconds,
   );
   const contact = monsterContact?.contact ?? null;
   const fleeAttempt =
@@ -587,10 +701,16 @@ export function createExpeditionOutcomeSnapshot(
     : null;
 
   let evaluation = baselineEvaluation;
-  /** @type {"doctrine-stop" | "monster-contact" | "monster-defeat" | null} */
+  /** @type {"doctrine-stop" | "monster-contact" | "monster-defeat" | "route-end" | null} */
   let interruptionCause =
     baselineEvaluation.planned.status === "paused"
-      ? /** @type {const} */ ("doctrine-stop")
+      ? cityDestination && cityDestination.arrival === null &&
+        (doctrinePauseAtSeconds === null ||
+          Math.abs(
+            baselineEvaluation.planned.atSeconds - doctrinePauseAtSeconds,
+          ) > EVENT_TIME_EPSILON_SECONDS)
+        ? /** @type {const} */ ("route-end")
+        : /** @type {const} */ ("doctrine-stop")
       : null;
 
   if (contactDisposition === "pause" && monsterPauseAtSeconds !== null) {
@@ -600,6 +720,7 @@ export function createExpeditionOutcomeSnapshot(
       consumptionProfile,
       route.position.elapsedSeconds,
       monsterPauseAtSeconds,
+      completionAtSeconds,
     );
     interruptionCause = /** @type {const} */ ("monster-contact");
   } else if (contactDisposition === "fail" && monsterPauseAtSeconds !== null) {
@@ -633,6 +754,9 @@ export function createExpeditionOutcomeSnapshot(
   return {
     ...evaluation,
     interruptionCause,
+    destinationCity: cityDestination?.city ?? null,
+    cityArrivalRadiusMeters: cityDestination?.radiusMeters ?? null,
+    cityArrival: cityDestination?.arrival ?? null,
     failureReason:
       evaluation.planned.status !== "failed"
         ? null
@@ -689,9 +813,14 @@ export function createCaravanStatusSnapshot(
   doctrine = null,
   outcome = null,
 ) {
+  const expeditionDurationSeconds =
+    outcome?.cityArrival?.atSeconds ?? route.totalDurationSeconds;
+  const expeditionDistanceMeters =
+    (outcome?.cityArrival?.routeDistanceKilometers ??
+      route.totalDistanceKilometers) * 1_000;
   const evaluatedAtSeconds = Math.min(
     route.position.elapsedSeconds,
-    route.totalDurationSeconds,
+    expeditionDurationSeconds,
   );
   const supplies = projectSupplies(
     initialSupplies,
@@ -708,13 +837,15 @@ export function createCaravanStatusSnapshot(
     initialSupplies,
     consumptionProfile,
     "moving",
-    route.totalDurationSeconds,
+    expeditionDurationSeconds,
   );
-  const totalDistanceMeters = route.totalDistanceKilometers * 1_000;
   const routeProgress =
-    totalDistanceMeters === 0
+    expeditionDistanceMeters === 0
       ? 1
-      : route.position.traveledDistanceMeters / totalDistanceMeters;
+      : Math.min(
+          1,
+          route.position.traveledDistanceMeters / expeditionDistanceMeters,
+        );
 
   return {
     doctrine,
@@ -726,11 +857,14 @@ export function createCaravanStatusSnapshot(
       progress: routeProgress,
       elapsedSeconds: route.position.elapsedSeconds,
       evaluatedAtSeconds,
-      totalDurationSeconds: route.totalDurationSeconds,
+      totalDurationSeconds: expeditionDurationSeconds,
       traveledDistanceKilometers:
         route.position.traveledDistanceMeters / 1_000,
       remainingDistanceKilometers:
-        route.position.remainingDistanceMeters / 1_000,
+        Math.max(
+          0,
+          expeditionDistanceMeters - route.position.traveledDistanceMeters,
+        ) / 1_000,
     },
     supplies: {
       initialFoodUnits: initialSupplies.foodUnits,
@@ -755,13 +889,13 @@ export function createCaravanStatusSnapshot(
         initialSupplies,
         consumptionProfile,
         "moving",
-        route.totalDurationSeconds,
+        expeditionDurationSeconds,
       ),
       firstDepletionAtSeconds: firstDepletion.atSeconds,
       depletionCause: firstDepletion.cause,
       depletionBeforeOrAtArrival:
         firstDepletion.atSeconds !== null &&
-        firstDepletion.atSeconds <= route.totalDurationSeconds,
+        firstDepletion.atSeconds <= expeditionDurationSeconds,
       foodAtArrival: atArrival.foodRemaining,
       waterAtArrival: atArrival.waterRemaining,
     },
@@ -888,15 +1022,52 @@ export function createExpeditionEventLogSnapshot(
     });
   }
 
-  events.push({
-    id: "arrival",
-    kind: "arrival",
-    atSeconds: route.totalDurationSeconds,
-    segmentIndex: null,
-    cause: null,
-    distanceKilometers: route.totalDistanceKilometers,
-    order: 40,
-  });
+  if (outcome?.destinationCity) {
+    if (outcome.cityArrival) {
+      events.push({
+        id: `arrival-${outcome.destinationCity.id}`,
+        kind: "arrival",
+        atSeconds: outcome.cityArrival.atSeconds,
+        segmentIndex: outcome.cityArrival.segmentIndex,
+        cause: null,
+        distanceKilometers: outcome.cityArrival.routeDistanceKilometers,
+        cityId: outcome.destinationCity.id,
+        cityName: outcome.destinationCity.name,
+        cityRadiusMeters: outcome.cityArrivalRadiusMeters ?? undefined,
+        distanceToCityMeters: outcome.cityArrival.distanceToCityMeters,
+        arrivalKind: outcome.cityArrival.kind,
+        order: 40,
+      });
+    } else {
+      events.push({
+        id: "route-ended-outside-city",
+        kind: "route-ended",
+        atSeconds: route.totalDurationSeconds,
+        segmentIndex: null,
+        cause: null,
+        distanceKilometers: route.totalDistanceKilometers,
+        cityId: outcome.destinationCity.id,
+        cityName: outcome.destinationCity.name,
+        cityRadiusMeters: outcome.cityArrivalRadiusMeters ?? undefined,
+        distanceToCityMeters: greatCircleDistance(
+          route.authoritativeRoute.end,
+          outcome.destinationCity.position,
+          route.authoritativeRoute.planetRadiusMeters,
+        ),
+        order: 40,
+      });
+    }
+  } else {
+    events.push({
+      id: "arrival",
+      kind: "arrival",
+      atSeconds: route.totalDurationSeconds,
+      segmentIndex: null,
+      cause: null,
+      distanceKilometers: route.totalDistanceKilometers,
+      order: 40,
+    });
+  }
   const legacyStopAtSeconds =
     outcome === null && doctrine?.status === "stopped"
       ? doctrine.decision?.decidedAtSeconds ?? null
@@ -913,7 +1084,9 @@ export function createExpeditionEventLogSnapshot(
               boundaryAtSeconds + EVENT_TIME_EPSILON_SECONDS &&
             !(
               boundaryStatus === "failed" &&
-              (event.kind === "arrival" || event.kind === "search-missed")
+              (event.kind === "arrival" ||
+                event.kind === "route-ended" ||
+                event.kind === "search-missed")
             ),
         );
   executionEvents.sort(
@@ -960,6 +1133,11 @@ export function createExpeditionEventLogSnapshot(
     relativeSpeedMetersPerSecond:
       event.relativeSpeedMetersPerSecond ?? null,
     secondsToSafeSeparation: event.secondsToSafeSeparation ?? null,
+    cityId: event.cityId ?? null,
+    cityName: event.cityName ?? null,
+    cityRadiusMeters: event.cityRadiusMeters ?? null,
+    distanceToCityMeters: event.distanceToCityMeters ?? null,
+    arrivalKind: event.arrivalKind ?? null,
     distanceKilometers: event.distanceKilometers,
     occurred: index <= activeEventIndex,
     active: index === activeEventIndex,

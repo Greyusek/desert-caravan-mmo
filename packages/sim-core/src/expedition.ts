@@ -39,9 +39,12 @@ const TIME_EPSILON_SECONDS = 1e-9;
 /**
  * GAME-003 — resolves the first authoritative expedition boundary.
  *
- * A doctrine pause wins only when it happens strictly before both arrival and
- * fatal depletion. Depletion wins an exact tie with arrival or pause because
+ * A doctrine pause wins only when it happens strictly before both completion
+ * and fatal depletion. Depletion wins an exact tie with either boundary because
  * SIM-006 defines an exactly empty critical stock as non-survivable for MVP.
+ * GAME-007 may supply an earlier city entry as the completion boundary, or null
+ * when the planned route never reaches its selected city. In the latter case,
+ * exhausting the route is a non-terminal pause rather than a false success.
  */
 export function evaluateExpeditionOutcome(
   route: RoutePlan,
@@ -49,11 +52,28 @@ export function evaluateExpeditionOutcome(
   consumptionProfile: ConsumptionProfile,
   elapsedSeconds: DurationSeconds,
   pausedAtSeconds: DurationSeconds | null = null,
+  completionAtSeconds: DurationSeconds | null = route.totalDurationSeconds,
 ): ExpeditionOutcomeEvaluation {
   assertNonNegativeFinite(elapsedSeconds, "elapsedSeconds");
   if (pausedAtSeconds !== null) {
     assertNonNegativeFinite(pausedAtSeconds, "pausedAtSeconds");
   }
+  if (completionAtSeconds !== null) {
+    assertNonNegativeFinite(completionAtSeconds, "completionAtSeconds");
+    if (
+      completionAtSeconds >
+      route.totalDurationSeconds + TIME_EPSILON_SECONDS
+    ) {
+      throw new RangeError(
+        "completionAtSeconds must not exceed route total duration",
+      );
+    }
+  }
+
+  const executionEndSeconds =
+    completionAtSeconds === null
+      ? route.totalDurationSeconds
+      : Math.min(completionAtSeconds, route.totalDurationSeconds);
 
   const firstDepletion = timeToFirstDepletion(
     initialSupplies,
@@ -63,13 +83,13 @@ export function evaluateExpeditionOutcome(
   const failureAtSeconds =
     firstDepletion.atSeconds !== null &&
     firstDepletion.atSeconds <=
-      route.totalDurationSeconds + TIME_EPSILON_SECONDS
+      executionEndSeconds + TIME_EPSILON_SECONDS
       ? firstDepletion.atSeconds
       : null;
 
   const pauseWins =
     pausedAtSeconds !== null &&
-    pausedAtSeconds < route.totalDurationSeconds - TIME_EPSILON_SECONDS &&
+    pausedAtSeconds < executionEndSeconds - TIME_EPSILON_SECONDS &&
     (failureAtSeconds === null ||
       pausedAtSeconds < failureAtSeconds - TIME_EPSILON_SECONDS);
 
@@ -85,11 +105,17 @@ export function evaluateExpeditionOutcome(
           atSeconds: failureAtSeconds,
           failureCause: firstDepletion.cause,
         }
-      : {
-          status: "completed",
-          atSeconds: route.totalDurationSeconds,
-          failureCause: null,
-        };
+      : completionAtSeconds === null
+        ? {
+            status: "paused",
+            atSeconds: route.totalDurationSeconds,
+            failureCause: null,
+          }
+        : {
+            status: "completed",
+            atSeconds: executionEndSeconds,
+            failureCause: null,
+          };
 
   if (elapsedSeconds + TIME_EPSILON_SECONDS < planned.atSeconds) {
     return {

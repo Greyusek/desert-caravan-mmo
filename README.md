@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 18 — GAME-006: implemented and covered by automated tests.**
+**Checkpoint 19 — GAME-007: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -37,6 +37,7 @@ Also implemented:
 - GAME-004 — first continuous-time contact between the finite caravan route and cyclic monster patrol, composed into expedition pause, map state and timeline through SIM-008.
 - GAME-005 — transparent Player Power 100 contact resolution: weaker monsters are defeated automatically, while stronger or equal monsters follow the explicit `FLEE | ACCEPT_FIGHT` doctrine.
 - GAME-006 — deterministic FLEE resolution from explicit movement inputs: a strictly faster caravan opens a safe gap and continues, while an equal or slower caravan is defeated.
+- GAME-007 — a selected generated city is the authoritative destination: the expedition completes on exact radius entry, a return to the origin requires exit and re-entry, and a route ending outside the city is not a success.
 
 Not implemented yet (intentionally): pursuit route replanning, persistent player discovery state, post-stop resume/idle lifecycle, rewards and expedition persistence, production player map and fog of war, server/database, and tactical combat.
 
@@ -73,17 +74,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 18:
+Expected for Checkpoint 19:
 
 ```text
-# tests 173
-# pass 173
+# tests 191
+# pass 191
 # fail 0
 ```
 
-This total contains 168 simulation/UI tests and 5 tooling regression tests.
+This total contains 186 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_18.md` for GAME-006 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_19.md` for GAME-007 details.
 
 ## Developer debug map
 
@@ -93,7 +94,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power/FLEE resolution. Select the `PWR 110` QA patrol and use `DEV: маршрут на перехват`: flee speed 6 km/h succeeds against its 5.4 km/h patrol speed, while 5 km/h fails. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power/FLEE resolution. Select start and destination cities, then use `DEV: маршрут в город`; choosing the start city as destination creates a real exit-and-return scenario. `DEV: маршрут на перехват` remains available for the PWR/FLEE checks. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -108,4 +109,4 @@ Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay:
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `GAME-007`: make a real city the authoritative expedition destination and complete the first return-to-city loop.
+The next functional checkpoint is `UI-005`: add deterministic play/pause simulation-clock controls at x1, x10, x100 and x1000 so the completed expedition loop can run without manually dragging time.

@@ -39,6 +39,7 @@
 - `CHECKPOINT_16.md` — первый авторитетный контакт движущегося каравана с циклическим патрулём.
 - `CHECKPOINT_17.md` — прозрачное разрешение контакта через Player Power 100, monster Power 90/110 и доктрину сильной угрозы.
 - `CHECKPOINT_18.md` — детерминированный исход FLEE из скоростей и безопасной дистанции без tactical combat.
+- `CHECKPOINT_19.md` — авторитетное прибытие в выбранный город и первый реальный цикл возвращения.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-004` и `GAME-001..GAME-006` покрыты 168 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 173 теста в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-004` и `GAME-001..GAME-007` покрыты 186 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 191 тест в pull request.

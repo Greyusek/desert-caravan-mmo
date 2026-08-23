@@ -154,3 +154,94 @@ test("GAME-003: invalid evaluation and pause times are rejected", () => {
     /pausedAtSeconds must be a non-negative finite number/,
   );
 });
+
+test("GAME-007: an earlier city entry replaces generic route completion", () => {
+  const result = evaluateExpeditionOutcome(
+    route,
+    safeSupplies,
+    consumption,
+    6_000,
+    null,
+    5_000,
+  );
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.endedAtSeconds, 5_000);
+  assert.deepEqual(result.planned, {
+    status: "completed",
+    atSeconds: 5_000,
+    failureCause: null,
+  });
+});
+
+test("GAME-007: depletion after city entry cannot replace safe arrival", () => {
+  const result = evaluateExpeditionOutcome(
+    route,
+    { foodUnits: 100, waterUnits: 20 },
+    consumption,
+    5_000,
+    null,
+    3_000,
+  );
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.failureCause, null);
+  assert.equal(result.endedAtSeconds, 3_000);
+});
+
+test("GAME-007: fatal depletion wins an exact city-arrival tie", () => {
+  const arrivalAtSeconds = 3_600;
+  const result = evaluateExpeditionOutcome(
+    route,
+    { foodUnits: 100, waterUnits: 20 },
+    consumption,
+    arrivalAtSeconds,
+    null,
+    arrivalAtSeconds,
+  );
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.failureCause, "water");
+  assert.equal(result.endedAtSeconds, arrivalAtSeconds);
+});
+
+test("GAME-007: route end without a city entry is a non-terminal pause", () => {
+  const result = evaluateExpeditionOutcome(
+    route,
+    safeSupplies,
+    consumption,
+    route.totalDurationSeconds,
+    null,
+    null,
+  );
+
+  assert.equal(result.status, "paused");
+  assert.equal(result.endedAtSeconds, route.totalDurationSeconds);
+  assert.equal(result.terminal, false);
+  assert.deepEqual(result.planned, {
+    status: "paused",
+    atSeconds: route.totalDurationSeconds,
+    failureCause: null,
+  });
+});
+
+test("GAME-007: invalid city-completion times are rejected", () => {
+  for (const completionAtSeconds of [
+    -1,
+    Number.NaN,
+    route.totalDurationSeconds + 1,
+  ]) {
+    assert.throws(
+      () =>
+        evaluateExpeditionOutcome(
+          route,
+          safeSupplies,
+          consumption,
+          0,
+          null,
+          completionAtSeconds,
+        ),
+      /completionAtSeconds/,
+    );
+  }
+});
