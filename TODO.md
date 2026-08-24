@@ -12,6 +12,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `DEVX-001`: document the CI-gated pre-MVP workflow and add one-command local acceptance.
 - [x] `WORLD-003` / `SIM-007`: detect hidden static objects on the caravan's real route.
 - [x] `DEVX-002`: make local acceptance launch npm reliably on Windows.
+- [x] `DEVX-003`: keep a short persistent Work handoff in the repository so an autonomous series can resume safely after a resource-limit stop.
 - [x] `WORLD-004`: add deterministic wandering monsters with cyclic patrol routes.
 - [x] `SIM-008`: detect encounters between two moving entities in overlapping time windows.
 - [x] `UI-001`: add a dependency-free north-up developer debug map.
