@@ -8,6 +8,16 @@
 - Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
 - Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
 
+## 0.0.25 — Checkpoint 25
+
+- Added `GAME-011`: a seed-bound in-session player discovery ledger shared by repeated expeditions in the current browser tab.
+- Recorded confirmed direct-observation provenance, first/latest expedition context and observation counts without storing absolute world coordinates in the player-facing ledger.
+- Made recording idempotent per object and expedition so repeated browser renders cannot invent duplicate observations.
+- Added known-target execution: a later expedition reobserves the object, continues through an otherwise selected STOP and emits a distinct journal event without a second doctrine decision.
+- Added a visible knowledge panel, expedition counter and explicit session reset; changing seed or reloading the page also starts an empty ledger.
+- Added seven GAME-011 regressions; repository verification now runs 245 tests.
+- Designated `GAME-012`, return-expedition preparation from a selected known-object entry using relative navigation data, as the next checkpoint.
+
 ## 0.0.24 — Checkpoint 24
 
 - Added `GAME-010`: continuous cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.

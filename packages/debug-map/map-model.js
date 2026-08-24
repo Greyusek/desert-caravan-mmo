@@ -107,7 +107,7 @@ export function advanceSimulationClock(
 }
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "doctrine-decision" | "route-resumed" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "known-target-observed" | "doctrine-decision" | "route-resumed" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -779,9 +779,18 @@ export function createCityArrivalSnapshot(
  * @param {string} seed
  * @param {import("../sim-core/dist/src/index.js").City} originCity
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {readonly string[]} [knownObjectIds]
  */
-export function createRumorSearchSnapshot(seed, originCity, route) {
+export function createRumorSearchSnapshot(
+  seed,
+  originCity,
+  route,
+  knownObjectIds = [],
+) {
   const scenario = createRumorSearchScenario(seed, originCity);
+  const targetPreviouslyKnown = knownObjectIds.includes(
+    scenario.serverTruth.target.id,
+  );
   const plannedDiscovery = discoverStaticObjectsAlongRoute(
     route.authoritativeRoute,
     [scenario.serverTruth.target],
@@ -813,6 +822,9 @@ export function createRumorSearchSnapshot(seed, originCity, route) {
       id: originCity.id,
       name: originCity.name,
     },
+    targetKnowledge: targetPreviouslyKnown
+      ? /** @type {const} */ ("known")
+      : /** @type {const} */ ("unknown"),
     status,
     evaluatedAtSeconds,
     discoveryRadiusMeters: DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
@@ -882,8 +894,24 @@ export function createDiscoveryDoctrineSnapshot(route, rumorSearch, doctrine) {
     route.position.elapsedSeconds,
     route.totalDurationSeconds,
   );
+  const plannedDiscovery = rumorSearch.serverTruth.plannedDiscovery;
+  if (
+    rumorSearch.targetKnowledge === "known" &&
+    plannedDiscovery !== null &&
+    evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
+      plannedDiscovery.elapsedSeconds
+  ) {
+    return {
+      doctrine,
+      status: /** @type {const} */ ("known-and-continuing"),
+      evaluatedAtSeconds,
+      movementElapsedSeconds: evaluatedAtSeconds,
+      decision: null,
+      knownObjectId: plannedDiscovery.object.id,
+    };
+  }
   const evaluation = evaluateStaticObjectDiscoveryDoctrine(
-    rumorSearch.serverTruth.plannedDiscovery,
+    plannedDiscovery,
     doctrine,
     evaluatedAtSeconds,
   );
@@ -914,7 +942,13 @@ export function createDiscoveryResumeSnapshot(
   doctrine,
   resumedObjectId = null,
 ) {
-  if (resumedObjectId === null || doctrine.status === "pending") return null;
+  if (
+    resumedObjectId === null ||
+    doctrine.status === "pending" ||
+    doctrine.status === "known-and-continuing"
+  ) {
+    return null;
+  }
 
   const evaluation = resumeStaticObjectDiscoveryDoctrine(
     doctrine,
@@ -1707,13 +1741,20 @@ function addRumorSearchEvent(
 
   if (rumorSearch.status === "found" && rumorSearch.discovery) {
     events.push({
-      id: "rumor-target-discovered",
-      kind: "target-discovered",
+      id:
+        rumorSearch.targetKnowledge === "known"
+          ? "rumor-target-reobserved"
+          : "rumor-target-discovered",
+      kind:
+        rumorSearch.targetKnowledge === "known"
+          ? "known-target-observed"
+          : "target-discovered",
       atSeconds: rumorSearch.discovery.atSeconds,
       segmentIndex: rumorSearch.discovery.segmentIndex,
       cause: null,
       distanceKilometers: rumorSearch.discovery.routeDistanceKilometers,
       objectKind: rumorSearch.rumor.targetKind,
+      objectId: rumorSearch.serverTruth.target.id,
       order: 15,
     });
 

@@ -14,3 +14,4 @@ export * from "./flee.js";
 export * from "./power-contact.js";
 export * from "./city-arrival.js";
 export * from "./stop-lifecycle.js";
+export * from "./player-knowledge.js";

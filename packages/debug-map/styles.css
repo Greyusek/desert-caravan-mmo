@@ -300,6 +300,126 @@ input[type="range"] {
     var(--panel);
 }
 
+.knowledge-panel {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(244, 184, 96, 0.3);
+  border-radius: 18px;
+  background:
+    linear-gradient(125deg, rgba(108, 73, 31, 0.17), transparent 48%),
+    var(--panel);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.2);
+}
+
+.knowledge-heading,
+.knowledge-footer,
+.knowledge-item__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.knowledge-counters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.knowledge-counters output {
+  padding: 7px 11px;
+  border: 1px solid rgba(244, 184, 96, 0.32);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: rgba(111, 72, 29, 0.25);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#knowledge-count {
+  min-width: 2.1rem;
+  color: #17120d;
+  background: var(--accent-strong);
+  text-align: center;
+}
+
+.knowledge-empty {
+  margin: 16px 0 0;
+  padding: 15px;
+  border: 1px dashed rgba(236, 203, 148, 0.2);
+  border-radius: 12px;
+  color: var(--muted);
+  background: rgba(18, 13, 9, 0.3);
+  line-height: 1.5;
+}
+
+.knowledge-list {
+  display: grid;
+  margin: 16px 0 0;
+  padding: 0;
+  gap: 10px;
+  list-style: none;
+}
+
+.knowledge-list[hidden] {
+  display: none;
+}
+
+.knowledge-item {
+  padding: 14px 15px;
+  border: 1px solid rgba(88, 199, 180, 0.23);
+  border-radius: 12px;
+  background: rgba(18, 13, 9, 0.42);
+}
+
+.knowledge-item__heading strong {
+  color: var(--ink);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-item__heading span {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #a7f0e3;
+  background: rgba(29, 76, 68, 0.38);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.knowledge-item p {
+  margin: 8px 0 0;
+  color: #a8977b;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.knowledge-footer {
+  align-items: flex-end;
+  margin-top: 14px;
+}
+
+.knowledge-footer p {
+  max-width: 780px;
+  margin: 0;
+  color: #8f816a;
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.knowledge-footer button {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  color: #cbb891;
+  background: rgba(18, 13, 9, 0.55);
+  border: 1px solid rgba(236, 203, 148, 0.2);
+}
+
 .contact-panel {
   display: grid;
   margin-top: 18px;
@@ -1035,7 +1155,8 @@ input[type="range"] {
   filter: drop-shadow(0 0 5px rgba(239, 111, 94, 0.66));
 }
 
-[data-state="found"] .rumor-target-marker {
+[data-state="found"] .rumor-target-marker,
+.rumor-panel[data-knowledge="known"] .rumor-target-marker {
   fill: var(--teal);
   stroke: #d8fff8;
 }
@@ -2346,6 +2467,13 @@ input[type="range"] {
   }
 
   .contact-heading {
+    flex-direction: column;
+  }
+
+  .knowledge-heading,
+  .knowledge-footer,
+  .knowledge-item__heading {
+    align-items: flex-start;
     flex-direction: column;
   }
 
