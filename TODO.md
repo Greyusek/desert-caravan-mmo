@@ -42,7 +42,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 
 ## Future R&D anchors
 
-- [ ] `DESIGN-AI-001`: integrate the autonomous «Искины» direction into GDD/ROADMAP when the core player Action API is mature enough for AI-player experiments. Preserve the concept in [`docs/AI_ISKINS_CONCEPT.md`](docs/AI_ISKINS_CONCEPT.md); do not move it ahead of the current MVP checkpoints merely because it is documented.
+- [x] `DESIGN-AI-001`: integrate the autonomous «Искины» direction into GDD/ROADMAP as a future simulation layer. The accepted contract and experiments live in [`docs/AI_ISKINS_CONCEPT.md`](docs/AI_ISKINS_CONCEPT.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md); implementation remains behind the current MVP checkpoints and its dependency gate.
 
 ## Maintenance rules
 

@@ -2,6 +2,10 @@
 
 ## Unreleased — Design consolidation
 
+- Adopted autonomous «Искины» as a long-term design pillar while keeping `GAME-013` as the immediate functional checkpoint.
+- Canonized `AI decides; simulation resolves`, subject-limited perception, validated Action API boundaries and model/provider independence.
+- Added NPC / AI Player, City AI, Species AI, separated memory/learning layers and Cognitive LOD to GDD v0.5.
+- Added gated `AI-001..AI-005` experiments to the roadmap without introducing neural dependencies into MVP-0.
 - Integrated the previously unmerged world-bible history into the repository without changing runtime code or package version.
 - Added canonical chapters for world history, magic, bestiary, ecology, System 256 and presentation direction.
 - Published GDD v0.4 as the cross-document entry point and preserved GDD v0.2/v0.3 as archives.
