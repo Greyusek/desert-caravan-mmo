@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 30 — GAME-016: implemented and covered by automated tests.**
+**Checkpoint 31 — CITY-001: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -47,6 +47,7 @@ Also implemented:
 - GAME-014 — each expedition adds only its actually travelled bearing/distance prefix to the matching local session chart; future route legs stay hidden and prior progress cannot be erased by rewinding the DEV clock.
 - GAME-015 — a physically scaled 300 m visibility radius around those travelled tracks cuts the first session fog-of-war corridor; map scale changes pixels, never the underlying survey distance.
 - GAME-016 — an authoritatively reached city becomes a confirmed relative landmark on the matching origin-city chart; planned routes and unsuccessful journeys reveal nothing, and the player record contains no absolute coordinates.
+- CITY-001 — every seeded city has deterministic finite food and water stocks exposed in DEV details, without trading or consumption yet.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
@@ -85,17 +86,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 30:
+Expected for Checkpoint 31:
 
 ```text
-# tests 267
-# pass 267
+# tests 270
+# pass 270
 # fail 0
 ```
 
-This total contains 262 simulation/UI tests and 5 tooling regression tests.
+This total contains 265 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_30.md` for GAME-016 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_31.md` for CITY-001 details.
 
 ## Developer debug map
 
@@ -120,4 +121,4 @@ Then open `http://127.0.0.1:4173`. The world map is intentionally a developer ov
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint will be selected from the remaining MVP-0 queue after Checkpoint 30 acceptance; no later persistence, physical-map or AI layer is pulled forward implicitly.
+The next functional checkpoint will continue the minimal city-resource slice after Checkpoint 31; no later persistence, production-chain, physical-map or AI layer is pulled forward implicitly.

@@ -2439,6 +2439,8 @@ function drawSnapshot(
       "data-detail-rows": JSON.stringify([
         ["Тип", isDestination ? "Город назначения" : "Город"],
         ["Радиус прибытия", isDestination ? `${outcome.cityArrivalRadiusMeters ?? 0} м` : "—"],
+        ["Еда в городе", `${city.stocks?.foodUnits ?? 0} ед.`],
+        ["Вода в городе", `${city.stocks?.waterUnits ?? 0} ед.`],
         ["Широта", city.position.latitudeDeg.toFixed(6)],
         ["Долгота", city.position.longitudeDeg.toFixed(6)],
       ]),

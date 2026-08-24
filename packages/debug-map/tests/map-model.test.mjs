@@ -160,6 +160,9 @@ test("UI-001: the default debug snapshot contains every authoritative world laye
   assert.equal(snapshot.seed, "checkpoint-04");
   assert.equal(snapshot.elapsedSeconds, 0);
   assert.equal(snapshot.cities.length, 10);
+  assert.equal(snapshot.cities.every((city) => city.stocks), true);
+  assert.ok((snapshot.cities[0]?.stocks?.foodUnits ?? 0) >= 10_000);
+  assert.ok((snapshot.cities[0]?.stocks?.waterUnits ?? 0) >= 10_000);
   assert.equal(snapshot.staticObjects.length, 4);
   assert.equal(snapshot.monsters.length, 1);
   assert.deepEqual(
