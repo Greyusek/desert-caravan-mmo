@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 23 — GAME-009: implemented and covered by automated tests.**
+**Checkpoint 24 — GAME-010: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -40,10 +40,11 @@ Also implemented:
 - GAME-007 — a selected generated city is the authoritative destination: the expedition completes on exact radius entry, a return to the origin requires exit and re-entry, and a route ending outside the city is not a success.
 - GAME-008 — an executed discovery `STOP` can be explicitly resumed at its exact authoritative coordinate; the acknowledged object remains marked and cannot trigger the same stop again.
 - GAME-009 — a discovery `STOP` has an explicit idle duration: expedition/world time and SIM-006 idle consumption advance while SIM-005 route time stays pinned, then later ETA and moving contacts continue on the shifted world timeline.
+- GAME-010 — cyclic patrols can contact the stationary caravan during the discovery-STOP interval: weak patrols are defeated without ending the wait, strong-patrol defeat remains terminal, and successful FLEE cancels the remaining idle time and resumes the route at the exact contact boundary.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
-Not implemented yet (intentionally): patrol contact that begins and ends while a caravan is stationary at STOP, pursuit route replanning, persistent player discovery state, rewards and expedition persistence, production player map and fog of war, server/database, and tactical combat.
+Not implemented yet (intentionally): several simultaneous patrol contacts, pursuit route replanning, persistent player discovery state, rewards and expedition persistence, production player map and fog of war, server/database, and tactical combat.
 
 ## Requirements
 
@@ -78,17 +79,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 23:
+Expected for Checkpoint 24:
 
 ```text
-# tests 229
-# pass 229
+# tests 238
+# pass 238
 # fail 0
 ```
 
-This total contains 224 simulation/UI tests and 5 tooling regression tests.
+This total contains 233 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_23.md` for GAME-009 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_24.md` for GAME-010 details.
 
 ## Developer debug map
 
@@ -98,7 +99,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power/FLEE resolution. Select `STOP`, choose the stop duration, press `DEV: маршрут к цели`, advance to discovery and schedule the wait-and-resume action. During that interval world time and idle consumption advance while the caravan remains at the discovery coordinate; resume and every later ETA are shifted by the full wait. Select start and destination cities, then use `DEV: маршрут в город`; choosing the start city as destination creates a real exit-and-return scenario. Use Play/Pause and x1, x10, x100 or x1000 to run it without dragging the time slider. `DEV: маршрут на перехват` remains available for the PWR/FLEE checks; its local inset can switch between ±1/±5/±25 km and ±5 min/±30 min/±3 h without changing simulation state. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power/FLEE resolution. Select `STOP`, choose the stop duration, press `DEV: маршрут к цели`, advance to discovery and schedule the wait-and-resume action. During that interval world time and idle consumption advance while the caravan remains at the discovery coordinate. `DEV: патруль к стоянке` prepares the same flow with a guaranteed patrol contact halfway through a six-hour wait: PWR 90 leaves the wait intact, successful PWR 110 FLEE resumes early, and failed FLEE or ACCEPT_FIGHT kills the caravan at STOP. Select start and destination cities, then use `DEV: маршрут в город`; choosing the start city as destination creates a real exit-and-return scenario. Use Play/Pause and x1, x10, x100 or x1000 to run it without dragging the time slider. `DEV: маршрут на перехват` remains available for moving PWR/FLEE checks; the local inset can switch between ±1/±5/±25 km and ±5 min/±30 min/±3 h without changing simulation state. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -113,4 +114,4 @@ Then open `http://127.0.0.1:4173`. The map is intentionally a developer overlay:
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `GAME-010`: resolve cyclic-patrol contacts that occur while the caravan is stationary during a discovery STOP.
+The next functional checkpoint is `GAME-011`: retain discovered-object knowledge in an in-session player expedition ledger without adding database persistence yet.

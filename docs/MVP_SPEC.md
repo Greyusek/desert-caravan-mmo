@@ -156,6 +156,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - техническая безопасная дистанция GAME-006 равна двум interaction radius: **1000 м** при текущей границе контакта 500 м;
 - строго более быстрый караван открывает разрыв со скоростью `caravanSpeed - monsterSpeed`, достигает безопасной дистанции за `(safeSeparation - contactSeparation) / relativeSpeed` и продолжает исходный маршрут;
 - равная или меньшая скорость означает терминальное поражение на границе контакта; случайности, бонуса от Power и tactical rounds нет.
+- те же правила действуют, если циклический патруль входит в радиус неподвижного каравана во время discovery `STOP`: слабая угроза не отменяет ожидание, успешный `FLEE` досрочно возобновляет маршрут, а истощение сохраняет приоритет при точном совпадении времени.
 
 Затаившийся монстр использует уменьшенный базовый радиус обнаружения (150 м). Блуждающий монстр движется по собственному маршруту, поэтому геометрическое пересечение путей без совпадения во времени встречу не создаёт.
 
@@ -255,4 +256,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `UI-006` — local spatial/time zoom for short patrol loops and close encounters.
 - [x] `GAME-008` — explicit route resume after an authoritative discovery STOP without rediscovering the acknowledged target.
 - [x] `GAME-009` — explicit discovery-STOP duration and SIM-006 idle consumption before resume.
-- [ ] `GAME-010` — cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.
+- [x] `GAME-010` — cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.
+- [ ] `GAME-011` — in-session player discovery ledger across repeated expeditions without database persistence.

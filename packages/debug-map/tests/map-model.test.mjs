@@ -25,6 +25,7 @@ import {
   createMonsterContactSnapshot,
   createMonsterInterceptRoutePreset,
   createRumorSearchSnapshot,
+  createStationaryStopPatrolPreset,
   projectCoordinate,
   splitPathAtAntimeridian,
 } from "../map-model.js";
@@ -2366,6 +2367,281 @@ test("GAME-009: the 25-percent warning can occur inside the idle interval", () =
   assert.equal(warning?.occurred, true);
   assert.equal(
     scenario.log.events.some((event) => event.kind === "supplies-depleted"),
+    false,
+  );
+});
+
+function game010ScenarioAt(
+  expeditionElapsedSeconds,
+  {
+    idleDurationSeconds = 6 * 3_600,
+    monsterPower = 110,
+    strongMonsterDoctrine = "FLEE",
+    fleeSpeedMetersPerSecond = 6 / 3.6,
+    initialSupplies = game009Supplies,
+    profile = game009Consumption,
+  } = {},
+) {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const timelineRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    expeditionElapsedSeconds,
+  );
+  const timelineSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    timelineRoute,
+  );
+  const plannedStop = timelineSearch.serverTruth.plannedDiscovery;
+  assert.ok(plannedStop);
+  const stopRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    plannedStop.elapsedSeconds,
+  );
+  const stopSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    stopRoute,
+  );
+  const stoppedDoctrine = createDiscoveryDoctrineSnapshot(
+    stopRoute,
+    stopSearch,
+    "STOP",
+  );
+  const scheduledResume = createDiscoveryResumeSnapshot(
+    stoppedDoctrine,
+    stopSearch.serverTruth.target.id,
+  );
+  assert.ok(scheduledResume);
+  const scheduledLifecycle = createDiscoveryStopLifecycleSnapshot(
+    timelineRoute,
+    initialSupplies,
+    profile,
+    scheduledResume,
+    idleDurationSeconds,
+    expeditionElapsedSeconds,
+  );
+  assert.ok(scheduledLifecycle);
+  const plannedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    scheduledLifecycle.movementElapsedSeconds,
+  );
+  const search = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    plannedRoute,
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    plannedRoute,
+    search,
+    "STOP",
+  );
+  const resume = createDiscoveryResumeSnapshot(
+    doctrine,
+    search.serverTruth.target.id,
+  );
+  const world = createDebugMapSnapshot(
+    "checkpoint-04",
+    expeditionElapsedSeconds,
+    2,
+  );
+  const sourceMonster = world.monsters.find(
+    (monster) => monster.power === monsterPower,
+  );
+  assert.ok(sourceMonster);
+  const plannedContactAtSeconds =
+    plannedStop.elapsedSeconds + idleDurationSeconds / 2;
+  const monster = createStationaryStopPatrolPreset(
+    plannedStop.caravanPosition,
+    plannedContactAtSeconds,
+    sourceMonster,
+    expeditionElapsedSeconds,
+  );
+  const contact = createMonsterContactSnapshot(
+    plannedRoute,
+    monster,
+    scheduledLifecycle,
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    plannedRoute,
+    initialSupplies,
+    profile,
+    resume ?? doctrine,
+    contact,
+    strongMonsterDoctrine,
+    fleeSpeedMetersPerSecond,
+    null,
+    scheduledLifecycle,
+  );
+  const effectiveLifecycle = outcome.stopLifecycle ?? scheduledLifecycle;
+  const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
+  const status = createCaravanStatusSnapshot(
+    route,
+    initialSupplies,
+    profile,
+    resume ?? doctrine,
+    outcome,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    route,
+    initialSupplies,
+    profile,
+    search,
+    doctrine,
+    outcome,
+    resume ?? scheduledResume,
+    effectiveLifecycle,
+  );
+
+  return {
+    stopAtSeconds: plannedStop.elapsedSeconds,
+    plannedContactAtSeconds,
+    scheduledLifecycle,
+    effectiveLifecycle,
+    monster,
+    contact,
+    outcome,
+    route,
+    status,
+    log,
+  };
+}
+
+test("GAME-010: DEV patrol guarantees a transient contact inside STOP", () => {
+  const probe = game010ScenarioAt(0);
+  const contact = probe.contact.contact;
+
+  assert.equal(probe.monster.qaStationaryStop, true);
+  assert.ok(contact);
+  assert.equal(contact.caravanActivity, "idle");
+  approx(contact.expeditionElapsedSeconds, probe.plannedContactAtSeconds, 1e-5);
+  assert.equal(contact.routeElapsedSeconds, probe.stopAtSeconds);
+  assert.ok(
+    contact.expeditionElapsedSeconds <
+      probe.scheduledLifecycle.resumeAtSeconds,
+  );
+});
+
+test("GAME-010: weak patrol dies while the scheduled STOP continues", () => {
+  const probe = game010ScenarioAt(0, { monsterPower: 90 });
+  const scenario = game010ScenarioAt(
+    probe.plannedContactAtSeconds + 60,
+    { monsterPower: 90 },
+  );
+
+  assert.equal(
+    scenario.outcome.monsterContactResolution?.status,
+    "monster-defeated",
+  );
+  assert.equal(scenario.outcome.stopInterruptedByContact, false);
+  assert.equal(scenario.outcome.phase, "idle-at-stop");
+  assert.equal(scenario.route.position.elapsedSeconds, scenario.stopAtSeconds);
+  assert.equal(
+    scenario.effectiveLifecycle.resumeAtSeconds,
+    scenario.stopAtSeconds + 6 * 3_600,
+  );
+});
+
+test("GAME-010: successful FLEE interrupts STOP and resumes at contact", () => {
+  const probe = game010ScenarioAt(0);
+  const scenario = game010ScenarioAt(probe.plannedContactAtSeconds + 60);
+
+  assert.equal(
+    scenario.outcome.monsterContactResolution?.status,
+    "flee-succeeded",
+  );
+  assert.equal(scenario.outcome.stopInterruptedByContact, true);
+  assert.equal(scenario.outcome.scheduledIdleDurationSeconds, 6 * 3_600);
+  approx(
+    scenario.outcome.idleDurationSeconds,
+    scenario.plannedContactAtSeconds - scenario.stopAtSeconds,
+    1e-5,
+  );
+  approx(
+    scenario.outcome.resumeAtSeconds ?? 0,
+    scenario.plannedContactAtSeconds,
+    1e-5,
+  );
+  assert.ok(scenario.route.position.elapsedSeconds > scenario.stopAtSeconds);
+  const contactEventIndex = scenario.log.events.findIndex(
+    (event) => event.kind === "monster-contact",
+  );
+  const resumeEventIndex = scenario.log.events.findIndex(
+    (event) => event.kind === "route-resumed",
+  );
+  assert.ok(contactEventIndex >= 0);
+  assert.ok(resumeEventIndex > contactEventIndex);
+  assert.equal(
+    scenario.log.events[resumeEventIndex]?.resumeReason,
+    "monster-contact",
+  );
+});
+
+test("GAME-010: failed FLEE destroys the caravan at the stationary contact", () => {
+  const probe = game010ScenarioAt(0, {
+    fleeSpeedMetersPerSecond: 5 / 3.6,
+  });
+  const scenario = game010ScenarioAt(probe.plannedContactAtSeconds, {
+    fleeSpeedMetersPerSecond: 5 / 3.6,
+  });
+
+  assert.equal(scenario.outcome.status, "failed");
+  assert.equal(scenario.outcome.failureReason, "monster");
+  assert.equal(
+    scenario.outcome.monsterContactResolution?.status,
+    "flee-failed",
+  );
+  assert.equal(scenario.outcome.movementElapsedSeconds, scenario.stopAtSeconds);
+  assert.equal(scenario.route.position.elapsedSeconds, scenario.stopAtSeconds);
+});
+
+test("GAME-010: ACCEPT_FIGHT is terminal at a stationary strong patrol", () => {
+  const probe = game010ScenarioAt(0, {
+    strongMonsterDoctrine: "ACCEPT_FIGHT",
+  });
+  const scenario = game010ScenarioAt(probe.plannedContactAtSeconds, {
+    strongMonsterDoctrine: "ACCEPT_FIGHT",
+  });
+
+  assert.equal(scenario.outcome.status, "failed");
+  assert.equal(scenario.outcome.failureReason, "monster");
+  assert.equal(
+    scenario.outcome.monsterContactResolution?.status,
+    "expedition-defeated",
+  );
+  assert.equal(
+    scenario.outcome.monsterContact?.caravanActivity,
+    "idle",
+  );
+  assert.equal(scenario.route.position.elapsedSeconds, scenario.stopAtSeconds);
+});
+
+test("GAME-010: idle depletion wins an exact tie with stationary contact", () => {
+  const probe = game010ScenarioAt(0);
+  const contactAtSeconds =
+    probe.contact.contact?.expeditionElapsedSeconds ?? 0;
+  const stopHours = probe.stopAtSeconds / 3_600;
+  const idleHours = (contactAtSeconds - probe.stopAtSeconds) / 3_600;
+  const waterAtTie =
+    stopHours * game009Consumption.moving.waterUnitsPerHour +
+    idleHours * game009Consumption.idle.waterUnitsPerHour;
+  const scenario = game010ScenarioAt(contactAtSeconds, {
+    initialSupplies: { foodUnits: 1_000, waterUnits: waterAtTie },
+  });
+
+  assert.equal(scenario.outcome.status, "failed");
+  assert.equal(scenario.outcome.failureReason, "supplies");
+  assert.equal(scenario.outcome.failureActivity, "idle");
+  assert.equal(scenario.outcome.monsterContact, null);
+  assert.equal(
+    scenario.log.events.some((event) => event.kind === "monster-contact"),
     false,
   );
 });

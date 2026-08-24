@@ -543,6 +543,10 @@ input[type="range"] {
   width: 100%;
 }
 
+.contact-actions button + button {
+  margin-top: 8px;
+}
+
 .contact-actions p {
   margin: 8px 0 0;
   color: #8f816a;

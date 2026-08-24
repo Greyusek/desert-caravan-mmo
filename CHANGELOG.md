@@ -8,6 +8,17 @@
 - Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
 - Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
 
+## 0.0.24 — Checkpoint 24
+
+- Added `GAME-010`: continuous cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.
+- Extended SIM-008 with a stationary route-motion mode while preserving absolute patrol world time and exact interaction-radius entry.
+- Tagged every authoritative expedition contact as moving or idle and kept a contact exactly at scheduled resume in the moving phase.
+- Preserved first-boundary ordering: earlier or exact-time idle depletion suppresses contact; weak patrol victory keeps the planned wait; failed FLEE and ACCEPT_FIGHT remain terminal at STOP.
+- Made successful FLEE cancel the remaining wait, consume only the actual idle duration and resume the original route at the exact contact time.
+- Added ordered stationary-contact/forced-resume journal events, STOP-aware contact presentation and a deterministic DEV patrol preset that requires no seed hunting.
+- Added nine GAME-010 regressions; repository verification now runs 238 tests.
+- Designated `GAME-011`, an in-session player discovery ledger across repeated expeditions, as the next checkpoint.
+
 ## 0.0.23 — Checkpoint 23
 
 - Added `GAME-009`: an explicit discovery-STOP duration with separate expedition/world time and SIM-005 route time.
