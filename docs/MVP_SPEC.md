@@ -258,4 +258,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-009` — explicit discovery-STOP duration and SIM-006 idle consumption before resume.
 - [x] `GAME-010` — cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.
 - [x] `GAME-011` — in-session player discovery ledger across repeated expeditions without database persistence.
-- [ ] `GAME-012` — prepare a return expedition from a selected known-object entry using relative navigation data.
+- [x] `GAME-012` — prepare a return expedition from a selected known-object entry using relative navigation data.
+- [ ] `GAME-013` — render confirmed entries on a coordinate-free north-up session knowledge map.

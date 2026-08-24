@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  createKnownObjectReturnNavigation,
   createPlayerDiscoveryLedger,
   recordDirectDiscoveryObservation,
   wasObjectKnownBeforeExpedition,
@@ -15,6 +16,8 @@ const firstObservation = {
   observedAtSeconds: 6_540,
   segmentIndex: 1,
   routeDistanceMeters: 32_700,
+  originBearingDeg: 307.75,
+  originDistanceMeters: 32_850,
 };
 
 test("GAME-011: a direct discovery creates confirmed knowledge without coordinates", () => {
@@ -45,6 +48,8 @@ test("GAME-011: a direct discovery creates confirmed knowledge without coordinat
   });
   assert.equal("position" in result.entry, false);
   assert.equal("coordinate" in result.entry, false);
+  assert.equal(JSON.stringify(result.entry).includes("latitude"), false);
+  assert.equal(JSON.stringify(result.entry).includes("longitude"), false);
 });
 
 test("GAME-011: repeated rendering records one observation per expedition", () => {
@@ -117,6 +122,22 @@ test("GAME-011: invalid ledgers and observations are rejected", () => {
       ),
     /routeDistanceMeters/,
   );
+  assert.throws(
+    () =>
+      recordDirectDiscoveryObservation(
+        createPlayerDiscoveryLedger("session-world"),
+        { ...firstObservation, originBearingDeg: Number.NaN },
+      ),
+    /originBearingDeg/,
+  );
+  assert.throws(
+    () =>
+      recordDirectDiscoveryObservation(
+        createPlayerDiscoveryLedger("session-world"),
+        { ...firstObservation, originDistanceMeters: 0 },
+      ),
+    /originDistanceMeters/,
+  );
   const first = recordDirectDiscoveryObservation(
     createPlayerDiscoveryLedger("session-world"),
     firstObservation,
@@ -132,5 +153,68 @@ test("GAME-011: invalid ledgers and observations are rejected", () => {
         expeditionNumber: 2,
       }),
     /must not precede the latest observation/,
+  );
+});
+
+test("GAME-012: a known entry produces relative navigation without coordinates", () => {
+  const { ledger } = recordDirectDiscoveryObservation(
+    createPlayerDiscoveryLedger("session-world"),
+    { ...firstObservation, originBearingDeg: -52.25 },
+  );
+
+  const navigation = createKnownObjectReturnNavigation(
+    ledger,
+    firstObservation.objectId,
+  );
+
+  assert.deepEqual(navigation, {
+    objectId: "rumor-mine-city-01",
+    objectKind: "mine",
+    originCityId: "city-01",
+    source: "direct-observation",
+    confidence: "confirmed",
+    firstObservedInExpedition: 1,
+    command: {
+      bearingDeg: 307.75,
+      distanceMeters: 32_850,
+    },
+  });
+  assert.equal(JSON.stringify(navigation).includes("latitude"), false);
+  assert.equal(JSON.stringify(navigation).includes("longitude"), false);
+});
+
+test("GAME-012: return navigation stays anchored to the first observation", () => {
+  const first = recordDirectDiscoveryObservation(
+    createPlayerDiscoveryLedger("session-world"),
+    firstObservation,
+  );
+  const second = recordDirectDiscoveryObservation(first.ledger, {
+    ...firstObservation,
+    expeditionNumber: 2,
+    originCityId: "city-07",
+    originBearingDeg: 120,
+    originDistanceMeters: 50_000,
+  });
+
+  const navigation = createKnownObjectReturnNavigation(
+    second.ledger,
+    firstObservation.objectId,
+  );
+
+  assert.equal(navigation.originCityId, "city-01");
+  assert.deepEqual(navigation.command, {
+    bearingDeg: 307.75,
+    distanceMeters: 32_850,
+  });
+});
+
+test("GAME-012: return navigation rejects an unknown selection", () => {
+  assert.throws(
+    () =>
+      createKnownObjectReturnNavigation(
+        createPlayerDiscoveryLedger("session-world"),
+        "unknown-object",
+      ),
+    /known ledger entry/,
   );
 });

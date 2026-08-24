@@ -24,11 +24,16 @@ import {
   createFourSegmentRouteSnapshot,
   createMonsterContactSnapshot,
   createMonsterInterceptRoutePreset,
+  createKnownObjectReturnRoutePreset,
   createRumorSearchSnapshot,
   createStationaryStopPatrolPreset,
   projectCoordinate,
   splitPathAtAntimeridian,
 } from "../map-model.js";
+import {
+  createPlayerDiscoveryLedger,
+  recordDirectDiscoveryObservation,
+} from "../../sim-core/dist/src/index.js";
 
 function approx(actual, expected, tolerance = 1e-9) {
   assert.ok(
@@ -2732,5 +2737,57 @@ test("GAME-011: a known target is reobserved without executing STOP again", () =
   assert.equal(
     log.events.find((event) => event.kind === "known-target-observed")?.id,
     "rumor-target-reobserved",
+  );
+});
+
+test("GAME-012: a selected ledger entry fills one coordinate-free return leg", () => {
+  const recorded = recordDirectDiscoveryObservation(
+    createPlayerDiscoveryLedger("checkpoint-04"),
+    {
+      expeditionNumber: 1,
+      objectId: "rumor-mine-city-01",
+      objectKind: "mine",
+      originCityId: "city-01",
+      rumorId: "rumor-city-01-01",
+      observedAtSeconds: 6_540,
+      segmentIndex: 0,
+      routeDistanceMeters: 32_700,
+      originBearingDeg: 307.75,
+      originDistanceMeters: 32_850,
+    },
+  );
+
+  const preset = createKnownObjectReturnRoutePreset(
+    recorded.ledger,
+    "rumor-mine-city-01",
+  );
+
+  assert.deepEqual(preset, {
+    kind: "known-object-return",
+    objectId: "rumor-mine-city-01",
+    objectKind: "mine",
+    originCityId: "city-01",
+    source: "direct-observation",
+    confidence: "confirmed",
+    firstObservedInExpedition: 1,
+    commands: [
+      { bearingDeg: 307.75, distanceKilometers: 32.85 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+  });
+  assert.equal(JSON.stringify(preset).includes("latitude"), false);
+  assert.equal(JSON.stringify(preset).includes("longitude"), false);
+});
+
+test("GAME-012: a return preset requires an existing ledger selection", () => {
+  assert.throws(
+    () =>
+      createKnownObjectReturnRoutePreset(
+        createPlayerDiscoveryLedger("checkpoint-04"),
+        "unknown-object",
+      ),
+    /known ledger entry/,
   );
 });

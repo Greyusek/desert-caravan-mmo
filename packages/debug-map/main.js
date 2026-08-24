@@ -21,6 +21,7 @@ import {
   createFourSegmentRouteSnapshot,
   createMonsterContactSnapshot,
   createMonsterInterceptRoutePreset,
+  createKnownObjectReturnRoutePreset,
   createRumorSearchSnapshot,
   createStationaryStopPatrolPreset,
   projectCoordinate,
@@ -131,6 +132,10 @@ const knowledgeEmpty = requireElement(
   HTMLParagraphElement,
 );
 const knowledgeList = requireElement("knowledge-list", HTMLOListElement);
+const knowledgeRouteStatus = requireElement(
+  "knowledge-route-status",
+  HTMLOutputElement,
+);
 const knowledgeReset = requireElement("knowledge-reset", HTMLButtonElement);
 const contactPanel = requireElement("contact-panel", HTMLElement);
 const contactState = requireElement("contact-state", HTMLParagraphElement);
@@ -191,6 +196,8 @@ let supplySettings = readSupplySettings();
 let expeditionNumber = 1;
 let discoveryLedger = createPlayerDiscoveryLedger(seedInput.value.trim());
 /** @type {string | null} */
+let preparedKnowledgeObjectId = null;
+/** @type {string | null} */
 let resumedDiscoveryObjectId = null;
 let stationaryStopQaEnabled = false;
 /** @type {ReturnType<typeof createRumorSearchSnapshot> | null} */
@@ -208,6 +215,7 @@ seedForm.addEventListener("submit", (event) => {
   if (nextSeed.length > 0 && nextSeed !== discoveryLedger.worldSeed) {
     discoveryLedger = createPlayerDiscoveryLedger(nextSeed);
     expeditionNumber = 1;
+    preparedKnowledgeObjectId = null;
   }
   resetSimulationClock();
   render();
@@ -249,6 +257,7 @@ clockSpeed.addEventListener("change", () => {
 
 routeForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  preparedKnowledgeObjectId = null;
   resetSimulationClock();
   render();
 });
@@ -280,6 +289,33 @@ knowledgeReset.addEventListener("click", () => {
   if (seed.length === 0) return;
   discoveryLedger = createPlayerDiscoveryLedger(seed);
   expeditionNumber = 1;
+  preparedKnowledgeObjectId = null;
+  resetSimulationClock();
+  render();
+});
+
+knowledgeList.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  const button = event.target.closest("button[data-knowledge-object-id]");
+  if (!(button instanceof HTMLButtonElement)) return;
+  const objectId = button.dataset.knowledgeObjectId;
+  if (!objectId) return;
+
+  const preset = createKnownObjectReturnRoutePreset(
+    discoveryLedger,
+    objectId,
+  );
+  stationaryStopQaEnabled = false;
+  expeditionNumber += 1;
+  preparedKnowledgeObjectId = preset.objectId;
+  routeStartCity.value = preset.originCityId;
+  routeBearingInputs.forEach((input, index) => {
+    input.value = preset.commands[index]?.bearingDeg.toFixed(6) ?? "0";
+  });
+  routeDistanceInputs.forEach((input, index) => {
+    input.value =
+      preset.commands[index]?.distanceKilometers.toFixed(6) ?? "0";
+  });
   resetSimulationClock();
   render();
 });
@@ -319,6 +355,7 @@ rumorDevRoute.addEventListener("click", () => {
   if (!activeRumorSearch) return;
 
   stationaryStopQaEnabled = false;
+  preparedKnowledgeObjectId = null;
   const { exactBearingDeg, exactDistanceKilometers } =
     activeRumorSearch.serverTruth;
   routeBearingInputs.forEach((input, index) => {
@@ -351,6 +388,7 @@ contactDevRoute.addEventListener("click", () => {
   if (!selected) return;
 
   stationaryStopQaEnabled = false;
+  preparedKnowledgeObjectId = null;
   routeStartCity.value = selected.city.id;
   routeSpeed.value = selected.preset.speedKilometersPerHour.toFixed(6);
   routeBearingInputs.forEach((input, index) => {
@@ -367,6 +405,7 @@ contactDevRoute.addEventListener("click", () => {
 contactStopDevRoute.addEventListener("click", () => {
   if (!activeRumorSearch) return;
 
+  preparedKnowledgeObjectId = null;
   const { exactBearingDeg, exactDistanceKilometers } =
     activeRumorSearch.serverTruth;
   routeBearingInputs.forEach((input, index) => {
@@ -392,6 +431,7 @@ cityDevRoute.addEventListener("click", () => {
   if (!startCity || !destinationCity) return;
 
   stationaryStopQaEnabled = false;
+  preparedKnowledgeObjectId = null;
   const preset = createCityArrivalRoutePreset(
     startCity.position,
     destinationCity,
@@ -437,6 +477,7 @@ function render() {
     if (discoveryLedger.worldSeed !== snapshot.seed) {
       discoveryLedger = createPlayerDiscoveryLedger(snapshot.seed);
       expeditionNumber = 1;
+      preparedKnowledgeObjectId = null;
     }
     const knownObjectIds = discoveryLedger.entries
       .filter(
@@ -625,6 +666,9 @@ function render() {
         segmentIndex: rumorSearch.discovery.segmentIndex,
         routeDistanceMeters:
           rumorSearch.discovery.routeDistanceKilometers * 1_000,
+        originBearingDeg: rumorSearch.serverTruth.exactBearingDeg,
+        originDistanceMeters:
+          rumorSearch.serverTruth.exactDistanceKilometers * 1_000,
       });
       discoveryLedger = recorded.ledger;
     }
@@ -1366,12 +1410,26 @@ function renderRumorSearch(search, doctrine, outcome) {
 function renderDiscoveryLedger(ledger, snapshot) {
   knowledgeCount.textContent = String(ledger.entries.length);
   knowledgeExpedition.textContent = `Экспедиция #${expeditionNumber}`;
+  const preparedEntry = ledger.entries.find(
+    (entry) => entry.objectId === preparedKnowledgeObjectId,
+  );
+  const preparedCity = preparedEntry
+    ? snapshot.cities.find(
+        (city) => city.id === preparedEntry.firstObservation.originCityId,
+      )
+    : null;
+  knowledgeRouteStatus.textContent = preparedEntry
+    ? `Экспедиция #${expeditionNumber} подготовлена: ${preparedCity?.name ?? preparedEntry.firstObservation.originCityId} → ${staticKindLabel(preparedEntry.objectKind)}.`
+    : "Повторный маршрут ещё не подготовлен.";
   knowledgeEmpty.hidden = ledger.entries.length > 0;
   knowledgeList.hidden = ledger.entries.length === 0;
   knowledgeList.replaceChildren(
     ...ledger.entries.map((entry) => {
       const item = document.createElement("li");
       item.className = "knowledge-item";
+      item.dataset.prepared = String(
+        entry.objectId === preparedKnowledgeObjectId,
+      );
 
       const heading = document.createElement("div");
       heading.className = "knowledge-item__heading";
@@ -1392,7 +1450,22 @@ function renderDiscoveryLedger(ledger, snapshot) {
           ? "Наблюдений: 1 · источник: личное наблюдение · уверенность: подтверждено."
           : `Наблюдений: ${entry.observationCount} · последнее в экспедиции #${entry.latestObservation.expeditionNumber} на ${formatElapsed(entry.latestObservation.observedAtSeconds)}.`;
 
-      item.append(heading, first, latest);
+      const navigation = document.createElement("p");
+      navigation.className = "knowledge-item__navigation";
+      navigation.textContent = `Навигация от ${firstCity?.name ?? entry.firstObservation.originCityId}: азимут ${formatNumber(entry.firstObservation.originBearingDeg, 2)}° · ${formatNumber(entry.firstObservation.originDistanceMeters / 1_000, 3)} км.`;
+
+      const action = document.createElement("div");
+      action.className = "knowledge-item__action";
+      const returnButton = document.createElement("button");
+      returnButton.type = "button";
+      returnButton.dataset.knowledgeObjectId = entry.objectId;
+      returnButton.textContent =
+        entry.objectId === preparedKnowledgeObjectId
+          ? "Подготовить ещё один поход"
+          : "Подготовить поход к объекту";
+      action.append(returnButton);
+
+      item.append(heading, first, latest, navigation, action);
       return item;
     }),
   );

@@ -1,5 +1,9 @@
-import type { DurationSeconds } from "./route.js";
-import type { DistanceMeters } from "./types.js";
+import type { DurationSeconds, RouteCommand } from "./route.js";
+import {
+  normalizeBearing,
+  type BearingDegrees,
+  type DistanceMeters,
+} from "./types.js";
 import type { StaticWorldObjectKind } from "./world.js";
 
 export type PlayerKnowledgeSource = "direct-observation";
@@ -14,6 +18,8 @@ export interface DirectDiscoveryObservationInput {
   readonly observedAtSeconds: DurationSeconds;
   readonly segmentIndex: number;
   readonly routeDistanceMeters: DistanceMeters;
+  readonly originBearingDeg: BearingDegrees;
+  readonly originDistanceMeters: DistanceMeters;
 }
 
 export interface PlayerDiscoveryObservation
@@ -48,6 +54,16 @@ export interface DiscoveryLedgerRecordResult {
   readonly status: DiscoveryLedgerRecordStatus;
 }
 
+export interface KnownObjectReturnNavigation {
+  readonly objectId: string;
+  readonly objectKind: StaticWorldObjectKind;
+  readonly originCityId: string;
+  readonly source: PlayerKnowledgeSource;
+  readonly confidence: PlayerKnowledgeConfidence;
+  readonly firstObservedInExpedition: number;
+  readonly command: RouteCommand;
+}
+
 /**
  * GAME-011 — creates browser-session knowledge for exactly one deterministic
  * world. Persistence, physical map ownership and database concerns deliberately
@@ -74,6 +90,7 @@ export function recordDirectDiscoveryObservation(
 
   const observation: PlayerDiscoveryObservation = {
     ...input,
+    originBearingDeg: normalizeBearing(input.originBearingDeg),
     source: "direct-observation",
     confidence: "confirmed",
   };
@@ -132,6 +149,40 @@ export function recordDirectDiscoveryObservation(
   };
 }
 
+/**
+ * GAME-012 — turns one selected confirmed ledger entry into a coordinate-free
+ * navigation command from the city where the object was first observed.
+ * Later observations never rewrite this original personal-map anchor.
+ */
+export function createKnownObjectReturnNavigation(
+  ledger: PlayerDiscoveryLedger,
+  objectId: string,
+): KnownObjectReturnNavigation {
+  assertLedger(ledger);
+  assertNonEmptyString(objectId, "objectId");
+
+  const entry = ledger.entries.find(
+    (candidate) => candidate.objectId === objectId,
+  );
+  if (!entry) {
+    throw new RangeError("objectId must reference a known ledger entry");
+  }
+
+  const first = entry.firstObservation;
+  return {
+    objectId: entry.objectId,
+    objectKind: entry.objectKind,
+    originCityId: first.originCityId,
+    source: entry.source,
+    confidence: entry.confidence,
+    firstObservedInExpedition: first.expeditionNumber,
+    command: {
+      bearingDeg: first.originBearingDeg,
+      distanceMeters: first.originDistanceMeters,
+    },
+  };
+}
+
 /** True only when the object was learned in an earlier expedition. */
 export function wasObjectKnownBeforeExpedition(
   ledger: PlayerDiscoveryLedger,
@@ -166,6 +217,10 @@ function assertObservationInput(input: DirectDiscoveryObservationInput): void {
     throw new RangeError("segmentIndex must be a non-negative safe integer");
   }
   assertNonNegativeFinite(input.routeDistanceMeters, "routeDistanceMeters");
+  if (!Number.isFinite(input.originBearingDeg)) {
+    throw new TypeError("originBearingDeg must be a finite number");
+  }
+  assertPositiveFinite(input.originDistanceMeters, "originDistanceMeters");
 }
 
 function assertStaticObjectKind(
@@ -191,5 +246,11 @@ function assertPositiveSafeInteger(value: number, name: string): void {
 function assertNonNegativeFinite(value: number, name: string): void {
   if (!Number.isFinite(value) || value < 0) {
     throw new RangeError(`${name} must be a non-negative finite number`);
+  }
+}
+
+function assertPositiveFinite(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`${name} must be a positive finite number`);
   }
 }

@@ -8,6 +8,16 @@
 - Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
 - Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
 
+## 0.0.26 — Checkpoint 26
+
+- Added `GAME-012`: every confirmed discovery retains a normalized bearing and distance from its first-observation city without storing an absolute world coordinate.
+- Added a pure known-object return-navigation API whose first personal observation remains the immutable route anchor after later re-observations.
+- Converted a selected entry into one real route-editor leg plus three empty legs, preserving the existing four-segment UI contract.
+- Added a per-entry action that starts the next expedition at T+0, selects the original city and fills the route directly from player knowledge.
+- Added visible relative-navigation facts and prepared-route state to the session knowledge panel.
+- Added five GAME-012 regressions; repository verification now runs 250 tests.
+- Designated `GAME-013`, a player-facing north-up session knowledge map derived only from relative fixes, as the next checkpoint.
+
 ## 0.0.25 — Checkpoint 25
 
 - Added `GAME-011`: a seed-bound in-session player discovery ledger shared by repeated expeditions in the current browser tab.
