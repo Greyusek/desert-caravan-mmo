@@ -2439,8 +2439,12 @@ function drawSnapshot(
       "data-detail-rows": JSON.stringify([
         ["Тип", isDestination ? "Город назначения" : "Город"],
         ["Радиус прибытия", isDestination ? `${outcome.cityArrivalRadiusMeters ?? 0} м` : "—"],
-        ["Еда в городе", `${city.stocks?.foodUnits ?? 0} ед.`],
-        ["Вода в городе", `${city.stocks?.waterUnits ?? 0} ед.`],
+        ["Население", `${city.population.inhabitants} NPC`],
+        ["Еда сейчас", `${formatNumber(city.stocks.foodUnits, 1)} ед.`],
+        ["Вода сейчас", `${formatNumber(city.stocks.waterUnits, 1)} ед.`],
+        ["Статус запасов", cityStockStatusLabel(city.stocks.status)],
+        ["Еда изначально", `${city.initialStocks.foodUnits} ед.`],
+        ["Вода изначально", `${city.initialStocks.waterUnits} ед.`],
         ["Широта", city.position.latitudeDeg.toFixed(6)],
         ["Долгота", city.position.longitudeDeg.toFixed(6)],
       ]),
@@ -2653,6 +2657,14 @@ function drawSnapshot(
     svgTitle("Караван"),
   );
   worldMap.append(caravan);
+}
+
+/** @param {import("../sim-core/dist/src/index.js").CityStockStatus} status */
+function cityStockStatusLabel(status) {
+  if (status === "food-depleted") return "Нет еды";
+  if (status === "water-depleted") return "Нет воды";
+  if (status === "food-and-water-depleted") return "Нет еды и воды";
+  return "Запасы есть";
 }
 
 /**

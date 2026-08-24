@@ -42,6 +42,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-015`: reveal a physically scaled 300 m player-visibility corridor around actually travelled tracks as the first session fog-of-war slice.
 - [x] `GAME-016`: after authoritative arrival, record the reached city as a confirmed relative personal-map landmark without exposing or globally joining server coordinates.
 - [x] `CITY-001`: give every seeded city deterministic finite food and water stocks, visible in DEV tools but not yet consumed or traded.
+- [x] `CITY-002`: generate aggregate NPC populations and project their food/water consumption from authoritative world time.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors

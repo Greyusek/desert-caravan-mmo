@@ -54,6 +54,7 @@
 - `CHECKPOINT_29.md` — физический 300-метровый радиус обзора и первый fog-mask поверх пройденных коридоров.
 - `CHECKPOINT_30.md` — достигнутый город как подтверждённый относительный ориентир личной карты после authoritative arrival.
 - `CHECKPOINT_31.md` — детерминированные конечные запасы еды и воды в каждом seeded-городе.
+- `CHECKPOINT_32.md` — агрегированное NPC-население и расход городских запасов по мировому времени.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006`, `GAME-001..GAME-016` и `CITY-001` покрыты 265 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 270 тестов в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006`, `GAME-001..GAME-016` и `CITY-001..CITY-002` покрыты 273 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 278 тестов в pull request.

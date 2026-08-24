@@ -24,10 +24,16 @@ export interface CityStocks {
   readonly waterUnits: number;
 }
 
+export interface CityPopulation {
+  readonly cityId: string;
+  readonly inhabitants: number;
+}
+
 export interface SeededWorld {
   readonly seed: string;
   readonly cities: readonly City[];
   readonly cityStocks: readonly CityStocks[];
+  readonly cityPopulations: readonly CityPopulation[];
   readonly staticObjects: readonly StaticWorldObject[];
   readonly wanderingMonsters: readonly WanderingMonster[];
 }
@@ -59,6 +65,8 @@ const WANDERING_MONSTER_MINIMUM_LEG_METERS = 4_000;
 const WANDERING_MONSTER_MAXIMUM_LEG_METERS = 12_000;
 const CITY_MINIMUM_STOCK_UNITS = 10_000;
 const CITY_MAXIMUM_STOCK_UNITS = 50_000;
+const CITY_MINIMUM_POPULATION = 100;
+const CITY_MAXIMUM_POPULATION = 500;
 
 /**
  * WORLD-001 — creates the first reproducible world layer.
@@ -104,6 +112,19 @@ export function generateSeededWorld(
       ),
     };
   });
+  const cityPopulations = cities.map((city): CityPopulation => {
+    const populationRandom = mulberry32(
+      hashSeed(`${seed}:city-population:${city.id}`),
+    );
+    return {
+      cityId: city.id,
+      inhabitants: randomSafeIntegerInRange(
+        populationRandom,
+        CITY_MINIMUM_POPULATION,
+        CITY_MAXIMUM_POPULATION,
+      ),
+    };
+  });
 
   const staticObjects = STATIC_OBJECT_KINDS.flatMap((kind) => {
     const count = options.staticObjectCounts?.[kind] ?? DEFAULT_STATIC_OBJECT_COUNT;
@@ -131,7 +152,14 @@ export function generateSeededWorld(
     (_, index): WanderingMonster => createWanderingMonster(seed, index),
   );
 
-  return { seed, cities, cityStocks, staticObjects, wanderingMonsters };
+  return {
+    seed,
+    cities,
+    cityStocks,
+    cityPopulations,
+    staticObjects,
+    wanderingMonsters,
+  };
 }
 
 function assertStaticObjectCount(count: number, kind: StaticWorldObjectKind): void {

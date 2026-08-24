@@ -183,6 +183,25 @@ test("UI-001: the same seed and time reproduce the complete map snapshot", () =>
   );
 });
 
+test("CITY-002: debug world time projects aggregate city consumption", () => {
+  const atStart = createDebugMapSnapshot("city-consumption", 0);
+  const afterOneDay = createDebugMapSnapshot("city-consumption", 86_400);
+  const initial = atStart.cities[0];
+  const later = afterOneDay.cities[0];
+  assert.ok(initial);
+  assert.ok(later);
+
+  assert.equal(later.population.inhabitants, initial.population.inhabitants);
+  assert.equal(
+    later.stocks.foodUnits,
+    initial.initialStocks.foodUnits - initial.population.inhabitants,
+  );
+  assert.equal(
+    later.stocks.waterUnits,
+    initial.initialStocks.waterUnits - initial.population.inhabitants * 2,
+  );
+});
+
 test("UI-001: changing the seed changes projected world positions", () => {
   const first = createDebugMapSnapshot("debug-map-a");
   const second = createDebugMapSnapshot("debug-map-b");
