@@ -3029,3 +3029,76 @@ test("GAME-014: map rejects travel knowledge from another world seed", () => {
     /worldSeed/,
   );
 });
+
+test("GAME-015: the session visibility radius is physically scaled to 300 m", () => {
+  const travelled = recordExpeditionTravelProgress(
+    createPlayerTravelLedger("checkpoint-04"),
+    {
+      expeditionNumber: 1,
+      originCityId: "city-01",
+      routeCommands: [{ bearingDeg: 0, distanceMeters: 10_000 }],
+      traveledDistanceMeters: 10_000,
+    },
+  );
+  const map = createSessionKnowledgeMapSnapshot(
+    createPlayerDiscoveryLedger("checkpoint-04"),
+    null,
+    travelled.ledger,
+  );
+
+  assert.equal(map.scaleRadiusMeters, 10_000);
+  assert.equal(map.visibilityRadiusMeters, 300);
+  approx(map.visibilityRadiusPixels, 3.48);
+  approx(map.visibilityDiameterPixels, 6.96);
+});
+
+test("GAME-015: one physical radius shrinks predictably on a wider chart", () => {
+  let ledger = createPlayerTravelLedger("checkpoint-04");
+  ledger = recordExpeditionTravelProgress(ledger, {
+    expeditionNumber: 1,
+    originCityId: "city-01",
+    routeCommands: [{ bearingDeg: 90, distanceMeters: 10_000 }],
+    traveledDistanceMeters: 10_000,
+  }).ledger;
+  ledger = recordExpeditionTravelProgress(ledger, {
+    expeditionNumber: 2,
+    originCityId: "city-02",
+    routeCommands: [{ bearingDeg: 90, distanceMeters: 100_000 }],
+    traveledDistanceMeters: 100_000,
+  }).ledger;
+
+  const discoveries = createPlayerDiscoveryLedger("checkpoint-04");
+  const local = createSessionKnowledgeMapSnapshot(
+    discoveries,
+    "city-01",
+    ledger,
+  );
+  const wide = createSessionKnowledgeMapSnapshot(
+    discoveries,
+    "city-02",
+    ledger,
+  );
+
+  approx(
+    (local.visibilityRadiusPixels / local.radiusPixels) *
+      local.scaleRadiusMeters,
+    300,
+  );
+  approx(
+    (wide.visibilityRadiusPixels / wide.radiusPixels) *
+      wide.scaleRadiusMeters,
+    300,
+  );
+  approx(local.visibilityRadiusPixels / wide.visibilityRadiusPixels, 10);
+});
+
+test("GAME-015: an empty session has no invented visibility aperture", () => {
+  const map = createSessionKnowledgeMapSnapshot(
+    createPlayerDiscoveryLedger("checkpoint-04"),
+  );
+
+  assert.equal(map.visibilityRadiusMeters, 300);
+  assert.equal(map.visibilityRadiusPixels, 0);
+  assert.equal(map.visibilityDiameterPixels, 0);
+  assert.deepEqual(map.tracks, []);
+});

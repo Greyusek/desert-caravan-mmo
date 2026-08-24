@@ -12,6 +12,16 @@
 - Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
 - Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
 
+## 0.0.29 — Checkpoint 29
+
+- Added `GAME-015`: actually travelled tracks now cut a physically scaled 300 m visibility radius through the session map's unexplored field.
+- Reused the accepted `DEFAULT_VISIBLE_TARGET_RADIUS_METERS` simulation constant instead of introducing a presentation-only width.
+- Converted the former fixed-width decorative corridor into a scale-dependent diameter derived from map meters per pixel.
+- Added an SVG fog mask that unions all travelled corridors for the selected origin city while keeping future route legs absent.
+- Kept confirmed knowledge markers and expedition center lines readable above the fog layer without joining independent city charts.
+- Added three GAME-015 scaling regressions; repository verification now runs 265 tests.
+- Recorded the acceptance finding about reached cities as `GAME-016`, the next checkpoint: confirm an arrived city as a relative personal-map landmark without exposing its server coordinates.
+
 ## 0.0.28 — Checkpoint 28
 
 - Added `GAME-014`: every expedition retains its actually travelled route prefix in coordinate-free session knowledge.

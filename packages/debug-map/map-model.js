@@ -5,6 +5,7 @@ import {
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
   DEFAULT_PLAYER_POWER,
+  DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
   createRoutePlan,
   createKnownObjectReturnNavigation,
   createRumorSearchScenario,
@@ -797,6 +798,18 @@ export function createSessionKnowledgeMapSnapshot(
     origin,
     radiusPixels,
     scaleRadiusMeters,
+    visibilityRadiusMeters: DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
+    visibilityRadiusPixels:
+      scaleRadiusMeters > 0
+        ? (DEFAULT_VISIBLE_TARGET_RADIUS_METERS / scaleRadiusMeters) *
+          radiusPixels
+        : 0,
+    visibilityDiameterPixels:
+      scaleRadiusMeters > 0
+        ? ((DEFAULT_VISIBLE_TARGET_RADIUS_METERS * 2) /
+            scaleRadiusMeters) *
+          radiusPixels
+        : 0,
     tracks: localTracks.map((track) => ({
       expeditionNumber: track.expeditionNumber,
       originCityId: track.originCityId,

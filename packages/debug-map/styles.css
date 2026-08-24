@@ -413,9 +413,13 @@ input[type="range"] {
   stroke-linejoin: round;
 }
 
+.knowledge-map-fog {
+  fill: rgba(6, 8, 7, 0.84);
+  pointer-events: none;
+}
+
 .knowledge-map-corridor {
-  stroke: rgba(88, 199, 180, 0.12);
-  stroke-width: 10;
+  stroke: rgba(88, 199, 180, 0.2);
 }
 
 .knowledge-map-track {
