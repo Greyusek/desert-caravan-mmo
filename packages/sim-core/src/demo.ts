@@ -20,6 +20,7 @@ import {
   generateSeededWorld,
   kilometers,
   meters,
+  planEmergencySupplyReturn,
   positionAtTime,
   projectCitySettlementAtTime,
   projectCityStocksAtTime,
@@ -45,7 +46,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 33 demo");
+console.log("Desert Caravan MMO — Checkpoint 34 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -450,6 +451,34 @@ console.log(
     : "  return route missed the city",
 );
 
+const emergencySupplies = { foodUnits: 100, waterUnits: 100 };
+const emergencyConsumption = {
+  moving: { foodUnitsPerHour: 12.5, waterUnitsPerHour: 12.5 },
+  idle: { foodUnitsPerHour: 2, waterUnitsPerHour: 2 },
+};
+const emergencyOutboundRoute = createRoutePlan(
+  start,
+  [{ bearingDeg: 90, distanceMeters: kilometers(40) }],
+  speedMetersPerSecond,
+);
+const emergencyReturn = planEmergencySupplyReturn(
+  emergencyOutboundRoute,
+  emergencySupplies,
+  emergencyConsumption,
+  "RETURN_TO_ORIGIN",
+);
+const emergencyArrival = findFirstCityArrival(
+  emergencyReturn.effectiveRoute,
+  returnCity,
+);
+
+console.log("\nGAME-017 emergency supply doctrine:");
 console.log(
-  "\nCheckpoint 33 shortage population decline: npm run debug-map -> http://127.0.0.1:4173",
+  emergencyReturn.threshold && emergencyArrival
+    ? `  ${emergencyReturn.threshold.cause} reaches ${(emergencyReturn.threshold.remainingFraction * 100).toFixed(0)}% at T=${(emergencyReturn.threshold.atSeconds / 3_600).toFixed(3)} h; direct return=${((emergencyReturn.returnDistanceMeters ?? 0) / 1_000).toFixed(3)} km; ${emergencyArrival.kind} at T=${(emergencyArrival.elapsedSeconds / 3_600).toFixed(3)} h`
+    : "  emergency return was not triggered",
+);
+
+console.log(
+  "\nCheckpoint 34 emergency return: npm run debug-map -> http://127.0.0.1:4173",
 );

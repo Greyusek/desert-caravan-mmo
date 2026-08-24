@@ -1,4 +1,8 @@
-import { destinationPoint, greatCircleDistance } from "./geometry.js";
+import {
+  destinationPoint,
+  greatCircleDistance,
+  initialBearingDegrees,
+} from "./geometry.js";
 import {
   DEFAULT_INTERACTION_RADIUS_METERS,
   DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
@@ -221,27 +225,6 @@ function createWanderingMonster(seed: string, index: number): WanderingMonster {
       DEFAULT_WANDERING_MONSTER_SPEED_METERS_PER_SECOND,
     ),
   };
-}
-
-function initialBearingDegrees(
-  start: WorldCoordinate,
-  destination: WorldCoordinate,
-): number {
-  const degreesToRadians = Math.PI / 180;
-  const radiansToDegrees = 180 / Math.PI;
-  const startLatitude = start.latitudeDeg * degreesToRadians;
-  const destinationLatitude = destination.latitudeDeg * degreesToRadians;
-  const longitudeDelta =
-    (destination.longitudeDeg - start.longitudeDeg) * degreesToRadians;
-  const y = Math.sin(longitudeDelta) * Math.cos(destinationLatitude);
-  const x =
-    Math.cos(startLatitude) * Math.sin(destinationLatitude) -
-    Math.sin(startLatitude) *
-      Math.cos(destinationLatitude) *
-      Math.cos(longitudeDelta);
-
-  if (Math.abs(x) + Math.abs(y) < Number.EPSILON) return 0;
-  return normalizeBearing(Math.atan2(y, x) * radiansToDegrees);
 }
 
 /** FNV-1a over UTF-16 code units, kept local so world generation stays dependency-free. */

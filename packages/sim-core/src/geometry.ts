@@ -76,6 +76,26 @@ export function greatCircleDistance(
   return planetRadiusMeters * centralAngle;
 }
 
+/** Returns the normalized initial great-circle bearing from A to B. */
+export function initialBearingDegrees(
+  start: WorldCoordinate,
+  destination: WorldCoordinate,
+): BearingDegrees {
+  const startLatitude = start.latitudeDeg * DEG_TO_RAD;
+  const destinationLatitude = destination.latitudeDeg * DEG_TO_RAD;
+  const longitudeDelta =
+    (destination.longitudeDeg - start.longitudeDeg) * DEG_TO_RAD;
+  const y = Math.sin(longitudeDelta) * Math.cos(destinationLatitude);
+  const x =
+    Math.cos(startLatitude) * Math.sin(destinationLatitude) -
+    Math.sin(startLatitude) *
+      Math.cos(destinationLatitude) *
+      Math.cos(longitudeDelta);
+
+  if (Math.abs(x) + Math.abs(y) < Number.EPSILON) return 0;
+  return normalizeBearing(Math.atan2(y, x) * RAD_TO_DEG);
+}
+
 function assertPositiveRadius(radiusMeters: number): void {
   if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) {
     throw new RangeError("planetRadiusMeters must be a positive finite number");

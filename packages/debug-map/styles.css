@@ -1738,6 +1738,35 @@ input[type="range"] {
   background: var(--danger);
 }
 
+.supply-doctrine-panel {
+  display: grid;
+  margin-top: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(236, 203, 148, 0.1);
+}
+
+.supply-doctrine-control {
+  margin: 0;
+}
+
+.supply-doctrine-actions {
+  min-width: 220px;
+  text-align: right;
+}
+
+.supply-doctrine-actions .doctrine-result {
+  max-width: 360px;
+  margin: 0 0 9px;
+  color: #bba77f;
+}
+
+.supply-doctrine-actions button {
+  white-space: nowrap;
+}
+
 .supply-settings {
   margin-top: 11px;
   border-top: 1px solid rgba(236, 203, 148, 0.1);
@@ -2805,6 +2834,15 @@ input[type="range"] {
   .expedition-grid,
   .supply-form {
     grid-template-columns: 1fr;
+  }
+
+  .supply-doctrine-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .supply-doctrine-actions {
+    min-width: 0;
+    text-align: left;
   }
 
   .route-form {

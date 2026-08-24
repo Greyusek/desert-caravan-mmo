@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 33 · CITY-003</p>
+          <p class="eyebrow">Checkpoint 34 · GAME-017</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -469,6 +469,45 @@
             <strong id="forecast-title">Запасов хватит</strong>
             <p id="forecast-detail" class="forecast-detail">Расчёт ожидает маршрут</p>
           </article>
+        </div>
+
+        <div class="supply-doctrine-panel">
+          <fieldset class="doctrine-control supply-doctrine-control">
+            <legend>GAME-017 · При 50% критического ресурса</legend>
+            <label for="supply-doctrine-return">
+              <input
+                id="supply-doctrine-return"
+                type="radio"
+                name="supply-doctrine"
+                value="RETURN_TO_ORIGIN"
+                checked
+              />
+              <span>
+                <strong>Вернуться в город старта</strong>
+                <small>RETURN_TO_ORIGIN · будущие сегменты заменяются прямым возвратом</small>
+              </span>
+            </label>
+            <label for="supply-doctrine-continue">
+              <input
+                id="supply-doctrine-continue"
+                type="radio"
+                name="supply-doctrine"
+                value="CONTINUE"
+              />
+              <span>
+                <strong>Продолжить маршрут</strong>
+                <small>CONTINUE · риск истощения принимается явно</small>
+              </span>
+            </label>
+          </fieldset>
+          <div class="supply-doctrine-actions">
+            <p id="supply-doctrine-result" class="doctrine-result">
+              Аварийная граница будет рассчитана по запасам и moving-расходу.
+            </p>
+            <button id="supply-emergency-dev-route" type="button">
+              DEV: проверить возврат
+            </button>
+          </div>
         </div>
 
         <details class="supply-settings">

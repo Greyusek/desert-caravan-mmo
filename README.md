@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 33 — CITY-003: implemented and covered by automated tests.**
+**Checkpoint 34 — GAME-017: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -47,13 +47,14 @@ Also implemented:
 - GAME-014 — each expedition adds only its actually travelled bearing/distance prefix to the matching local session chart; future route legs stay hidden and prior progress cannot be erased by rewinding the DEV clock.
 - GAME-015 — a physically scaled 300 m visibility radius around those travelled tracks cuts the first session fog-of-war corridor; map scale changes pixels, never the underlying survey distance.
 - GAME-016 — an authoritatively reached city becomes a confirmed relative landmark on the matching origin-city chart; planned routes and unsuccessful journeys reveal nothing, and the player record contains no absolute coordinates.
+- GAME-017 — when food or water reaches 50% during uninterrupted movement, `RETURN_TO_ORIGIN` preserves the travelled prefix and replaces every future leg with a direct great-circle return; `CONTINUE` records the same decision boundary without changing the route.
 - CITY-001 — every seeded city has deterministic finite food and water stocks exposed in DEV details, without trading or consumption yet.
 - CITY-002 — deterministic aggregate NPC populations consume those stocks from authoritative world time at explicit provisional per-person rates; exact depletion is visible in DEV details.
 - CITY-003 — the first food or water shortage reduces aggregate population by a deterministic 1% per game day; declining population also slows later consumption of any remaining stock.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
-Not implemented yet (intentionally): several simultaneous patrol contacts, pursuit route replanning, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, and autonomous neural NPC / City / Species agents.
+Not implemented yet (intentionally): emergency-threshold composition during discovery STOP, automatic resupply, several simultaneous patrol contacts, pursuit route replanning, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, and autonomous neural NPC / City / Species agents.
 
 ## Requirements
 
@@ -88,17 +89,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 33:
+Expected for Checkpoint 34:
 
 ```text
-# tests 284
-# pass 284
+# tests 294
+# pass 294
 # fail 0
 ```
 
-This total contains 279 simulation/UI tests and 5 tooling regression tests.
+This total contains 289 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_33.md` for CITY-003 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_34.md` for GAME-017 details.
 
 ## Developer debug map
 
@@ -108,7 +109,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The world map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, supplies, timeline, doctrines, outcomes and Power/FLEE resolution. The separate player-facing map starts as unexplored darkness. Select `STOP`, press `DEV: маршрут к цели`, and advance time: only the actually travelled path cuts a transparent corridor with a physical radius of 300 m. Planned future legs are never drawn, moving the DEV slider backwards does not erase retained visibility, and earlier expedition corridors remain. The center line and confirmed knowledge markers stay visible above the fog. Independent origin cities still use separate charts. After an authoritative city arrival, the reached city appears as a confirmed relative landmark only on the expedition's origin-city chart. Discoveries, tracks, city landmarks and session fog reset together on a different seed, page reload or the clear button. Existing arrival, idle-contact and Power/FLEE DEV presets remain available. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The world map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, supplies, timeline, doctrines, outcomes and Power/FLEE resolution. The separate player-facing map starts as unexplored darkness. Select `STOP`, press `DEV: маршрут к цели`, and advance time: only the actually travelled path cuts a transparent corridor with a physical radius of 300 m. Planned future legs are never drawn, moving the DEV slider backwards does not erase retained visibility, and earlier expedition corridors remain. The center line and confirmed knowledge markers stay visible above the fog. Independent origin cities still use separate charts. After an authoritative city arrival, the reached city appears as a confirmed relative landmark only on the expedition's origin-city chart. `DEV: проверить возврат` prepares GAME-017; the next two clicks advance to the 50% decision and then the successful origin-city re-entry. Discoveries, tracks, city landmarks and session fog reset together on a different seed, page reload or the clear button. Existing arrival, idle-contact and Power/FLEE DEV presets remain available. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -123,4 +124,4 @@ Then open `http://127.0.0.1:4173`. The world map is intentionally a developer ov
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint will select the smallest remaining MVP-0 slice after Checkpoint 33; no later persistence, production-chain, physical-map or AI layer is pulled forward implicitly.
+The next functional checkpoint is GAME-018: compose the same emergency boundary with discovery-STOP idle consumption without pulling automatic resupply, persistence, production-chain, physical-map or AI work forward.
