@@ -706,13 +706,25 @@ export function createKnownObjectReturnRoutePreset(ledger, objectId) {
  *
  * @param {import("../sim-core/dist/src/index.js").PlayerDiscoveryLedger} ledger
  * @param {string | null} [preferredOriginCityId]
+ * @param {import("../sim-core/dist/src/index.js").PlayerTravelLedger | null} [travelLedger]
  */
 export function createSessionKnowledgeMapSnapshot(
   ledger,
   preferredOriginCityId = null,
+  travelLedger = null,
 ) {
   if (!ledger || !Array.isArray(ledger.entries)) {
     throw new TypeError("ledger.entries must be an array");
+  }
+  if (travelLedger !== null) {
+    if (!Array.isArray(travelLedger.tracks)) {
+      throw new TypeError("travelLedger.tracks must be an array");
+    }
+    if (travelLedger.worldSeed !== ledger.worldSeed) {
+      throw new RangeError(
+        "travelLedger.worldSeed must match the discovery ledger",
+      );
+    }
   }
   if (
     preferredOriginCityId !== null &&
@@ -723,9 +735,12 @@ export function createSessionKnowledgeMapSnapshot(
   }
 
   const originCityIds = [
-    ...new Set(
-      ledger.entries.map((entry) => entry.firstObservation.originCityId),
-    ),
+    ...new Set([
+      ...ledger.entries.map(
+        (entry) => entry.firstObservation.originCityId,
+      ),
+      ...(travelLedger?.tracks.map((track) => track.originCityId) ?? []),
+    ]),
   ];
   if (
     preferredOriginCityId !== null &&
@@ -748,9 +763,23 @@ export function createSessionKnowledgeMapSnapshot(
         )
         .map((entry) => createKnownObjectReturnNavigation(ledger, entry.objectId))
     : [];
+  const localTracks = originCityId
+    ? (travelLedger?.tracks ?? [])
+        .filter((track) => track.originCityId === originCityId)
+        .map(createLocalTravelTrack)
+    : [];
+  const furthestTrackPointMeters = Math.max(
+    0,
+    ...localTracks.flatMap((track) =>
+      track.points.map((point) =>
+        Math.hypot(point.eastMeters, point.northMeters),
+      ),
+    ),
+  );
   const furthestDistanceMeters = Math.max(
     0,
     ...navigations.map((navigation) => navigation.command.distanceMeters),
+    furthestTrackPointMeters,
   );
   const scaleRadiusMeters =
     furthestDistanceMeters > 0
@@ -768,6 +797,23 @@ export function createSessionKnowledgeMapSnapshot(
     origin,
     radiusPixels,
     scaleRadiusMeters,
+    tracks: localTracks.map((track) => ({
+      expeditionNumber: track.expeditionNumber,
+      originCityId: track.originCityId,
+      traveledDistanceMeters: track.traveledDistanceMeters,
+      points: track.points.map((point) => ({
+        x:
+          origin.x +
+          (scaleRadiusMeters > 0
+            ? (point.eastMeters / scaleRadiusMeters) * radiusPixels
+            : 0),
+        y:
+          origin.y -
+          (scaleRadiusMeters > 0
+            ? (point.northMeters / scaleRadiusMeters) * radiusPixels
+            : 0),
+      })),
+    })),
     entries: navigations.map((navigation) => {
       const angleRadians = (navigation.command.bearingDeg * Math.PI) / 180;
       const distancePixels =
@@ -787,6 +833,29 @@ export function createSessionKnowledgeMapSnapshot(
         y: origin.y - Math.cos(angleRadians) * distancePixels,
       };
     }),
+  };
+}
+
+/**
+ * Integrates player-known bearing/distance legs on a local tangent chart.
+ * No server coordinate is read or emitted.
+ * @param {import("../sim-core/dist/src/index.js").ExpeditionTravelTrack} track
+ */
+function createLocalTravelTrack(track) {
+  let eastMeters = 0;
+  let northMeters = 0;
+  const points = [{ eastMeters, northMeters }];
+  for (const leg of track.legs) {
+    const angleRadians = (leg.bearingDeg * Math.PI) / 180;
+    eastMeters += Math.sin(angleRadians) * leg.distanceMeters;
+    northMeters += Math.cos(angleRadians) * leg.distanceMeters;
+    points.push({ eastMeters, northMeters });
+  }
+  return {
+    expeditionNumber: track.expeditionNumber,
+    originCityId: track.originCityId,
+    traveledDistanceMeters: track.traveledDistanceMeters,
+    points,
   };
 }
 

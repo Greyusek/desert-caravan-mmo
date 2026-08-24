@@ -64,6 +64,37 @@ export interface KnownObjectReturnNavigation {
   readonly command: RouteCommand;
 }
 
+export interface ExpeditionTravelTrack {
+  readonly expeditionNumber: number;
+  readonly originCityId: string;
+  readonly legs: readonly RouteCommand[];
+  readonly traveledDistanceMeters: DistanceMeters;
+}
+
+export interface PlayerTravelLedger {
+  readonly worldSeed: string;
+  readonly tracks: readonly ExpeditionTravelTrack[];
+}
+
+export interface ExpeditionTravelProgressInput {
+  readonly expeditionNumber: number;
+  readonly originCityId: string;
+  readonly routeCommands: readonly RouteCommand[];
+  readonly traveledDistanceMeters: DistanceMeters;
+}
+
+export type TravelLedgerRecordStatus =
+  | "no-progress"
+  | "first-progress"
+  | "progressed"
+  | "unchanged";
+
+export interface TravelLedgerRecordResult {
+  readonly ledger: PlayerTravelLedger;
+  readonly track: ExpeditionTravelTrack | null;
+  readonly status: TravelLedgerRecordStatus;
+}
+
 /**
  * GAME-011 — creates browser-session knowledge for exactly one deterministic
  * world. Persistence, physical map ownership and database concerns deliberately
@@ -74,6 +105,133 @@ export function createPlayerDiscoveryLedger(
 ): PlayerDiscoveryLedger {
   assertNonEmptyString(worldSeed, "worldSeed");
   return { worldSeed, entries: [] };
+}
+
+/**
+ * GAME-014 — creates a coordinate-free browser-session record of corridors the
+ * player has physically travelled. Like discovery knowledge, this is not yet a
+ * persistent or transferable production map.
+ */
+export function createPlayerTravelLedger(
+  worldSeed: string,
+): PlayerTravelLedger {
+  assertNonEmptyString(worldSeed, "worldSeed");
+  return { worldSeed, tracks: [] };
+}
+
+/**
+ * Retains only the executed prefix of a route. Planned legs beyond
+ * traveledDistanceMeters never enter the ledger, repeated renders are
+ * idempotent, and rewinding a development clock cannot erase prior travel.
+ */
+export function recordExpeditionTravelProgress(
+  ledger: PlayerTravelLedger,
+  input: ExpeditionTravelProgressInput,
+): TravelLedgerRecordResult {
+  assertTravelLedger(ledger);
+  assertPositiveSafeInteger(input.expeditionNumber, "expeditionNumber");
+  assertNonEmptyString(input.originCityId, "originCityId");
+  assertNonNegativeFinite(
+    input.traveledDistanceMeters,
+    "traveledDistanceMeters",
+  );
+  if (!Array.isArray(input.routeCommands) || input.routeCommands.length === 0) {
+    throw new RangeError("routeCommands must contain at least one command");
+  }
+
+  const routeCommands = input.routeCommands.map((command, index) => {
+    if (!Number.isFinite(command.bearingDeg)) {
+      throw new TypeError(
+        `routeCommands[${index}].bearingDeg must be a finite number`,
+      );
+    }
+    assertNonNegativeFinite(
+      command.distanceMeters,
+      `routeCommands[${index}].distanceMeters`,
+    );
+    return {
+      bearingDeg: normalizeBearing(command.bearingDeg),
+      distanceMeters: command.distanceMeters,
+    };
+  });
+  const totalDistanceMeters = routeCommands.reduce(
+    (sum, command) => sum + command.distanceMeters,
+    0,
+  );
+  if (input.traveledDistanceMeters > totalDistanceMeters + 1e-7) {
+    throw new RangeError(
+      "traveledDistanceMeters must not exceed the planned route distance",
+    );
+  }
+
+  const existingIndex = ledger.tracks.findIndex(
+    (track) => track.expeditionNumber === input.expeditionNumber,
+  );
+  const existing =
+    existingIndex >= 0 ? ledger.tracks[existingIndex] ?? null : null;
+  if (existing && existing.originCityId !== input.originCityId) {
+    throw new RangeError(
+      "originCityId must match the existing expedition travel track",
+    );
+  }
+  if (
+    !existing &&
+    ledger.tracks.some(
+      (track) => track.expeditionNumber > input.expeditionNumber,
+    )
+  ) {
+    throw new RangeError(
+      "expeditionNumber must not precede recorded travel tracks",
+    );
+  }
+
+  const executedDistanceMeters = Math.min(
+    input.traveledDistanceMeters,
+    totalDistanceMeters,
+  );
+  if (executedDistanceMeters <= 1e-7) {
+    return {
+      ledger,
+      track: existing,
+      status: existing ? "unchanged" : "no-progress",
+    };
+  }
+  if (
+    existing &&
+    executedDistanceMeters <= existing.traveledDistanceMeters + 1e-7
+  ) {
+    return { ledger, track: existing, status: "unchanged" };
+  }
+
+  const legs = executedRoutePrefix(routeCommands, executedDistanceMeters);
+  if (existing) assertTravelTrackPrefix(existing.legs, legs);
+  const track: ExpeditionTravelTrack = {
+    expeditionNumber: input.expeditionNumber,
+    originCityId: input.originCityId,
+    legs,
+    traveledDistanceMeters: legs.reduce(
+      (sum, leg) => sum + leg.distanceMeters,
+      0,
+    ),
+  };
+
+  if (!existing) {
+    return {
+      ledger: { worldSeed: ledger.worldSeed, tracks: [...ledger.tracks, track] },
+      track,
+      status: "first-progress",
+    };
+  }
+  return {
+    ledger: {
+      worldSeed: ledger.worldSeed,
+      tracks: ledger.tracks.map((candidate, index) =>
+        index === existingIndex ? track : candidate,
+      ),
+    },
+    track,
+    status: "progressed",
+  };
 }
 
 /**
@@ -203,6 +361,56 @@ function assertLedger(ledger: PlayerDiscoveryLedger): void {
   assertNonEmptyString(ledger.worldSeed, "ledger.worldSeed");
   if (!Array.isArray(ledger.entries)) {
     throw new TypeError("ledger.entries must be an array");
+  }
+}
+
+function assertTravelLedger(ledger: PlayerTravelLedger): void {
+  assertNonEmptyString(ledger.worldSeed, "ledger.worldSeed");
+  if (!Array.isArray(ledger.tracks)) {
+    throw new TypeError("ledger.tracks must be an array");
+  }
+}
+
+function executedRoutePrefix(
+  commands: readonly RouteCommand[],
+  traveledDistanceMeters: DistanceMeters,
+): RouteCommand[] {
+  const legs: RouteCommand[] = [];
+  let remainingDistanceMeters = traveledDistanceMeters;
+  for (const command of commands) {
+    if (remainingDistanceMeters <= 1e-7) break;
+    const distanceMeters = Math.min(
+      command.distanceMeters,
+      remainingDistanceMeters,
+    );
+    if (distanceMeters > 1e-7) {
+      legs.push({ bearingDeg: command.bearingDeg, distanceMeters });
+      remainingDistanceMeters -= distanceMeters;
+    }
+  }
+  return legs;
+}
+
+function assertTravelTrackPrefix(
+  previous: readonly RouteCommand[],
+  next: readonly RouteCommand[],
+): void {
+  for (let index = 0; index < previous.length; index += 1) {
+    const previousLeg = previous[index];
+    const nextLeg = next[index];
+    if (!previousLeg || !nextLeg) {
+      throw new RangeError("routeCommands must preserve recorded travel");
+    }
+    const isLastPreviousLeg = index === previous.length - 1;
+    const distanceMatches = isLastPreviousLeg
+      ? nextLeg.distanceMeters + 1e-7 >= previousLeg.distanceMeters
+      : Math.abs(nextLeg.distanceMeters - previousLeg.distanceMeters) <= 1e-7;
+    if (
+      Math.abs(nextLeg.bearingDeg - previousLeg.bearingDeg) > 1e-9 ||
+      !distanceMatches
+    ) {
+      throw new RangeError("routeCommands must preserve recorded travel");
+    }
   }
 }
 

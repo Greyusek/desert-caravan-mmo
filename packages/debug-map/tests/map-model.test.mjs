@@ -35,7 +35,9 @@ import {
 } from "../map-model.js";
 import {
   createPlayerDiscoveryLedger,
+  createPlayerTravelLedger,
   recordDirectDiscoveryObservation,
+  recordExpeditionTravelProgress,
 } from "../../sim-core/dist/src/index.js";
 
 function approx(actual, expected, tolerance = 1e-9) {
@@ -2935,5 +2937,95 @@ test("GAME-013: empty knowledge and unknown origins are explicit", () => {
   assert.throws(
     () => createSessionKnowledgeMapSnapshot(ledger, "city-99"),
     /knowledge-map origin/,
+  );
+});
+
+test("GAME-014: a travelled prefix renders north-up without a discovery", () => {
+  const recorded = recordExpeditionTravelProgress(
+    createPlayerTravelLedger("checkpoint-04"),
+    {
+      expeditionNumber: 1,
+      originCityId: "city-01",
+      routeCommands: [
+        { bearingDeg: 0, distanceMeters: 10_000 },
+        { bearingDeg: 90, distanceMeters: 10_000 },
+        { bearingDeg: 180, distanceMeters: 40_000 },
+      ],
+      traveledDistanceMeters: 15_000,
+    },
+  );
+  const map = createSessionKnowledgeMapSnapshot(
+    createPlayerDiscoveryLedger("checkpoint-04"),
+    null,
+    recorded.ledger,
+  );
+
+  assert.equal(map.originCityId, "city-01");
+  assert.equal(map.entries.length, 0);
+  assert.equal(map.tracks.length, 1);
+  assert.equal(map.scaleRadiusMeters, 20_000);
+  assert.deepEqual(map.tracks[0]?.points[0], { x: 260, y: 150 });
+  approx(map.tracks[0]?.points[1]?.x, 260);
+  approx(map.tracks[0]?.points[1]?.y, 92);
+  approx(map.tracks[0]?.points[2]?.x, 289);
+  approx(map.tracks[0]?.points[2]?.y, 92);
+  assert.equal(map.tracks[0]?.traveledDistanceMeters, 15_000);
+});
+
+test("GAME-014: trail origins stay separate from unrelated discovery anchors", () => {
+  const discovered = recordDirectDiscoveryObservation(
+    createPlayerDiscoveryLedger("checkpoint-04"),
+    {
+      expeditionNumber: 1,
+      objectId: "mine-a",
+      objectKind: "mine",
+      originCityId: "city-01",
+      rumorId: "rumor-a",
+      observedAtSeconds: 1_000,
+      segmentIndex: 0,
+      routeDistanceMeters: 10_000,
+      originBearingDeg: 45,
+      originDistanceMeters: 10_000,
+    },
+  );
+  const travelled = recordExpeditionTravelProgress(
+    createPlayerTravelLedger("checkpoint-04"),
+    {
+      expeditionNumber: 2,
+      originCityId: "city-02",
+      routeCommands: [{ bearingDeg: 225, distanceMeters: 8_000 }],
+      traveledDistanceMeters: 8_000,
+    },
+  );
+
+  const cityOne = createSessionKnowledgeMapSnapshot(
+    discovered.ledger,
+    "city-01",
+    travelled.ledger,
+  );
+  const cityTwo = createSessionKnowledgeMapSnapshot(
+    discovered.ledger,
+    "city-02",
+    travelled.ledger,
+  );
+
+  assert.deepEqual(cityOne.originCityIds, ["city-01", "city-02"]);
+  assert.equal(cityOne.entries.length, 1);
+  assert.equal(cityOne.tracks.length, 0);
+  assert.equal(cityTwo.entries.length, 0);
+  assert.equal(cityTwo.tracks.length, 1);
+  assert.equal(JSON.stringify(cityTwo).includes("latitude"), false);
+  assert.equal(JSON.stringify(cityTwo).includes("longitude"), false);
+});
+
+test("GAME-014: map rejects travel knowledge from another world seed", () => {
+  assert.throws(
+    () =>
+      createSessionKnowledgeMapSnapshot(
+        createPlayerDiscoveryLedger("checkpoint-04"),
+        null,
+        createPlayerTravelLedger("other-world"),
+      ),
+    /worldSeed/,
   );
 });

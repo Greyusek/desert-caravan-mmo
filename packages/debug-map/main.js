@@ -31,7 +31,9 @@ import {
 } from "./map-model.js";
 import {
   createPlayerDiscoveryLedger,
+  createPlayerTravelLedger,
   recordDirectDiscoveryObservation,
+  recordExpeditionTravelProgress,
   wasObjectKnownBeforeExpedition,
 } from "../sim-core/dist/src/index.js";
 
@@ -126,6 +128,10 @@ const doctrineMarkAndContinue = requireElement(
 const rumorDevRoute = requireElement("rumor-dev-route", HTMLButtonElement);
 const rumorMap = requireElement("rumor-map", SVGSVGElement);
 const knowledgeCount = requireElement("knowledge-count", HTMLOutputElement);
+const knowledgeTrackCount = requireElement(
+  "knowledge-track-count",
+  HTMLOutputElement,
+);
 const knowledgeExpedition = requireElement(
   "knowledge-expedition",
   HTMLOutputElement,
@@ -207,6 +213,7 @@ let clockAnchorElapsedSeconds = 0;
 let supplySettings = readSupplySettings();
 let expeditionNumber = 1;
 let discoveryLedger = createPlayerDiscoveryLedger(seedInput.value.trim());
+let travelLedger = createPlayerTravelLedger(seedInput.value.trim());
 /** @type {string | null} */
 let preparedKnowledgeObjectId = null;
 /** @type {string | null} */
@@ -228,6 +235,7 @@ seedForm.addEventListener("submit", (event) => {
   const nextSeed = seedInput.value.trim();
   if (nextSeed.length > 0 && nextSeed !== discoveryLedger.worldSeed) {
     discoveryLedger = createPlayerDiscoveryLedger(nextSeed);
+    travelLedger = createPlayerTravelLedger(nextSeed);
     expeditionNumber = 1;
     preparedKnowledgeObjectId = null;
     selectedKnowledgeMapOriginCityId = null;
@@ -272,6 +280,7 @@ clockSpeed.addEventListener("change", () => {
 
 routeForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  beginNewExpeditionIfTravelled();
   preparedKnowledgeObjectId = null;
   resetSimulationClock();
   render();
@@ -307,6 +316,7 @@ knowledgeReset.addEventListener("click", () => {
   const seed = seedInput.value.trim();
   if (seed.length === 0) return;
   discoveryLedger = createPlayerDiscoveryLedger(seed);
+  travelLedger = createPlayerTravelLedger(seed);
   expeditionNumber = 1;
   preparedKnowledgeObjectId = null;
   selectedKnowledgeMapOriginCityId = null;
@@ -375,6 +385,7 @@ outcomeAction.addEventListener("click", () => {
 rumorDevRoute.addEventListener("click", () => {
   if (!activeRumorSearch) return;
 
+  beginNewExpeditionIfTravelled();
   stationaryStopQaEnabled = false;
   preparedKnowledgeObjectId = null;
   const { exactBearingDeg, exactDistanceKilometers } =
@@ -394,6 +405,8 @@ contactDevRoute.addEventListener("click", () => {
     (candidate) => candidate.id === contactMonsterSelect.value,
   );
   if (!activeSnapshot || !monster) return;
+
+  beginNewExpeditionIfTravelled();
 
   const candidates = activeSnapshot.cities.map((city) => ({
     city,
@@ -426,6 +439,7 @@ contactDevRoute.addEventListener("click", () => {
 contactStopDevRoute.addEventListener("click", () => {
   if (!activeRumorSearch) return;
 
+  beginNewExpeditionIfTravelled();
   preparedKnowledgeObjectId = null;
   const { exactBearingDeg, exactDistanceKilometers } =
     activeRumorSearch.serverTruth;
@@ -451,6 +465,7 @@ cityDevRoute.addEventListener("click", () => {
   );
   if (!startCity || !destinationCity) return;
 
+  beginNewExpeditionIfTravelled();
   stationaryStopQaEnabled = false;
   preparedKnowledgeObjectId = null;
   const preset = createCityArrivalRoutePreset(
@@ -497,6 +512,7 @@ function render() {
     );
     if (discoveryLedger.worldSeed !== snapshot.seed) {
       discoveryLedger = createPlayerDiscoveryLedger(snapshot.seed);
+      travelLedger = createPlayerTravelLedger(snapshot.seed);
       expeditionNumber = 1;
       preparedKnowledgeObjectId = null;
       selectedKnowledgeMapOriginCityId = null;
@@ -661,6 +677,16 @@ function render() {
     );
     const effectiveStopLifecycle = outcome.stopLifecycle ?? stopLifecycle;
     const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
+    const recordedTravel = recordExpeditionTravelProgress(travelLedger, {
+      expeditionNumber,
+      originCityId: startCity.id,
+      routeCommands: route.authoritativeRoute.segments.map((segment) => ({
+        bearingDeg: segment.bearingDeg,
+        distanceMeters: segment.distanceMeters,
+      })),
+      traveledDistanceMeters: route.position.traveledDistanceMeters,
+    });
+    travelLedger = recordedTravel.ledger;
     const rumorSearch = createRumorSearchSnapshot(
       snapshot.seed,
       startCity,
@@ -732,7 +758,7 @@ function render() {
     timeOutput.textContent = formatElapsed(elapsedSeconds);
     routeSummary.textContent = formatRouteSummary(route);
     renderRumorSearch(rumorSearch, effectiveDoctrine, outcome);
-    renderDiscoveryLedger(discoveryLedger, snapshot);
+    renderDiscoveryLedger(discoveryLedger, travelLedger, snapshot);
     renderCaravanStatus(caravanStatus);
     renderExpeditionOutcome(outcome);
     renderMonsterContact(monsterContact, outcome);
@@ -854,6 +880,17 @@ function resetSimulationClock() {
   elapsedSeconds = 0;
   resumedDiscoveryObjectId = null;
   timeSlider.value = "0";
+}
+
+/** Starts a distinct expedition before replacing a route that already moved. */
+function beginNewExpeditionIfTravelled() {
+  if (
+    travelLedger.tracks.some(
+      (track) => track.expeditionNumber === expeditionNumber,
+    )
+  ) {
+    expeditionNumber += 1;
+  }
 }
 
 /** @returns {void} */
@@ -1427,28 +1464,32 @@ function renderRumorSearch(search, doctrine, outcome) {
 
 /**
  * @param {import("../sim-core/dist/src/index.js").PlayerDiscoveryLedger} ledger
+ * @param {import("../sim-core/dist/src/index.js").PlayerTravelLedger} travel
  * @param {ReturnType<typeof createDebugMapSnapshot>} snapshot
  */
-function renderDiscoveryLedger(ledger, snapshot) {
+function renderDiscoveryLedger(ledger, travel, snapshot) {
   if (
     selectedKnowledgeMapOriginCityId !== null &&
-    !ledger.entries.some(
-      (entry) =>
-        entry.firstObservation.originCityId ===
-        selectedKnowledgeMapOriginCityId,
-    )
+    ![
+      ...ledger.entries.map(
+        (entry) => entry.firstObservation.originCityId,
+      ),
+      ...travel.tracks.map((track) => track.originCityId),
+    ].includes(selectedKnowledgeMapOriginCityId)
   ) {
     selectedKnowledgeMapOriginCityId = null;
   }
   const map = createSessionKnowledgeMapSnapshot(
     ledger,
     selectedKnowledgeMapOriginCityId,
+    travel,
   );
   selectedKnowledgeMapOriginCityId = map.originCityId;
   syncKnowledgeMapOriginOptions(map, snapshot.cities);
   drawSessionKnowledgeMap(map, snapshot.cities);
 
   knowledgeCount.textContent = String(ledger.entries.length);
+  knowledgeTrackCount.textContent = `Путей: ${travel.tracks.length}`;
   knowledgeExpedition.textContent = `Экспедиция #${expeditionNumber}`;
   const preparedEntry = ledger.entries.find(
     (entry) => entry.objectId === preparedKnowledgeObjectId,
@@ -1520,7 +1561,7 @@ function syncKnowledgeMapOriginOptions(map, cities) {
   if (map.originCityIds.length === 0) {
     const empty = document.createElement("option");
     empty.value = "";
-    empty.textContent = "Нет открытий";
+    empty.textContent = "Нет данных";
     knowledgeMapOrigin.replaceChildren(empty);
     knowledgeMapOrigin.disabled = true;
     return;
@@ -1552,9 +1593,9 @@ function drawSessionKnowledgeMap(map, cities) {
       x: KNOWLEDGE_MAP_WIDTH / 2,
       y: KNOWLEDGE_MAP_HEIGHT / 2,
     });
-    empty.textContent = "Подтверждённых открытий пока нет";
+    empty.textContent = "Открытий и пройденных путей пока нет";
     knowledgeMap.append(empty);
-    knowledgeMapScale.textContent = "Масштаб появится после открытия";
+    knowledgeMapScale.textContent = "Масштаб появится после движения";
     return;
   }
 
@@ -1584,6 +1625,44 @@ function drawSessionKnowledgeMap(map, cities) {
       y2: map.origin.y + map.radiusPixels,
     }),
   );
+
+  for (const track of map.tracks) {
+    const points = track.points
+      .map((point) => `${point.x},${point.y}`)
+      .join(" ");
+    const corridor = svgElement("polyline", {
+      class: "knowledge-map-corridor",
+      points,
+    });
+    const path = svgElement("polyline", {
+      class: "knowledge-map-track",
+      points,
+      "data-current": String(
+        track.expeditionNumber === expeditionNumber,
+      ),
+    });
+    path.append(
+      svgTitle(
+        `Экспедиция #${track.expeditionNumber} · пройдено ${formatNumber(track.traveledDistanceMeters / 1_000, 2)} км`,
+      ),
+    );
+    const end = track.points.at(-1);
+    knowledgeMap.append(corridor, path);
+    if (end) {
+      const endMarker = svgElement("circle", {
+        class: "knowledge-map-track-end",
+        cx: end.x,
+        cy: end.y,
+        r: 3.5,
+      });
+      endMarker.append(
+        svgTitle(
+          `Конец пройденного пути экспедиции #${track.expeditionNumber}`,
+        ),
+      );
+      knowledgeMap.append(endMarker);
+    }
+  }
 
   for (const entry of map.entries) {
     const rightSide = entry.x >= map.origin.x;
@@ -1639,7 +1718,7 @@ function drawSessionKnowledgeMap(map, cities) {
   originLabel.textContent = city?.name ?? map.originCityId;
   knowledgeMap.append(origin, originLabel);
 
-  knowledgeMapScale.textContent = `Радиус ${formatNumber(map.scaleRadiusMeters / 1_000, 2)} км · точек ${map.entries.length}`;
+  knowledgeMapScale.textContent = `Радиус ${formatNumber(map.scaleRadiusMeters / 1_000, 2)} км · точек ${map.entries.length} · путей ${map.tracks.length}`;
 }
 
 /**

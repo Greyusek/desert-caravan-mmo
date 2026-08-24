@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 27 · GAME-013</p>
+          <p class="eyebrow">Checkpoint 28 · GAME-014</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -166,24 +166,25 @@
       <section class="knowledge-panel" aria-labelledby="knowledge-title">
         <div class="knowledge-heading">
           <div>
-            <p class="section-kicker">GAME-013 · Session knowledge map</p>
+            <p class="section-kicker">GAME-014 · Travelled corridors</p>
             <h2 id="knowledge-title">Журнал знаний игрока</h2>
           </div>
           <div class="knowledge-counters">
             <output id="knowledge-expedition">Экспедиция #1</output>
             <output id="knowledge-count">0</output>
+            <output id="knowledge-track-count">Путей: 0</output>
           </div>
         </div>
         <article class="knowledge-map-card" aria-labelledby="knowledge-map-title">
           <div class="knowledge-map-heading">
             <div>
               <p class="section-kicker">Coordinate-free · North-up</p>
-              <h3 id="knowledge-map-title">Личная карта открытий</h3>
+              <h3 id="knowledge-map-title">Личная карта знаний и путей</h3>
             </div>
             <label>
               Опорный город
               <select id="knowledge-map-origin" aria-label="Опорный город личной карты" disabled>
-                <option value="">Нет открытий</option>
+                <option value="">Нет данных</option>
               </select>
             </label>
           </div>
@@ -192,16 +193,17 @@
               id="knowledge-map"
               viewBox="0 0 520 300"
               role="img"
-              aria-label="Личная north-up карта подтверждённых открытий без абсолютных координат"
+              aria-label="Личная north-up карта подтверждённых открытий и пройденных путей без абсолютных координат"
             ></svg>
           </div>
           <div class="knowledge-map-meta">
             <span aria-label="Север сверху">↑ N</span>
-            <output id="knowledge-map-scale">Масштаб появится после открытия</output>
+            <output id="knowledge-map-scale">Масштаб появится после движения</output>
           </div>
           <p id="knowledge-map-note" class="knowledge-map-note">
             Независимые городские привязки не склеиваются скрытыми координатами.
-            Маркеры вычисляются только из личных азимута и расстояния.
+            Маркеры и коридоры вычисляются только из личных азимутов и
+            фактически пройденных расстояний; будущий маршрут не показывается.
           </p>
         </article>
         <p id="knowledge-empty" class="knowledge-empty">
@@ -215,8 +217,9 @@
               Повторный маршрут ещё не подготовлен.
             </output>
             <p>
-              Только память текущей вкладки: без localStorage, базы данных,
-              глобальной синхронизации и абсолютных координат.
+              Только память текущей вкладки: открытия и пройденные коридоры без
+              localStorage, базы данных, глобальной синхронизации и абсолютных
+              координат.
             </p>
           </div>
           <button id="knowledge-reset" type="button">
