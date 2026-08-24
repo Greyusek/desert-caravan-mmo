@@ -7,8 +7,10 @@ import {
   findFirstCityArrival,
   greatCircleDistance,
   planEmergencySupplyReturn,
+  planEmergencySupplyReturnDuringIdleStop,
   projectSupplies,
   timeToSupplyEmergencyThreshold,
+  timeToSupplyEmergencyThresholdDuringIdleStop,
 } from "../dist/src/index.js";
 
 const start = createWorldCoordinate(0, 0);
@@ -203,4 +205,146 @@ test("GAME-017: doctrine and threshold fraction are validated", () => {
       /remainingFraction/,
     );
   }
+});
+
+const idleEmergencyProfile = {
+  moving: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+  idle: { foodUnitsPerHour: 25, waterUnitsPerHour: 25 },
+};
+
+test("GAME-018: the original-stock 50% boundary is exact inside STOP", () => {
+  const threshold = timeToSupplyEmergencyThresholdDuringIdleStop(
+    { foodUnits: 100, waterUnits: 100 },
+    idleEmergencyProfile,
+    2_000,
+    3 * 3_600,
+  );
+
+  assert.deepEqual(threshold, {
+    atSeconds: 9_200,
+    routeAtSeconds: 2_000,
+    idleElapsedSeconds: 7_200,
+    cause: "both",
+    remainingFraction: 0.5,
+    foodRemaining: 50,
+    waterRemaining: 50,
+  });
+});
+
+test("GAME-018: RETURN cuts the remaining wait at the STOP coordinate", () => {
+  const route = createRoutePlan(
+    start,
+    [{ bearingDeg: 90, distanceMeters: 100_000 }],
+    10,
+  );
+  const plan = planEmergencySupplyReturnDuringIdleStop(
+    route,
+    { foodUnits: 100, waterUnits: 100 },
+    idleEmergencyProfile,
+    "RETURN_TO_ORIGIN",
+    2_000,
+    3 * 3_600,
+  );
+
+  assert.equal(plan.triggersDuringIdleStop, true);
+  assert.equal(plan.interruptsIdleStop, true);
+  assert.equal(plan.scheduledIdleDurationSeconds, 10_800);
+  assert.equal(plan.effectiveIdleDurationSeconds, 7_200);
+  assert.equal(plan.triggerRouteDistanceMeters, 20_000);
+  assert.equal(plan.effectiveRoute.segments.length, 2);
+  approx(plan.returnDistanceMeters, 20_000, 1e-7);
+  approx(plan.returnToOriginAtRouteSeconds, 4_000, 1e-6);
+  approx(plan.returnToOriginAtExpeditionSeconds, 11_200, 1e-6);
+  approx(greatCircleDistance(plan.effectiveRoute.end, start), 0, 1e-6);
+});
+
+test("GAME-018: CONTINUE records the idle boundary and keeps the full wait", () => {
+  const route = createRoutePlan(
+    start,
+    [{ bearingDeg: 90, distanceMeters: 100_000 }],
+    10,
+  );
+  const plan = planEmergencySupplyReturnDuringIdleStop(
+    route,
+    { foodUnits: 100, waterUnits: 100 },
+    idleEmergencyProfile,
+    "CONTINUE",
+    2_000,
+    3 * 3_600,
+  );
+
+  assert.equal(plan.triggersDuringIdleStop, true);
+  assert.equal(plan.interruptsIdleStop, false);
+  assert.equal(plan.effectiveIdleDurationSeconds, 10_800);
+  assert.equal(plan.effectiveRoute, route);
+  assert.equal(plan.returnSegmentIndex, null);
+});
+
+test("GAME-018: a moving threshold before STOP is not emitted a second time", () => {
+  const threshold = timeToSupplyEmergencyThresholdDuringIdleStop(
+    { foodUnits: 100, waterUnits: 100 },
+    {
+      moving: { foodUnitsPerHour: 100, waterUnitsPerHour: 0 },
+      idle: { foodUnitsPerHour: 25, waterUnitsPerHour: 25 },
+    },
+    2_000,
+    3 * 3_600,
+  );
+
+  assert.equal(threshold, null);
+});
+
+test("GAME-018: a threshold tied with STOP triggers at zero idle time", () => {
+  const route = createRoutePlan(
+    start,
+    [{ bearingDeg: 90, distanceMeters: 100_000 }],
+    10,
+  );
+  const plan = planEmergencySupplyReturnDuringIdleStop(
+    route,
+    { foodUnits: 100, waterUnits: 1_000 },
+    {
+      moving: { foodUnitsPerHour: 90, waterUnitsPerHour: 0 },
+      idle: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+    },
+    "RETURN_TO_ORIGIN",
+    2_000,
+    3_600,
+  );
+
+  assert.equal(plan.threshold?.idleElapsedSeconds, 0);
+  assert.equal(plan.threshold?.atSeconds, 2_000);
+  assert.equal(plan.effectiveIdleDurationSeconds, 0);
+  assert.equal(plan.interruptsIdleStop, true);
+});
+
+test("GAME-018: STOP route time and duration are validated", () => {
+  const route = createRoutePlan(
+    start,
+    [{ bearingDeg: 90, distanceMeters: 1_000 }],
+    10,
+  );
+
+  assert.throws(
+    () =>
+      planEmergencySupplyReturnDuringIdleStop(
+        route,
+        { foodUnits: 100, waterUnits: 100 },
+        idleEmergencyProfile,
+        "RETURN_TO_ORIGIN",
+        route.totalDurationSeconds + 1,
+        3_600,
+      ),
+    /stopAtRouteSeconds must not exceed route total duration/,
+  );
+  assert.throws(
+    () =>
+      timeToSupplyEmergencyThresholdDuringIdleStop(
+        { foodUnits: 100, waterUnits: 100 },
+        idleEmergencyProfile,
+        0,
+        -1,
+      ),
+    /idleDurationSeconds must be a non-negative finite number/,
+  );
 });

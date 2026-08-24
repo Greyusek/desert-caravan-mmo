@@ -128,6 +128,10 @@ const supplyEmergencyDevRoute = requireElement(
   "supply-emergency-dev-route",
   HTMLButtonElement,
 );
+const supplyEmergencyIdleDevRoute = requireElement(
+  "supply-emergency-idle-dev-route",
+  HTMLButtonElement,
+);
 const eventLogCount = requireElement("event-log-count", HTMLOutputElement);
 const eventLogNext = requireElement("event-log-next", HTMLParagraphElement);
 const eventLogList = requireElement("event-log-list", HTMLOListElement);
@@ -519,6 +523,7 @@ supplyEmergencyDevRoute.addEventListener("click", () => {
   pauseSimulationClock();
   if (
     activeSupplyEmergency?.appliesReturn &&
+    activeSupplyEmergency.triggerActivity === "moving" &&
     activeSupplyEmergency.triggerAtSeconds !== null &&
     elapsedSeconds + 1e-9 < activeSupplyEmergency.triggerAtSeconds
   ) {
@@ -529,6 +534,7 @@ supplyEmergencyDevRoute.addEventListener("click", () => {
   }
   if (
     activeSupplyEmergency?.status === "returning" &&
+    activeSupplyEmergency.triggerActivity === "moving" &&
     activeOutcome
   ) {
     elapsedSeconds = activeOutcome.planned.atSeconds;
@@ -561,6 +567,62 @@ supplyEmergencyDevRoute.addEventListener("click", () => {
   );
   if (weakMonster) contactMonsterSelect.value = weakMonster.id;
   resetSimulationClock();
+  render();
+});
+
+supplyEmergencyIdleDevRoute.addEventListener("click", () => {
+  pauseSimulationClock();
+  if (
+    activeSupplyEmergency?.appliesReturn &&
+    activeSupplyEmergency.triggerActivity === "idle" &&
+    activeSupplyEmergency.triggerAtSeconds !== null &&
+    elapsedSeconds + 1e-9 < activeSupplyEmergency.triggerAtSeconds
+  ) {
+    elapsedSeconds = activeSupplyEmergency.triggerAtSeconds;
+    timeSlider.value = String(elapsedSeconds);
+    render();
+    return;
+  }
+  if (
+    activeSupplyEmergency?.status === "returning" &&
+    activeSupplyEmergency.triggerActivity === "idle" &&
+    activeOutcome
+  ) {
+    elapsedSeconds = activeOutcome.planned.atSeconds;
+    timeSlider.value = String(elapsedSeconds);
+    render();
+    return;
+  }
+  if (!activeRumorSearch) return;
+
+  beginNewExpeditionIfTravelled();
+  stationaryStopQaEnabled = false;
+  preparedKnowledgeObjectId = null;
+  const { exactBearingDeg, exactDistanceKilometers, target } =
+    activeRumorSearch.serverTruth;
+  routeSpeed.value = "5";
+  routeBearingInputs.forEach((input, index) => {
+    input.value = index === 0 ? exactBearingDeg.toFixed(6) : "0";
+  });
+  routeDistanceInputs.forEach((input, index) => {
+    input.value = index === 0 ? exactDistanceKilometers.toFixed(6) : "0";
+  });
+  doctrineStop.checked = true;
+  stopIdleHours.value = "6";
+  initialFood.value = "100";
+  initialWater.value = "100";
+  movingFoodRate.value = "0";
+  movingWaterRate.value = "0";
+  idleFoodRate.value = "25";
+  idleWaterRate.value = "25";
+  supplySettings = readSupplySettings();
+  supplyDoctrineReturn.checked = true;
+  const weakMonster = activeSnapshot?.monsters.find(
+    (monster) => monster.power < 100,
+  );
+  if (weakMonster) contactMonsterSelect.value = weakMonster.id;
+  resetSimulationClock();
+  resumedDiscoveryObjectId = target.id;
   render();
 });
 
@@ -698,34 +760,8 @@ function render() {
       preEmergencyRumorSearch,
       readDiscoveryDoctrine(),
     );
-    const pauseBeforeEmergencyAtSeconds = stopLifecycle?.stopAtRouteSeconds ??
-      (preEmergencyDoctrine.status === "stopped"
-        ? preEmergencyDoctrine.decision?.decidedAtSeconds ?? null
-        : null);
-    const supplyEmergency = createEmergencySupplyDoctrineSnapshot(
-      plannedRoute,
-      supplySettings.initial,
-      supplySettings.profile,
-      readSupplyEmergencyDoctrine(),
-      pauseBeforeEmergencyAtSeconds,
-    );
-    const executionRoute = supplyEmergency.effectiveRoute;
-    const executionStopLifecycle = supplyEmergency.appliesReturn
-      ? null
-      : stopLifecycle;
-    const plannedRumorSearch = createRumorSearchSnapshot(
-      snapshot.seed,
-      startCity,
-      executionRoute,
-      knownObjectIds,
-    );
-    const proposedDoctrine = createDiscoveryDoctrineSnapshot(
-      executionRoute,
-      plannedRumorSearch,
-      readDiscoveryDoctrine(),
-    );
-    const proposedResume = createDiscoveryResumeSnapshot(
-      proposedDoctrine,
+    const preEmergencyResume = createDiscoveryResumeSnapshot(
+      preEmergencyDoctrine,
       resumedDiscoveryObjectId,
     );
     let selectedMonster = snapshot.monsters.find(
@@ -755,13 +791,45 @@ function render() {
       }
       selectedMonster = qaMonster;
     }
-    const monsterContact = selectedMonster
+    const strongMonsterDoctrine = readStrongMonsterDoctrine();
+    const fleeSpeedMetersPerSecond = contactFleeSpeed.valueAsNumber / 3.6;
+    const preEmergencyMonsterContact = selectedMonster
       ? createMonsterContactSnapshot(
-          executionRoute,
+          plannedRoute,
           selectedMonster,
-          executionStopLifecycle,
+          stopLifecycle,
         )
       : null;
+    const preEmergencyOutcome = createExpeditionOutcomeSnapshot(
+      plannedRoute,
+      supplySettings.initial,
+      supplySettings.profile,
+      preEmergencyResume ?? preEmergencyDoctrine,
+      preEmergencyMonsterContact,
+      strongMonsterDoctrine,
+      fleeSpeedMetersPerSecond,
+      cityTimelineDestination,
+      stopLifecycle,
+    );
+    const blockingExpeditionAtSeconds =
+      preEmergencyOutcome.stopInterruptedByContact ||
+        preEmergencyOutcome.failureReason === "monster"
+        ? preEmergencyOutcome.monsterContact?.expeditionElapsedSeconds ?? null
+        : null;
+    const pauseBeforeEmergencyAtSeconds = stopLifecycle?.stopAtRouteSeconds ??
+      (preEmergencyDoctrine.status === "stopped"
+        ? preEmergencyDoctrine.decision?.decidedAtSeconds ?? null
+        : null);
+    const supplyEmergency = createEmergencySupplyDoctrineSnapshot(
+      plannedRoute,
+      supplySettings.initial,
+      supplySettings.profile,
+      readSupplyEmergencyDoctrine(),
+      pauseBeforeEmergencyAtSeconds,
+      stopLifecycle,
+      blockingExpeditionAtSeconds,
+    );
+    const executionRoute = supplyEmergency.effectiveRoute;
     const effectiveDestinationCity = supplyEmergency.appliesReturn
       ? startCity
       : destinationCity;
@@ -769,16 +837,52 @@ function render() {
       executionRoute,
       effectiveDestinationCity,
     );
+    const executionStopLifecycle = supplyEmergency.appliesReturn
+      ? supplyEmergency.triggerActivity === "idle" && lifecycleResume
+        ? createDiscoveryStopLifecycleSnapshot(
+            executionRoute,
+            supplySettings.initial,
+            supplySettings.profile,
+            lifecycleResume,
+            supplyEmergency.effectiveIdleDurationSeconds,
+            elapsedSeconds,
+            cityDestination,
+          )
+        : null
+      : stopLifecycle;
+    const plannedRumorSearch = createRumorSearchSnapshot(
+      snapshot.seed,
+      startCity,
+      executionRoute,
+      knownObjectIds,
+    );
+    const proposedDoctrine = createDiscoveryDoctrineSnapshot(
+      executionRoute,
+      plannedRumorSearch,
+      readDiscoveryDoctrine(),
+    );
+    const proposedResume = createDiscoveryResumeSnapshot(
+      proposedDoctrine,
+      resumedDiscoveryObjectId,
+    );
+    const monsterContact = selectedMonster
+      ? createMonsterContactSnapshot(
+          executionRoute,
+          selectedMonster,
+          executionStopLifecycle,
+        )
+      : null;
     const outcome = createExpeditionOutcomeSnapshot(
       executionRoute,
       supplySettings.initial,
       supplySettings.profile,
       proposedResume ?? proposedDoctrine,
       monsterContact,
-      readStrongMonsterDoctrine(),
-      contactFleeSpeed.valueAsNumber / 3.6,
+      strongMonsterDoctrine,
+      fleeSpeedMetersPerSecond,
       cityDestination,
       executionStopLifecycle,
+      supplyEmergency,
     );
     const effectiveStopLifecycle =
       outcome.stopLifecycle ?? executionStopLifecycle;
@@ -873,7 +977,12 @@ function render() {
     monsterCount.textContent = String(snapshot.monsters.length);
     timeOutput.textContent = formatElapsed(elapsedSeconds);
     routeSummary.textContent = formatRouteSummary(route);
-    renderRumorSearch(rumorSearch, effectiveDoctrine, outcome);
+    renderRumorSearch(
+      rumorSearch,
+      effectiveDoctrine,
+      outcome,
+      supplyEmergency,
+    );
     renderDiscoveryLedger(discoveryLedger, travelLedger, snapshot);
     renderCaravanStatus(caravanStatus);
     renderSupplyEmergencyDoctrine(supplyEmergency, startCity, outcome);
@@ -1416,7 +1525,9 @@ function eventTitle(event) {
   if (event.kind === "route-resumed") {
     return event.resumeReason === "monster-contact"
       ? "FLEE прервал стоянку"
-      : "Маршрут возобновлён";
+      : event.resumeReason === "supply-emergency"
+        ? "Аварийный возврат прервал стоянку"
+        : "Маршрут возобновлён";
   }
   if (event.kind === "monster-contact") {
     if (event.powerResolutionStatus === "monster-defeated") {
@@ -1458,9 +1569,12 @@ function eventDetail(event, route) {
   if (event.kind === "supplies-emergency-doctrine") {
     const threshold = `${formatNumber((event.remainingFraction ?? 0.5) * 100, 0)}%`;
     const cause = formatDepletionCause(event.cause);
+    const activity = event.supplyEmergencyActivity === "idle"
+      ? "на стоянке"
+      : "в пути";
     return event.supplyEmergencyDoctrine === "RETURN_TO_ORIGIN"
-      ? `${cause} · ${threshold} · ${formatNumber(event.returnDistanceKilometers ?? 0, 1)} км напрямую до города старта`
-      : `${cause} · ${threshold} · исходный маршрут сохранён`;
+      ? `${cause} · ${threshold} ${activity} · ${formatNumber(event.returnDistanceKilometers ?? 0, 1)} км напрямую до города старта`
+      : `${cause} · ${threshold} ${activity} · исходный маршрут сохранён`;
   }
   if (event.kind === "supplies-low") {
     return "Порог раннего предупреждения";
@@ -1482,7 +1596,9 @@ function eventDetail(event, route) {
   if (event.kind === "route-resumed") {
     return event.resumeReason === "monster-contact"
       ? `Патруль вынудил начать отход после ${formatDuration(event.idleDurationSeconds ?? 0)} стоянки · исходный маршрут открыт`
-      : `${event.idleDurationSeconds ? `Стоянка ${formatDuration(event.idleDurationSeconds)} завершена · ` : ""}${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
+      : event.resumeReason === "supply-emergency"
+        ? `50% критического ресурса после ${formatDuration(event.idleDurationSeconds ?? 0)} стоянки · курс на город старта`
+        : `${event.idleDurationSeconds ? `Стоянка ${formatDuration(event.idleDurationSeconds)} завершена · ` : ""}${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
   }
   if (event.kind === "monster-contact") {
     const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
@@ -1520,8 +1636,9 @@ function eventDetail(event, route) {
  * @param {ReturnType<typeof createRumorSearchSnapshot>} search
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | NonNullable<ReturnType<typeof createDiscoveryResumeSnapshot>>} doctrine
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
+ * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot>} supplyEmergency
  */
-function renderRumorSearch(search, doctrine, outcome) {
+function renderRumorSearch(search, doctrine, outcome, supplyEmergency) {
   const knownTarget = search.targetKnowledge === "known";
   const waiting = outcome.phase === "idle-at-stop";
   const idleFailure =
@@ -1530,6 +1647,7 @@ function renderRumorSearch(search, doctrine, outcome) {
     doctrine.status === "resumed-and-continuing" &&
     !waiting &&
     !idleFailure;
+  const supplyInterrupted = outcome.stopInterruptedBySupplyEmergency;
   rumorPanel.dataset.state = search.status;
   rumorPanel.dataset.knowledge = search.targetKnowledge;
   if (search.status === "found") {
@@ -1540,7 +1658,9 @@ function renderRumorSearch(search, doctrine, outcome) {
         : waiting
           ? "Стоянка у цели"
           : resumed
-            ? "Маршрут возобновлён"
+            ? supplyInterrupted
+              ? "Аварийный возврат из STOP"
+              : "Маршрут возобновлён"
             : doctrine.status === "stopped"
               ? "Караван остановлен"
               : "Цель отмечена";
@@ -1564,10 +1684,12 @@ function renderRumorSearch(search, doctrine, outcome) {
         ? `STOP выполнена, но критические запасы исчерпались во время стоянки до возобновления.`
         : waiting
           ? `STOP выполнена: стоянка ${formatDuration(outcome.idleElapsedSeconds)} / ${formatDuration(outcome.idleDurationSeconds)}, маршрутное время заморожено.`
-          : resumed
+        : resumed
         ? outcome.stopInterruptedByContact
           ? `STOP исполнена, но патруль вынудил досрочно начать FLEE; цель отмечена, исходный маршрут снова открыт.`
-          : `STOP исполнена и явно снята: цель уже отмечена, исходный маршрут снова открыт.`
+          : supplyInterrupted
+            ? `STOP исполнена, но критический запас (${formatDepletionCause(supplyEmergency.threshold?.cause ?? null).toLocaleLowerCase("ru-RU")}) достиг 50% после ${formatDuration(outcome.idleDurationSeconds)}; остаток стоянки отменён, караван возвращается в город старта.`
+            : `STOP исполнена и явно снята: цель уже отмечена, исходный маршрут снова открыт.`
         : doctrine.status === "stopped"
         ? `STOP выполнена: маршрут поставлен на паузу в точке обнаружения.`
         : `MARK_AND_CONTINUE выполнена: цель отмечена, караван продолжает маршрут.`;
@@ -2093,6 +2215,9 @@ function renderCaravanStatus(status) {
   const stopInterruptedByContact = Boolean(
     status.outcome?.stopInterruptedByContact,
   );
+  const stopInterruptedBySupplyEmergency = Boolean(
+    status.outcome?.stopInterruptedBySupplyEmergency,
+  );
   const doctrineContinues =
     status.doctrine?.status === "marked-and-continuing" ||
     status.doctrine?.status === "known-and-continuing";
@@ -2128,7 +2253,9 @@ function renderCaravanStatus(status) {
         : doctrineResumed
           ? stopInterruptedByContact
             ? "FLEE прервал стоянку · в пути"
-            : "Цель отмечена · маршрут возобновлён"
+            : stopInterruptedBySupplyEmergency
+              ? "50% запасов · возврат в город"
+              : "Цель отмечена · маршрут возобновлён"
         : doctrineContinues
           ? knownTargetContinues
             ? "Известная цель подтверждена · в пути"
@@ -2231,21 +2358,29 @@ function renderCaravanStatus(status) {
       ? "Запасов не хватит на стоянку"
       : stopInterruptedByContact
         ? "Патруль прервёт стоянку"
-      : "Идёт стоянка у цели";
+        : stopInterruptedBySupplyEmergency
+          ? "50% запасов прервут стоянку"
+          : "Идёт стоянка у цели";
     forecastDetail.textContent = monsterWillDefeat
       ? `Контакт на ${formatElapsed(status.outcome?.planned.atSeconds ?? 0)} завершит экспедицию выбранной доктриной.`
       : fatalSupplyBeforeResume
       ? `${formatDepletionCause(status.outcome?.planned.failureCause ?? null)} закончатся на ${formatElapsed(status.outcome?.planned.atSeconds ?? 0)} до возобновления.`
       : stopInterruptedByContact
         ? `Успешный FLEE начнётся на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)} и отменит остаток ожидания.`
-      : `Маршрутное время заморожено; idle-расход действует до ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}.`;
+        : stopInterruptedBySupplyEmergency
+          ? `RETURN_TO_ORIGIN сработает на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)} и отменит остаток ожидания.`
+          : `Маршрутное время заморожено; idle-расход действует до ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}.`;
   } else if (doctrineResumed) {
     forecastTitle.textContent = stopInterruptedByContact
       ? "Стоянка прервана патрулём"
-      : "Маршрут возобновлён";
+      : stopInterruptedBySupplyEmergency
+        ? "Стоянка прервана на пороге 50%"
+        : "Маршрут возобновлён";
     forecastDetail.textContent = stopInterruptedByContact
       ? `Успешный FLEE начался на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}; учтено только ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)} фактической стоянки.`
-      : "Найденная цель уже отмечена и не создаст повторный STOP; следующие границы рассчитываются по исходному маршруту.";
+      : stopInterruptedBySupplyEmergency
+        ? `Учтено ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)} фактической стоянки; караван возвращается в город старта.`
+        : "Найденная цель уже отмечена и не создаст повторный STOP; следующие границы рассчитываются по исходному маршруту.";
   } else if (monsterVictoryOccurred) {
     forecastTitle.textContent = "Слабый патруль уничтожен";
     forecastDetail.textContent = `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} > Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; караван продолжает маршрут.`;
@@ -2270,45 +2405,61 @@ function renderCaravanStatus(status) {
  */
 function renderSupplyEmergencyDoctrine(emergency, startCity, outcome) {
   const cause = formatDepletionCause(emergency.threshold?.cause ?? null);
+  const idleTrigger = emergency.triggerActivity === "idle";
+  const triggerButton = idleTrigger
+    ? supplyEmergencyIdleDevRoute
+    : supplyEmergencyDevRoute;
   const completedReturn =
     emergency.appliesReturn && outcome.status === "completed";
+  supplyEmergencyDevRoute.textContent = "DEV: возврат в пути";
+  supplyEmergencyIdleDevRoute.textContent = "DEV: возврат из STOP";
 
   if (completedReturn) {
     supplyDoctrineResult.textContent =
-      `Аварийный возврат завершён: караван вошёл в радиус ${startCity.name}.`;
-    supplyEmergencyDevRoute.textContent = "DEV: новый тест возврата";
+      `Аварийный возврат${idleTrigger ? " из STOP" : ""} завершён: караван вошёл в радиус ${startCity.name}.`;
+    triggerButton.textContent = idleTrigger
+      ? "DEV: новый STOP-возврат"
+      : "DEV: новый тест возврата";
     return;
   }
   if (emergency.status === "not-triggered") {
     supplyDoctrineResult.textContent =
-      "До планового финиша ни один критический ресурс не падает до 50%.";
-    supplyEmergencyDevRoute.textContent = "DEV: проверить возврат";
+      "До первой границы исполнения ни один критический ресурс не падает до 50%.";
     return;
   }
   if (emergency.status === "blocked-by-earlier-pause") {
     supplyDoctrineResult.textContent =
-      "Раньше срабатывает discovery STOP; этот первый срез не отменяет запланированную idle-стоянку.";
-    supplyEmergencyDevRoute.textContent = "DEV: проверить возврат";
+      "Раньше срабатывает discovery STOP; moving-порог не отменяет запланированную idle-стоянку.";
+    return;
+  }
+  if (emergency.status === "blocked-by-earlier-boundary") {
+    supplyDoctrineResult.textContent =
+      `Контакт с опасным патрулём на ${formatElapsed(emergency.blockingExpeditionAtSeconds ?? 0)} меняет исполнение раньше idle-порога 50%.`;
     return;
   }
   if (emergency.status === "pending") {
+    const activityDetail = idleTrigger
+      ? ` после ${formatDuration((emergency.triggerAtSeconds ?? 0) - (emergency.triggerAtRouteSeconds ?? 0))} стоянки`
+      : " в пути";
     supplyDoctrineResult.textContent = emergency.appliesReturn
-      ? `${cause} достигнут 50% на ${formatElapsed(emergency.triggerAtSeconds ?? 0)}; затем ${formatNumber(emergency.returnDistanceKilometers ?? 0, 1)} км напрямую до ${startCity.name}.`
-      : `${cause} достигнут 50% на ${formatElapsed(emergency.triggerAtSeconds ?? 0)}; доктрина CONTINUE сохранит исходный маршрут.`;
-    supplyEmergencyDevRoute.textContent = "DEV: к порогу 50%";
+      ? `${cause} достигнут 50%${activityDetail} на ${formatElapsed(emergency.triggerAtSeconds ?? 0)}; затем ${formatNumber(emergency.returnDistanceKilometers ?? 0, 1)} км напрямую до ${startCity.name}.`
+      : `${cause} достигнут 50%${activityDetail} на ${formatElapsed(emergency.triggerAtSeconds ?? 0)}; доктрина CONTINUE сохранит исходный маршрут${idleTrigger ? " и полную стоянку" : ""}.`;
+    triggerButton.textContent = "DEV: к порогу 50%";
     return;
   }
   if (emergency.status === "returning") {
     caravanStateLabel.textContent = `Аварийный возврат · ${startCity.name}`;
     supplyDoctrineResult.textContent =
-      `${cause} достигнут 50%; будущие сегменты отменены, караван возвращается напрямую.`;
-    supplyEmergencyDevRoute.textContent = "DEV: к городу";
+      `${cause} достигнут 50%; ${idleTrigger ? "остаток STOP и будущие сегменты отменены" : "будущие сегменты отменены"}, караван возвращается напрямую.`;
+    triggerButton.textContent = "DEV: к городу";
     return;
   }
 
   supplyDoctrineResult.textContent =
-    `${cause} достигнут 50%; CONTINUE оставил исходный маршрут без изменений.`;
-  supplyEmergencyDevRoute.textContent = "DEV: новый тест возврата";
+    `${cause} достигнут 50%; CONTINUE оставил ${idleTrigger ? "полную стоянку и " : ""}исходный маршрут без изменений.`;
+  triggerButton.textContent = idleTrigger
+    ? "DEV: новый STOP-возврат"
+    : "DEV: новый тест возврата";
 }
 
 /**
@@ -2328,6 +2479,8 @@ function renderExpeditionOutcome(outcome) {
     if (outcome.phase === "idle-at-stop") {
       const patrolWillInterrupt = outcome.stopInterruptedByContact;
       const monsterWillDefeat = outcome.failureReason === "monster";
+      const supplyWillInterrupt =
+        outcome.stopInterruptedBySupplyEmergency;
       const fatalSupplyBeforeResume =
         !monsterWillDefeat &&
         outcome.resumeAtSeconds !== null &&
@@ -2341,14 +2494,18 @@ function renderExpeditionOutcome(outcome) {
         ? "Караван не переживёт стоянку"
         : patrolWillInterrupt
           ? "Патруль прервёт стоянку"
-        : "Караван ждёт у найденной цели";
+        : supplyWillInterrupt
+          ? "50% запасов прервут стоянку"
+          : "Караван ждёт у найденной цели";
       outcomeAction.textContent = monsterWillDefeat
         ? "DEV: к контакту"
         : fatalSupplyBeforeResume
         ? "DEV: к гибели"
         : patrolWillInterrupt
           ? "DEV: к контакту"
-        : "DEV: к возобновлению";
+        : supplyWillInterrupt
+          ? "DEV: к порогу 50%"
+          : "DEV: к возобновлению";
       outcomeDetail.textContent = monsterWillDefeat
         ? outcome.monsterContactResolution?.status === "flee-failed"
           ? "Патруль войдёт в радиус неподвижного каравана; выбранной скорости FLEE не хватит для разрыва дистанции."
@@ -2357,14 +2514,18 @@ function renderExpeditionOutcome(outcome) {
         ? `SIM-006 исчерпает ${formatDepletionCause(outcome.planned.failureCause).toLocaleLowerCase("ru-RU")} до окончания ожидания; маршрут останется в точке STOP.`
         : patrolWillInterrupt
           ? `Караван остаётся неподвижен до входа патруля в радиус; успешный FLEE отменит остаток запланированных ${formatDuration(outcome.scheduledIdleDurationSeconds)}.`
-        : `Прошло ${formatDuration(outcome.idleElapsedSeconds)} из ${formatDuration(outcome.idleDurationSeconds)}; SIM-005 остаётся в точке STOP, SIM-006 расходует idle-запасы.`;
+        : supplyWillInterrupt
+          ? `RETURN_TO_ORIGIN отменит остаток запланированных ${formatDuration(outcome.scheduledIdleDurationSeconds)} на точном пороге 50%; до него SIM-005 остаётся в точке STOP.`
+          : `Прошло ${formatDuration(outcome.idleElapsedSeconds)} из ${formatDuration(outcome.idleDurationSeconds)}; SIM-005 остаётся в точке STOP, SIM-006 расходует idle-запасы.`;
       outcomeCause.textContent = monsterWillDefeat
         ? `Монстр · ${formatElapsed(outcome.planned.atSeconds)}`
         : fatalSupplyBeforeResume
         ? `Гибель · ${formatElapsed(outcome.planned.atSeconds)}`
         : patrolWillInterrupt
           ? `Контакт и FLEE · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`
-        : `Возобновление · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`;
+        : supplyWillInterrupt
+          ? `50% и возврат · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`
+          : `Возобновление · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`;
       return;
     }
     outcomeState.textContent = "В пути";

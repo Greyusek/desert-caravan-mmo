@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 34 · GAME-017</p>
+          <p class="eyebrow">Checkpoint 35 · GAME-018</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -473,7 +473,7 @@
 
         <div class="supply-doctrine-panel">
           <fieldset class="doctrine-control supply-doctrine-control">
-            <legend>GAME-017 · При 50% критического ресурса</legend>
+            <legend>GAME-017/018 · При 50% критического ресурса</legend>
             <label for="supply-doctrine-return">
               <input
                 id="supply-doctrine-return"
@@ -502,11 +502,16 @@
           </fieldset>
           <div class="supply-doctrine-actions">
             <p id="supply-doctrine-result" class="doctrine-result">
-              Аварийная граница будет рассчитана по запасам и moving-расходу.
+              Аварийная граница будет рассчитана по запасам и текущей активности.
             </p>
-            <button id="supply-emergency-dev-route" type="button">
-              DEV: проверить возврат
-            </button>
+            <div class="supply-doctrine-buttons">
+              <button id="supply-emergency-dev-route" type="button">
+                DEV: возврат в пути
+              </button>
+              <button id="supply-emergency-idle-dev-route" type="button">
+                DEV: возврат из STOP
+              </button>
+            </div>
           </div>
         </div>
 

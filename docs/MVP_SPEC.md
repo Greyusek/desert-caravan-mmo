@@ -34,7 +34,7 @@
 - слабый монстр: **90**;
 - сильный монстр: **110**;
 - раннее предупреждение о малом запасе: **25%**;
-- аварийная граница провизии GAME-017: **50%** еды или воды; более ранний порог нужен, чтобы прямой возврат при неизменных скорости и расходе оставался физически достижимым;
+- аварийная граница провизии GAME-017/018: **50%** исходного запаса еды или воды во время движения или discovery `STOP`; более ранний порог нужен, чтобы прямой возврат при неизменных скорости и расходе оставался физически достижимым;
 - production-время: ориентир **1 игровой день ≈ 3–4 реальных часа**, окончательно после playtest;
 - для разработки обязательны ускорения x1 / x10 / x100 / x1000.
 
@@ -272,4 +272,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `CITY-002` — aggregate NPC population consumes city stocks from authoritative world time.
 - [x] `CITY-003` — first shortage deterministically reduces population and later consumption.
 - [x] `GAME-017` — execute `RETURN_TO_ORIGIN | CONTINUE` when food or water reaches 50% during uninterrupted movement.
-- [ ] `GAME-018` — compose the 50% emergency boundary with discovery-STOP idle consumption and depart from the exact stop coordinate.
+- [x] `GAME-018` — compose the 50% emergency boundary with discovery-STOP idle consumption and depart from the exact stop coordinate.
+- [ ] `GAME-019` — establish the first detected-danger boundary and its ordering relative to contact before adding `AVOID | CONTINUE` route replanning.

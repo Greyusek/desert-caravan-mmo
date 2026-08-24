@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.35 — Checkpoint 35
+
+- Added `GAME-018`: the original-expedition 50% food/water boundary now remains active during a scheduled discovery `STOP` and uses the idle consumption profile.
+- Made `RETURN_TO_ORIGIN` cancel only the unelapsed part of the stop, preserve the exact discovery coordinate and replace the future route with one direct origin leg.
+- Kept `CONTINUE` deterministic and non-mutating: it records the same idle decision while preserving the complete wait and original route.
+- Preserved boundary priority: a route-changing stationary monster contact or defeat at the same or an earlier world time blocks the later emergency action; weak contacts do not.
+- Added explicit world-time/route-time fields, effective stop duration, `supply-emergency` resume provenance and moving/idle labels to the DEV map and event log.
+- Added a dedicated three-click `DEV: возврат из STOP` scenario alongside the existing moving-return preset.
+- Added nine GAME-018 regressions; repository verification now runs 303 tests.
+
 ## 0.0.34 — Checkpoint 34
 
 - Added `GAME-017`: food or water reaching the explicit 50% emergency threshold now invokes `RETURN_TO_ORIGIN | CONTINUE` during uninterrupted movement.

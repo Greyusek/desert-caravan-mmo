@@ -21,6 +21,7 @@ import {
   kilometers,
   meters,
   planEmergencySupplyReturn,
+  planEmergencySupplyReturnDuringIdleStop,
   positionAtTime,
   projectCitySettlementAtTime,
   projectCityStocksAtTime,
@@ -46,7 +47,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 34 demo");
+console.log("Desert Caravan MMO — Checkpoint 35 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -479,6 +480,24 @@ console.log(
     : "  emergency return was not triggered",
 );
 
+const idleEmergency = planEmergencySupplyReturnDuringIdleStop(
+  emergencyOutboundRoute,
+  emergencySupplies,
+  {
+    moving: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+    idle: { foodUnitsPerHour: 25, waterUnitsPerHour: 25 },
+  },
+  "RETURN_TO_ORIGIN",
+  2 * 3_600,
+  6 * 3_600,
+);
+console.log("\nGAME-018 emergency doctrine during discovery STOP:");
 console.log(
-  "\nCheckpoint 34 emergency return: npm run debug-map -> http://127.0.0.1:4173",
+  idleEmergency.threshold
+    ? `  ${idleEmergency.threshold.cause} reaches ${(idleEmergency.threshold.remainingFraction * 100).toFixed(0)}% at world T=${(idleEmergency.threshold.atSeconds / 3_600).toFixed(3)} h; idle=${(idleEmergency.effectiveIdleDurationSeconds / 3_600).toFixed(3)} / ${(idleEmergency.scheduledIdleDurationSeconds / 3_600).toFixed(3)} h; direct return=${((idleEmergency.returnDistanceMeters ?? 0) / 1_000).toFixed(3)} km; origin at world T=${((idleEmergency.returnToOriginAtExpeditionSeconds ?? 0) / 3_600).toFixed(3)} h`
+    : "  idle emergency return was not triggered",
+);
+
+console.log(
+  "\nCheckpoint 35 STOP emergency return: npm run debug-map -> http://127.0.0.1:4173",
 );
