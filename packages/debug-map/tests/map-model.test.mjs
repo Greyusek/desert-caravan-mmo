@@ -7,6 +7,8 @@ import {
   CONTACT_ZOOM_WIDTH,
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
+  KNOWLEDGE_MAP_HEIGHT,
+  KNOWLEDGE_MAP_WIDTH,
   SIMULATION_CLOCK_SPEED_MULTIPLIERS,
   advanceSimulationClock,
   applyDiscoveryDoctrineToRoute,
@@ -26,6 +28,7 @@ import {
   createMonsterInterceptRoutePreset,
   createKnownObjectReturnRoutePreset,
   createRumorSearchSnapshot,
+  createSessionKnowledgeMapSnapshot,
   createStationaryStopPatrolPreset,
   projectCoordinate,
   splitPathAtAntimeridian,
@@ -2789,5 +2792,148 @@ test("GAME-012: a return preset requires an existing ledger selection", () => {
         "unknown-object",
       ),
     /known ledger entry/,
+  );
+});
+
+test("GAME-013: confirmed fixes project north-up from one local origin", () => {
+  let ledger = createPlayerDiscoveryLedger("checkpoint-04");
+  for (const [index, fix] of [
+    ["north", "oasis", 0],
+    ["east", "mine", 90],
+    ["south", "ruins", 180],
+    ["west", "cave", 270],
+  ].entries()) {
+    ledger = recordDirectDiscoveryObservation(ledger, {
+      expeditionNumber: 1,
+      objectId: fix[0],
+      objectKind: fix[1],
+      originCityId: "city-01",
+      rumorId: `rumor-${index}`,
+      observedAtSeconds: 1_000 + index,
+      segmentIndex: 0,
+      routeDistanceMeters: 10_000,
+      originBearingDeg: fix[2],
+      originDistanceMeters: 10_000,
+    }).ledger;
+  }
+
+  const map = createSessionKnowledgeMapSnapshot(ledger);
+  assert.equal(map.width, KNOWLEDGE_MAP_WIDTH);
+  assert.equal(map.height, KNOWLEDGE_MAP_HEIGHT);
+  assert.equal(map.originCityId, "city-01");
+  assert.equal(map.scaleRadiusMeters, 10_000);
+  assert.deepEqual(map.origin, { x: 260, y: 150 });
+  const expected = [
+    { objectId: "north", x: 260, y: 34 },
+    { objectId: "east", x: 376, y: 150 },
+    { objectId: "south", x: 260, y: 266 },
+    { objectId: "west", x: 144, y: 150 },
+  ];
+  assert.deepEqual(
+    map.entries.map((entry) => entry.objectId),
+    expected.map((entry) => entry.objectId),
+  );
+  map.entries.forEach((entry, index) => {
+    const target = expected[index];
+    assert.ok(target);
+    approx(entry.x, target.x);
+    approx(entry.y, target.y);
+  });
+});
+
+test("GAME-013: independent city origins remain separate selectable charts", () => {
+  const first = recordDirectDiscoveryObservation(
+    createPlayerDiscoveryLedger("checkpoint-04"),
+    {
+      expeditionNumber: 1,
+      objectId: "mine-a",
+      objectKind: "mine",
+      originCityId: "city-01",
+      rumorId: "rumor-a",
+      observedAtSeconds: 1_000,
+      segmentIndex: 0,
+      routeDistanceMeters: 20_000,
+      originBearingDeg: 45,
+      originDistanceMeters: 20_000,
+    },
+  );
+  const second = recordDirectDiscoveryObservation(first.ledger, {
+    expeditionNumber: 2,
+    objectId: "oasis-b",
+    objectKind: "oasis",
+    originCityId: "city-02",
+    rumorId: "rumor-b",
+    observedAtSeconds: 2_000,
+    segmentIndex: 0,
+    routeDistanceMeters: 30_000,
+    originBearingDeg: 225,
+    originDistanceMeters: 30_000,
+  });
+
+  const defaultMap = createSessionKnowledgeMapSnapshot(second.ledger);
+  const cityTwoMap = createSessionKnowledgeMapSnapshot(
+    second.ledger,
+    "city-02",
+  );
+
+  assert.deepEqual(defaultMap.originCityIds, ["city-01", "city-02"]);
+  assert.deepEqual(defaultMap.entries.map((entry) => entry.objectId), [
+    "mine-a",
+  ]);
+  assert.equal(cityTwoMap.originCityId, "city-02");
+  assert.deepEqual(cityTwoMap.entries.map((entry) => entry.objectId), [
+    "oasis-b",
+  ]);
+  assert.equal(JSON.stringify(cityTwoMap).includes("latitude"), false);
+  assert.equal(JSON.stringify(cityTwoMap).includes("longitude"), false);
+});
+
+test("GAME-013: map marker stays anchored to the first personal fix", () => {
+  const first = recordDirectDiscoveryObservation(
+    createPlayerDiscoveryLedger("checkpoint-04"),
+    {
+      expeditionNumber: 1,
+      objectId: "known-mine",
+      objectKind: "mine",
+      originCityId: "city-01",
+      rumorId: "rumor-first",
+      observedAtSeconds: 1_000,
+      segmentIndex: 0,
+      routeDistanceMeters: 20_000,
+      originBearingDeg: 90,
+      originDistanceMeters: 20_000,
+    },
+  );
+  const reobserved = recordDirectDiscoveryObservation(first.ledger, {
+    expeditionNumber: 2,
+    objectId: "known-mine",
+    objectKind: "mine",
+    originCityId: "city-01",
+    rumorId: "rumor-later",
+    observedAtSeconds: 3_000,
+    segmentIndex: 1,
+    routeDistanceMeters: 50_000,
+    originBearingDeg: 180,
+    originDistanceMeters: 50_000,
+  });
+
+  const marker = createSessionKnowledgeMapSnapshot(reobserved.ledger).entries[0];
+  assert.equal(marker.bearingDeg, 90);
+  assert.equal(marker.distanceMeters, 20_000);
+  assert.equal(marker.x, 376);
+  assert.equal(marker.y, 150);
+});
+
+test("GAME-013: empty knowledge and unknown origins are explicit", () => {
+  const ledger = createPlayerDiscoveryLedger("checkpoint-04");
+  const map = createSessionKnowledgeMapSnapshot(ledger);
+
+  assert.equal(map.originCityId, null);
+  assert.deepEqual(map.originCityIds, []);
+  assert.deepEqual(map.entries, []);
+  assert.equal(map.scaleRadiusMeters, 0);
+  assert.throws(
+    () => createSessionKnowledgeMapSnapshot(ledger, "city-99"),
+    /knowledge-map origin/,
   );
 });

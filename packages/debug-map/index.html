@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 26 · GAME-012</p>
+          <p class="eyebrow">Checkpoint 27 · GAME-013</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -166,7 +166,7 @@
       <section class="knowledge-panel" aria-labelledby="knowledge-title">
         <div class="knowledge-heading">
           <div>
-            <p class="section-kicker">GAME-012 · Return navigation</p>
+            <p class="section-kicker">GAME-013 · Session knowledge map</p>
             <h2 id="knowledge-title">Журнал знаний игрока</h2>
           </div>
           <div class="knowledge-counters">
@@ -174,6 +174,36 @@
             <output id="knowledge-count">0</output>
           </div>
         </div>
+        <article class="knowledge-map-card" aria-labelledby="knowledge-map-title">
+          <div class="knowledge-map-heading">
+            <div>
+              <p class="section-kicker">Coordinate-free · North-up</p>
+              <h3 id="knowledge-map-title">Личная карта открытий</h3>
+            </div>
+            <label>
+              Опорный город
+              <select id="knowledge-map-origin" aria-label="Опорный город личной карты" disabled>
+                <option value="">Нет открытий</option>
+              </select>
+            </label>
+          </div>
+          <div class="knowledge-map-frame">
+            <svg
+              id="knowledge-map"
+              viewBox="0 0 520 300"
+              role="img"
+              aria-label="Личная north-up карта подтверждённых открытий без абсолютных координат"
+            ></svg>
+          </div>
+          <div class="knowledge-map-meta">
+            <span aria-label="Север сверху">↑ N</span>
+            <output id="knowledge-map-scale">Масштаб появится после открытия</output>
+          </div>
+          <p id="knowledge-map-note" class="knowledge-map-note">
+            Независимые городские привязки не склеиваются скрытыми координатами.
+            Маркеры вычисляются только из личных азимута и расстояния.
+          </p>
+        </article>
         <p id="knowledge-empty" class="knowledge-empty">
           Подтверждённых открытий пока нет. Найденный объект останется здесь после
           команды «Повторить экспедицию».
