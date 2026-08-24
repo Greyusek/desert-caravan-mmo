@@ -42,7 +42,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 26 demo");
+console.log("Desert Caravan MMO — Checkpoint 27 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -415,5 +415,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 26 known-object return navigation: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 27 session knowledge map: npm run debug-map -> http://127.0.0.1:4173",
 );

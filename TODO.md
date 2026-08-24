@@ -37,7 +37,8 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 
 ## Next
 
-- [ ] `GAME-013`: render confirmed ledger entries on a coordinate-free north-up session knowledge map, still without production physical-map ownership or database persistence.
+- [x] `GAME-013`: render confirmed ledger entries on a coordinate-free north-up session knowledge map, still without production physical-map ownership or database persistence.
+- [ ] `GAME-014`: retain executed expedition tracks on that session map and reveal only actually travelled corridors, still without database persistence or the production physical-map item.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors

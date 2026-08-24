@@ -52,6 +52,8 @@ export const CONTACT_ZOOM_SPATIAL_RADII_METERS = Object.freeze([
 export const CONTACT_ZOOM_TIME_RADII_SECONDS = Object.freeze([
   5 * 60, 30 * 60, 3 * 3_600,
 ]);
+export const KNOWLEDGE_MAP_WIDTH = 520;
+export const KNOWLEDGE_MAP_HEIGHT = 300;
 const ROUTE_SAMPLE_TARGET_METERS = 100_000;
 const MAX_ROUTE_SAMPLES_PER_SEGMENT = 64;
 const LOCAL_ROUTE_SAMPLE_TARGET_METERS = 1_000;
@@ -65,6 +67,7 @@ const RUMOR_MAP_PIXELS_PER_METER = 0.0022;
 const RUMOR_SECTOR_SAMPLE_COUNT = 16;
 const CONTACT_ZOOM_PADDING_PIXELS = 20;
 const CONTACT_ZOOM_TIME_SAMPLE_COUNT = 64;
+const KNOWLEDGE_MAP_PADDING_PIXELS = 34;
 
 /**
  * Converts elapsed wall-clock time into authoritative simulation time. The
@@ -692,6 +695,108 @@ export function createKnownObjectReturnRoutePreset(ledger, objectId) {
       { bearingDeg: 0, distanceKilometers: 0 },
     ],
   };
+}
+
+/**
+ * GAME-013 projects confirmed player knowledge into a local north-up chart.
+ * Independent origin cities remain separate chart anchors because the ledger
+ * deliberately contains no absolute coordinates with which to join them.
+ * Every marker is derived only from the immutable first-observation bearing
+ * and distance exposed by GAME-012.
+ *
+ * @param {import("../sim-core/dist/src/index.js").PlayerDiscoveryLedger} ledger
+ * @param {string | null} [preferredOriginCityId]
+ */
+export function createSessionKnowledgeMapSnapshot(
+  ledger,
+  preferredOriginCityId = null,
+) {
+  if (!ledger || !Array.isArray(ledger.entries)) {
+    throw new TypeError("ledger.entries must be an array");
+  }
+  if (
+    preferredOriginCityId !== null &&
+    (typeof preferredOriginCityId !== "string" ||
+      preferredOriginCityId.length === 0)
+  ) {
+    throw new RangeError("preferredOriginCityId must be null or non-empty");
+  }
+
+  const originCityIds = [
+    ...new Set(
+      ledger.entries.map((entry) => entry.firstObservation.originCityId),
+    ),
+  ];
+  if (
+    preferredOriginCityId !== null &&
+    !originCityIds.includes(preferredOriginCityId)
+  ) {
+    throw new RangeError(
+      "preferredOriginCityId must reference a knowledge-map origin",
+    );
+  }
+
+  const originCityId = preferredOriginCityId ?? originCityIds[0] ?? null;
+  const origin = {
+    x: KNOWLEDGE_MAP_WIDTH / 2,
+    y: KNOWLEDGE_MAP_HEIGHT / 2,
+  };
+  const navigations = originCityId
+    ? ledger.entries
+        .filter(
+          (entry) => entry.firstObservation.originCityId === originCityId,
+        )
+        .map((entry) => createKnownObjectReturnNavigation(ledger, entry.objectId))
+    : [];
+  const furthestDistanceMeters = Math.max(
+    0,
+    ...navigations.map((navigation) => navigation.command.distanceMeters),
+  );
+  const scaleRadiusMeters =
+    furthestDistanceMeters > 0
+      ? niceKnowledgeMapRadius(furthestDistanceMeters)
+      : 0;
+  const radiusPixels =
+    Math.min(KNOWLEDGE_MAP_WIDTH, KNOWLEDGE_MAP_HEIGHT) / 2 -
+    KNOWLEDGE_MAP_PADDING_PIXELS;
+
+  return {
+    width: KNOWLEDGE_MAP_WIDTH,
+    height: KNOWLEDGE_MAP_HEIGHT,
+    originCityIds,
+    originCityId,
+    origin,
+    radiusPixels,
+    scaleRadiusMeters,
+    entries: navigations.map((navigation) => {
+      const angleRadians = (navigation.command.bearingDeg * Math.PI) / 180;
+      const distancePixels =
+        scaleRadiusMeters > 0
+          ? (navigation.command.distanceMeters / scaleRadiusMeters) *
+            radiusPixels
+          : 0;
+      return {
+        objectId: navigation.objectId,
+        objectKind: navigation.objectKind,
+        source: navigation.source,
+        confidence: navigation.confidence,
+        firstObservedInExpedition: navigation.firstObservedInExpedition,
+        bearingDeg: navigation.command.bearingDeg,
+        distanceMeters: navigation.command.distanceMeters,
+        x: origin.x + Math.sin(angleRadians) * distancePixels,
+        y: origin.y - Math.cos(angleRadians) * distancePixels,
+      };
+    }),
+  };
+}
+
+/** @param {number} minimumRadiusMeters */
+function niceKnowledgeMapRadius(minimumRadiusMeters) {
+  assertPositiveFinite(minimumRadiusMeters, "minimumRadiusMeters");
+  const magnitude = 10 ** Math.floor(Math.log10(minimumRadiusMeters));
+  const normalized = minimumRadiusMeters / magnitude;
+  const multiplier = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return multiplier * magnitude;
 }
 
 /**

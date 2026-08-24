@@ -262,4 +262,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-010` — cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.
 - [x] `GAME-011` — in-session player discovery ledger across repeated expeditions without database persistence.
 - [x] `GAME-012` — prepare a return expedition from a selected known-object entry using relative navigation data.
-- [ ] `GAME-013` — render confirmed entries on a coordinate-free north-up session knowledge map.
+- [x] `GAME-013` — render confirmed entries on a coordinate-free north-up session knowledge map.
+- [ ] `GAME-014` — retain executed expedition tracks and actually travelled corridors on the session knowledge map.

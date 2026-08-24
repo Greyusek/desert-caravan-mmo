@@ -5,6 +5,8 @@ import {
   CONTACT_ZOOM_WIDTH,
   DEBUG_MAP_HEIGHT,
   DEBUG_MAP_WIDTH,
+  KNOWLEDGE_MAP_HEIGHT,
+  KNOWLEDGE_MAP_WIDTH,
   SIMULATION_CLOCK_SPEED_MULTIPLIERS,
   advanceSimulationClock,
   applyExpeditionOutcomeToRoute,
@@ -23,6 +25,7 @@ import {
   createMonsterInterceptRoutePreset,
   createKnownObjectReturnRoutePreset,
   createRumorSearchSnapshot,
+  createSessionKnowledgeMapSnapshot,
   createStationaryStopPatrolPreset,
   projectCoordinate,
 } from "./map-model.js";
@@ -132,6 +135,15 @@ const knowledgeEmpty = requireElement(
   HTMLParagraphElement,
 );
 const knowledgeList = requireElement("knowledge-list", HTMLOListElement);
+const knowledgeMap = requireElement("knowledge-map", SVGSVGElement);
+const knowledgeMapOrigin = requireElement(
+  "knowledge-map-origin",
+  HTMLSelectElement,
+);
+const knowledgeMapScale = requireElement(
+  "knowledge-map-scale",
+  HTMLOutputElement,
+);
 const knowledgeRouteStatus = requireElement(
   "knowledge-route-status",
   HTMLOutputElement,
@@ -198,6 +210,8 @@ let discoveryLedger = createPlayerDiscoveryLedger(seedInput.value.trim());
 /** @type {string | null} */
 let preparedKnowledgeObjectId = null;
 /** @type {string | null} */
+let selectedKnowledgeMapOriginCityId = null;
+/** @type {string | null} */
 let resumedDiscoveryObjectId = null;
 let stationaryStopQaEnabled = false;
 /** @type {ReturnType<typeof createRumorSearchSnapshot> | null} */
@@ -216,6 +230,7 @@ seedForm.addEventListener("submit", (event) => {
     discoveryLedger = createPlayerDiscoveryLedger(nextSeed);
     expeditionNumber = 1;
     preparedKnowledgeObjectId = null;
+    selectedKnowledgeMapOriginCityId = null;
   }
   resetSimulationClock();
   render();
@@ -284,12 +299,17 @@ contactDoctrineFight.addEventListener("change", pauseClockAndRender);
 contactFleeSpeed.addEventListener("change", pauseClockAndRender);
 contactSpatialZoom.addEventListener("change", render);
 contactTimeZoom.addEventListener("change", render);
+knowledgeMapOrigin.addEventListener("change", () => {
+  selectedKnowledgeMapOriginCityId = knowledgeMapOrigin.value || null;
+  render();
+});
 knowledgeReset.addEventListener("click", () => {
   const seed = seedInput.value.trim();
   if (seed.length === 0) return;
   discoveryLedger = createPlayerDiscoveryLedger(seed);
   expeditionNumber = 1;
   preparedKnowledgeObjectId = null;
+  selectedKnowledgeMapOriginCityId = null;
   resetSimulationClock();
   render();
 });
@@ -308,6 +328,7 @@ knowledgeList.addEventListener("click", (event) => {
   stationaryStopQaEnabled = false;
   expeditionNumber += 1;
   preparedKnowledgeObjectId = preset.objectId;
+  selectedKnowledgeMapOriginCityId = preset.originCityId;
   routeStartCity.value = preset.originCityId;
   routeBearingInputs.forEach((input, index) => {
     input.value = preset.commands[index]?.bearingDeg.toFixed(6) ?? "0";
@@ -478,6 +499,7 @@ function render() {
       discoveryLedger = createPlayerDiscoveryLedger(snapshot.seed);
       expeditionNumber = 1;
       preparedKnowledgeObjectId = null;
+      selectedKnowledgeMapOriginCityId = null;
     }
     const knownObjectIds = discoveryLedger.entries
       .filter(
@@ -1408,6 +1430,24 @@ function renderRumorSearch(search, doctrine, outcome) {
  * @param {ReturnType<typeof createDebugMapSnapshot>} snapshot
  */
 function renderDiscoveryLedger(ledger, snapshot) {
+  if (
+    selectedKnowledgeMapOriginCityId !== null &&
+    !ledger.entries.some(
+      (entry) =>
+        entry.firstObservation.originCityId ===
+        selectedKnowledgeMapOriginCityId,
+    )
+  ) {
+    selectedKnowledgeMapOriginCityId = null;
+  }
+  const map = createSessionKnowledgeMapSnapshot(
+    ledger,
+    selectedKnowledgeMapOriginCityId,
+  );
+  selectedKnowledgeMapOriginCityId = map.originCityId;
+  syncKnowledgeMapOriginOptions(map, snapshot.cities);
+  drawSessionKnowledgeMap(map, snapshot.cities);
+
   knowledgeCount.textContent = String(ledger.entries.length);
   knowledgeExpedition.textContent = `Экспедиция #${expeditionNumber}`;
   const preparedEntry = ledger.entries.find(
@@ -1469,6 +1509,137 @@ function renderDiscoveryLedger(ledger, snapshot) {
       return item;
     }),
   );
+}
+
+/**
+ * @param {ReturnType<typeof createSessionKnowledgeMapSnapshot>} map
+ * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
+ */
+function syncKnowledgeMapOriginOptions(map, cities) {
+  const cityNames = new Map(cities.map((city) => [city.id, city.name]));
+  if (map.originCityIds.length === 0) {
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "Нет открытий";
+    knowledgeMapOrigin.replaceChildren(empty);
+    knowledgeMapOrigin.disabled = true;
+    return;
+  }
+
+  knowledgeMapOrigin.replaceChildren(
+    ...map.originCityIds.map((cityId) => {
+      const option = document.createElement("option");
+      option.value = cityId;
+      option.textContent = cityNames.get(cityId) ?? cityId;
+      return option;
+    }),
+  );
+  knowledgeMapOrigin.disabled = map.originCityIds.length <= 1;
+  knowledgeMapOrigin.value = map.originCityId ?? "";
+}
+
+/**
+ * @param {ReturnType<typeof createSessionKnowledgeMapSnapshot>} map
+ * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
+ */
+function drawSessionKnowledgeMap(map, cities) {
+  knowledgeMap.replaceChildren();
+  const city = cities.find((candidate) => candidate.id === map.originCityId);
+
+  if (!map.originCityId) {
+    const empty = svgElement("text", {
+      class: "knowledge-map-empty-label",
+      x: KNOWLEDGE_MAP_WIDTH / 2,
+      y: KNOWLEDGE_MAP_HEIGHT / 2,
+    });
+    empty.textContent = "Подтверждённых открытий пока нет";
+    knowledgeMap.append(empty);
+    knowledgeMapScale.textContent = "Масштаб появится после открытия";
+    return;
+  }
+
+  for (const fraction of [0.25, 0.5, 0.75, 1]) {
+    knowledgeMap.append(
+      svgElement("circle", {
+        class: "knowledge-map-grid",
+        cx: map.origin.x,
+        cy: map.origin.y,
+        r: map.radiusPixels * fraction,
+      }),
+    );
+  }
+  knowledgeMap.append(
+    svgElement("line", {
+      class: "knowledge-map-axis",
+      x1: map.origin.x - map.radiusPixels,
+      x2: map.origin.x + map.radiusPixels,
+      y1: map.origin.y,
+      y2: map.origin.y,
+    }),
+    svgElement("line", {
+      class: "knowledge-map-axis",
+      x1: map.origin.x,
+      x2: map.origin.x,
+      y1: map.origin.y - map.radiusPixels,
+      y2: map.origin.y + map.radiusPixels,
+    }),
+  );
+
+  for (const entry of map.entries) {
+    const rightSide = entry.x >= map.origin.x;
+    knowledgeMap.append(
+      svgElement("line", {
+        class: "knowledge-map-bearing",
+        x1: map.origin.x,
+        y1: map.origin.y,
+        x2: entry.x,
+        y2: entry.y,
+      }),
+    );
+    const marker = svgElement("circle", {
+      class: `knowledge-map-marker knowledge-map-marker--${entry.objectKind}`,
+      cx: entry.x,
+      cy: entry.y,
+      r: 5.5,
+    });
+    marker.append(
+      svgTitle(
+        `${staticKindLabel(entry.objectKind)} · ${formatNumber(entry.bearingDeg, 2)}° · ${formatNumber(entry.distanceMeters / 1_000, 3)} км`,
+      ),
+    );
+    const label = svgElement("text", {
+      class: "knowledge-map-label",
+      x: entry.x + (rightSide ? 9 : -9),
+      y: entry.y - 3,
+      "text-anchor": rightSide ? "start" : "end",
+    });
+    label.textContent = staticKindLabel(entry.objectKind);
+    const distance = svgElement("text", {
+      class: "knowledge-map-distance",
+      x: entry.x + (rightSide ? 9 : -9),
+      y: entry.y + 9,
+      "text-anchor": rightSide ? "start" : "end",
+    });
+    distance.textContent = `${formatNumber(entry.bearingDeg, 1)}° · ${formatNumber(entry.distanceMeters / 1_000, 2)} км`;
+    knowledgeMap.append(marker, label, distance);
+  }
+
+  const origin = svgElement("circle", {
+    class: "knowledge-map-origin",
+    cx: map.origin.x,
+    cy: map.origin.y,
+    r: 6.5,
+  });
+  origin.append(svgTitle(city?.name ?? map.originCityId));
+  const originLabel = svgElement("text", {
+    class: "knowledge-map-label",
+    x: map.origin.x + 10,
+    y: map.origin.y - 9,
+  });
+  originLabel.textContent = city?.name ?? map.originCityId;
+  knowledgeMap.append(origin, originLabel);
+
+  knowledgeMapScale.textContent = `Радиус ${formatNumber(map.scaleRadiusMeters / 1_000, 2)} км · точек ${map.entries.length}`;
 }
 
 /**

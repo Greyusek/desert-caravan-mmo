@@ -12,6 +12,16 @@
 - Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
 - Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
 
+## 0.0.27 — Checkpoint 27
+
+- Added `GAME-013`: confirmed session-ledger entries render on a player-facing coordinate-free north-up knowledge map.
+- Derived every marker only from its immutable first-observation bearing and distance; the map snapshot contains no latitude or longitude.
+- Kept discoveries from different origin cities on separate selectable local charts instead of joining them through hidden server coordinates.
+- Added deterministic 1/2/5/10 chart scaling, cardinal grid, origin and object labels, relative bearings and distances.
+- Kept return-route preparation connected to the matching map anchor while preserving GAME-011/012 re-observation behavior.
+- Added four GAME-013 regressions; repository verification now runs 254 tests.
+- Designated `GAME-014`, retaining executed expedition tracks and travelled corridors on the session map, as the next checkpoint.
+
 ## 0.0.26 — Checkpoint 26
 
 - Added `GAME-012`: every confirmed discovery retains a normalized bearing and distance from its first-observation city without storing an absolute world coordinate.
