@@ -12,6 +12,7 @@ import {
   evaluateStaticObjectDiscoveryDoctrine,
   findFirstCityArrival,
   findFirstExpeditionMonsterContact,
+  findFirstExpeditionMonsterContactWithIdleStop,
   findFirstMovingEncounter,
   greatCircleDistance,
   generateSeededWorld,
@@ -38,7 +39,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 23 demo");
+console.log("Desert Caravan MMO — Checkpoint 24 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -290,6 +291,39 @@ console.log(
     : "  no contact",
 );
 
+const idlePatrolStart = destinationPoint(
+  encounterPoint,
+  270,
+  meters(1_500),
+);
+const idlePatrolRoute = createRoutePlan(
+  idlePatrolStart,
+  [
+    { bearingDeg: 90, distanceMeters: meters(3_000) },
+    { bearingDeg: 270, distanceMeters: meters(3_000) },
+  ],
+  10,
+);
+const idleContact = findFirstExpeditionMonsterContactWithIdleStop(
+  encounterCaravan,
+  {
+    id: "idle-demo-monster",
+    kind: "wandering-monster",
+    power: 110,
+    visionRadiusMeters: 300,
+    interactionRadiusMeters: 100,
+    patrolRoute: idlePatrolRoute,
+  },
+  100,
+  100,
+);
+console.log("\nGAME-010 stationary STOP contact:");
+console.log(
+  idleContact
+    ? `  ${idleContact.monsterId}: ${idleContact.caravanActivity} contact at world T=${idleContact.expeditionElapsedSeconds.toFixed(6)} s, route T=${idleContact.routeElapsedSeconds.toFixed(6)} s`
+    : "  no stationary contact",
+);
+
 console.log("\nGAME-005 Power contact resolution:");
 for (const [monsterPower, doctrine] of [
   [90, "FLEE"],
@@ -338,5 +372,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 23 STOP idle lifecycle: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 24 stationary STOP contact: npm run debug-map -> http://127.0.0.1:4173",
 );

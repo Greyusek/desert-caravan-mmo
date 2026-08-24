@@ -29,6 +29,10 @@ function cyclic(route, startsAtSeconds = 0) {
   return { route, startsAtSeconds, mode: "cyclic" };
 }
 
+function stationary(route, startsAtSeconds = 0) {
+  return { route, startsAtSeconds, mode: "stationary" };
+}
+
 function crossingRoutes(crossing = createWorldCoordinate(0, 0)) {
   const west = destinationPoint(
     crossing,
@@ -158,6 +162,46 @@ test("SIM-008: a finite caravan can meet a patrol during a later cycle", () => {
   approx(encounter.atSeconds, 400 + expectedPerpendicularEntrySeconds(100), EPS_SECONDS);
   assert.ok(encounter.firstRouteElapsedSeconds > closedPatrol.totalDurationSeconds);
   approx(encounter.secondRouteElapsedSeconds, encounter.atSeconds - 400, 1e-12);
+});
+
+test("GAME-010: a cyclic patrol enters a stationary motion radius continuously", () => {
+  const stop = createWorldCoordinate(0, 0);
+  const stationaryRoute = createRoutePlan(
+    stop,
+    [{ bearingDeg: 0, distanceMeters: 0 }],
+    SPEED_METERS_PER_SECOND,
+    PLANET_RADIUS_METERS,
+  );
+  const west = destinationPoint(stop, 270, 1_500, PLANET_RADIUS_METERS);
+  const patrol = createRoutePlan(
+    west,
+    [
+      { bearingDeg: 90, distanceMeters: 3_000 },
+      { bearingDeg: 270, distanceMeters: 3_000 },
+    ],
+    SPEED_METERS_PER_SECOND,
+    PLANET_RADIUS_METERS,
+  );
+  const encounter = findFirstMovingEncounter(
+    stationary(stationaryRoute, 100),
+    cyclic(patrol),
+    { startSeconds: 100, endSeconds: 200 },
+    100,
+  );
+
+  assert.ok(encounter);
+  approx(encounter.atSeconds, 140, EPS_SECONDS);
+  approx(encounter.firstRouteElapsedSeconds, 40, EPS_SECONDS);
+  approx(encounter.separationMeters, 100, 0.0001);
+  approx(
+    greatCircleDistance(
+      encounter.firstPosition,
+      stop,
+      PLANET_RADIUS_METERS,
+    ),
+    0,
+    0.000001,
+  );
 });
 
 test("SIM-008: moving encounters remain continuous across the antimeridian", () => {

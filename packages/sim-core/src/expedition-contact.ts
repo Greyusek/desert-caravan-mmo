@@ -1,4 +1,7 @@
-import { findFirstMovingEncounter } from "./encounter.js";
+import {
+  ENCOUNTER_TIME_TOLERANCE_SECONDS,
+  findFirstMovingEncounter,
+} from "./encounter.js";
 import { greatCircleDistance } from "./geometry.js";
 import type { WanderingMonster } from "./monster.js";
 import {
@@ -14,6 +17,7 @@ import {
   type DistanceMeters,
   type WorldCoordinate,
 } from "./types.js";
+import type { CaravanActivity } from "./supplies.js";
 
 export interface ExpeditionMonsterContact {
   readonly monsterId: string;
@@ -25,6 +29,8 @@ export interface ExpeditionMonsterContact {
   /** SIM-005 time on the original route, excluding any idle STOP duration. */
   readonly routeElapsedSeconds: DurationSeconds;
   readonly monsterPatrolElapsedSeconds: DurationSeconds;
+  /** Whether the caravan was moving or waiting at a discovery STOP. */
+  readonly caravanActivity: CaravanActivity;
   readonly separationMeters: DistanceMeters;
   readonly interactionRadiusMeters: DistanceMeters;
   readonly caravanPosition: WorldCoordinate;
@@ -76,6 +82,7 @@ export function findFirstExpeditionMonsterContact(
     expeditionElapsedSeconds: encounter.firstRouteElapsedSeconds,
     routeElapsedSeconds: encounter.firstRouteElapsedSeconds,
     monsterPatrolElapsedSeconds: encounter.secondRouteElapsedSeconds,
+    caravanActivity: "moving",
     separationMeters: encounter.separationMeters,
     interactionRadiusMeters: monster.interactionRadiusMeters,
     caravanPosition: encounter.firstPosition,
@@ -84,13 +91,9 @@ export function findFirstExpeditionMonsterContact(
 }
 
 /**
- * GAME-009 — searches moving contacts before a discovery STOP and after the
- * scheduled resume against uninterrupted world-time patrol motion.
- *
- * A patrol that enters and leaves interaction radius only while the caravan is
- * stationary is intentionally outside this checkpoint; stationary encounter
- * resolution requires its own lifecycle boundary. A patrol still inside the
- * radius when movement resumes is found immediately by the post-stop search.
+ * GAME-010 — searches the complete world-time execution around one discovery
+ * STOP: moving before it, stationary throughout the idle interval, then moving
+ * again after resume. A contact exactly at resume belongs to the moving phase.
  */
 export function findFirstExpeditionMonsterContactWithIdleStop(
   expeditionRoute: RoutePlan,
@@ -121,6 +124,64 @@ export function findFirstExpeditionMonsterContactWithIdleStop(
   ) {
     return uninterrupted;
   }
+
+  const idleStartsAtSeconds =
+    expeditionStartsAtSeconds + stopAtRouteSeconds;
+  const resumeAtSeconds = idleStartsAtSeconds + idleDurationSeconds;
+  if (idleDurationSeconds > ENCOUNTER_TIME_TOLERANCE_SECONDS) {
+    const stopPosition = positionAtTime(
+      expeditionRoute,
+      stopAtRouteSeconds,
+    ).coordinate;
+    const stationaryRoute = createRoutePlan(
+      stopPosition,
+      [{ bearingDeg: 0, distanceMeters: 0 }],
+      expeditionRoute.speedMetersPerSecond,
+      expeditionRoute.planetRadiusMeters,
+    );
+    const stationary = findFirstMovingEncounter(
+      {
+        route: stationaryRoute,
+        startsAtSeconds: idleStartsAtSeconds,
+        mode: "stationary",
+      },
+      {
+        route: monster.patrolRoute,
+        startsAtSeconds: 0,
+        mode: "cyclic",
+      },
+      {
+        startSeconds: idleStartsAtSeconds,
+        endSeconds: resumeAtSeconds,
+      },
+      monster.interactionRadiusMeters,
+    );
+
+    if (
+      stationary &&
+      stationary.atSeconds <
+        resumeAtSeconds - ENCOUNTER_TIME_TOLERANCE_SECONDS
+    ) {
+      return {
+        monsterId: monster.id,
+        monsterPower: monster.power,
+        monsterSpeedMetersPerSecond:
+          monster.patrolRoute.speedMetersPerSecond,
+        atSeconds: stationary.atSeconds,
+        expeditionElapsedSeconds:
+          stationary.atSeconds - expeditionStartsAtSeconds,
+        routeElapsedSeconds: stopAtRouteSeconds,
+        monsterPatrolElapsedSeconds:
+          stationary.secondRouteElapsedSeconds,
+        caravanActivity: "idle",
+        separationMeters: stationary.separationMeters,
+        interactionRadiusMeters: monster.interactionRadiusMeters,
+        caravanPosition: stationary.firstPosition,
+        monsterPosition: stationary.secondPosition,
+      };
+    }
+  }
+
   if (stopAtRouteSeconds >= expeditionRoute.totalDurationSeconds - 1e-9) {
     return null;
   }
@@ -130,8 +191,6 @@ export function findFirstExpeditionMonsterContactWithIdleStop(
     stopAtRouteSeconds,
   );
   if (!remainder) return null;
-  const resumeAtSeconds =
-    expeditionStartsAtSeconds + stopAtRouteSeconds + idleDurationSeconds;
   const postStop = findFirstExpeditionMonsterContact(
     remainder,
     monster,

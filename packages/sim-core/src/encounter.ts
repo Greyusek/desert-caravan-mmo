@@ -3,7 +3,7 @@ import { DEFAULT_INTERACTION_RADIUS_METERS } from "./monster.js";
 import { positionAtTime, type DurationSeconds, type RoutePlan } from "./route.js";
 import type { DistanceMeters, WorldCoordinate } from "./types.js";
 
-export type RouteMotionMode = "finite" | "cyclic";
+export type RouteMotionMode = "finite" | "cyclic" | "stationary";
 
 export interface RouteMotion {
   readonly route: RoutePlan;
@@ -52,7 +52,8 @@ const DOT_PRODUCT_EPSILON = 1e-14;
 
 /**
  * SIM-008 — finds the first instant at which two route-backed entities are
- * simultaneously inside an encounter radius.
+ * simultaneously inside an encounter radius. A stationary motion keeps the
+ * coordinate at `route.start` while absolute time continues to advance.
  *
  * Times are absolute simulation seconds. Finite routes are active from their
  * own start through arrival; cyclic routes repeat indefinitely and therefore
@@ -132,7 +133,8 @@ function findFirstEntryInsideSmoothInterval(
   const angularRadius = Math.min(encounterRadiusMeters / planetRadiusMeters, Math.PI);
   const thresholdDotProduct = Math.cos(angularRadius);
   const maximumAngularSpeed =
-    (first.route.speedMetersPerSecond + second.route.speedMetersPerSecond) /
+    (motionSpeedMetersPerSecond(first) +
+      motionSpeedMetersPerSecond(second)) /
     planetRadiusMeters;
   const secondDerivativeBound = maximumAngularSpeed ** 2;
 
@@ -316,6 +318,8 @@ function coordinateAtAbsoluteTime(
   motion: RouteMotion,
   atSeconds: DurationSeconds,
 ): WorldCoordinate {
+  if (motion.mode === "stationary") return motion.route.start;
+
   const elapsedSeconds = atSeconds - motion.startsAtSeconds;
   const routeElapsedSeconds =
     motion.mode === "cyclic"
@@ -328,6 +332,8 @@ function nextSegmentBoundaryAfter(
   motion: RouteMotion,
   atSeconds: DurationSeconds,
 ): DurationSeconds {
+  if (motion.mode === "stationary") return Number.POSITIVE_INFINITY;
+
   const elapsedSeconds = atSeconds - motion.startsAtSeconds;
 
   if (motion.mode === "finite") {
@@ -358,9 +364,15 @@ function firstPositiveSegmentEnd(route: RoutePlan): DurationSeconds {
 }
 
 function motionActiveEnd(motion: RouteMotion): DurationSeconds {
-  return motion.mode === "cyclic"
+  return motion.mode === "cyclic" || motion.mode === "stationary"
     ? Number.POSITIVE_INFINITY
     : motion.startsAtSeconds + motion.route.totalDurationSeconds;
+}
+
+function motionSpeedMetersPerSecond(motion: RouteMotion): number {
+  return motion.mode === "stationary"
+    ? 0
+    : motion.route.speedMetersPerSecond;
 }
 
 function isInsideEncounter(
@@ -375,8 +387,12 @@ function isInsideEncounter(
 
 function validateMotion(motion: RouteMotion, name: string): void {
   assertNonNegativeFinite(motion.startsAtSeconds, `${name}.startsAtSeconds`);
-  if (motion.mode !== "finite" && motion.mode !== "cyclic") {
-    throw new RangeError(`${name}.mode must be finite or cyclic`);
+  if (
+    motion.mode !== "finite" &&
+    motion.mode !== "cyclic" &&
+    motion.mode !== "stationary"
+  ) {
+    throw new RangeError(`${name}.mode must be finite, cyclic or stationary`);
   }
 
   if (motion.mode === "cyclic") {

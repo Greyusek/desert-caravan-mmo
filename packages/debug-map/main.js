@@ -22,6 +22,7 @@ import {
   createMonsterContactSnapshot,
   createMonsterInterceptRoutePreset,
   createRumorSearchSnapshot,
+  createStationaryStopPatrolPreset,
   projectCoordinate,
 } from "./map-model.js";
 
@@ -147,6 +148,10 @@ const contactDoctrineFight = requireElement(
   HTMLInputElement,
 );
 const contactDevRoute = requireElement("contact-dev-route", HTMLButtonElement);
+const contactStopDevRoute = requireElement(
+  "contact-stop-dev-route",
+  HTMLButtonElement,
+);
 const contactSpatialZoom = requireElement(
   "contact-spatial-zoom",
   HTMLSelectElement,
@@ -169,6 +174,7 @@ let clockAnchorElapsedSeconds = 0;
 let supplySettings = readSupplySettings();
 /** @type {string | null} */
 let resumedDiscoveryObjectId = null;
+let stationaryStopQaEnabled = false;
 /** @type {ReturnType<typeof createRumorSearchSnapshot> | null} */
 let activeRumorSearch = null;
 /** @type {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} */
@@ -280,6 +286,7 @@ outcomeAction.addEventListener("click", () => {
 rumorDevRoute.addEventListener("click", () => {
   if (!activeRumorSearch) return;
 
+  stationaryStopQaEnabled = false;
   const { exactBearingDeg, exactDistanceKilometers } =
     activeRumorSearch.serverTruth;
   routeBearingInputs.forEach((input, index) => {
@@ -311,6 +318,7 @@ contactDevRoute.addEventListener("click", () => {
   const selected = candidates[0];
   if (!selected) return;
 
+  stationaryStopQaEnabled = false;
   routeStartCity.value = selected.city.id;
   routeSpeed.value = selected.preset.speedKilometersPerHour.toFixed(6);
   routeBearingInputs.forEach((input, index) => {
@@ -324,6 +332,24 @@ contactDevRoute.addEventListener("click", () => {
   render();
 });
 
+contactStopDevRoute.addEventListener("click", () => {
+  if (!activeRumorSearch) return;
+
+  const { exactBearingDeg, exactDistanceKilometers } =
+    activeRumorSearch.serverTruth;
+  routeBearingInputs.forEach((input, index) => {
+    input.value = index === 0 ? exactBearingDeg.toFixed(6) : "0";
+  });
+  routeDistanceInputs.forEach((input, index) => {
+    input.value = index === 0 ? exactDistanceKilometers.toFixed(6) : "0";
+  });
+  doctrineStop.checked = true;
+  stopIdleHours.value = "6";
+  stationaryStopQaEnabled = true;
+  resetSimulationClock();
+  render();
+});
+
 cityDevRoute.addEventListener("click", () => {
   const startCity = activeSnapshot?.cities.find(
     (city) => city.id === routeStartCity.value,
@@ -333,6 +359,7 @@ cityDevRoute.addEventListener("click", () => {
   );
   if (!startCity || !destinationCity) return;
 
+  stationaryStopQaEnabled = false;
   const preset = createCityArrivalRoutePreset(
     startCity.position,
     destinationCity,
@@ -439,12 +466,13 @@ function render() {
         resumedDiscoveryObjectId,
       );
     }
+    const scheduledIdleDurationSeconds = readStopIdleDurationSeconds();
     const stopLifecycle = createDiscoveryStopLifecycleSnapshot(
       timelineRoute,
       supplySettings.initial,
       supplySettings.profile,
       lifecycleResume,
-      readStopIdleDurationSeconds(),
+      scheduledIdleDurationSeconds,
       elapsedSeconds,
       cityTimelineDestination,
     );
@@ -470,9 +498,33 @@ function render() {
       proposedDoctrine,
       resumedDiscoveryObjectId,
     );
-    const selectedMonster = snapshot.monsters.find(
+    let selectedMonster = snapshot.monsters.find(
       (monster) => monster.id === contactMonsterSelect.value,
     );
+    const plannedStop =
+      timelineRumorSearch.serverTruth.plannedDiscovery ?? null;
+    if (
+      stationaryStopQaEnabled &&
+      selectedMonster &&
+      plannedStop &&
+      scheduledIdleDurationSeconds > 0
+    ) {
+      const contactAtSeconds =
+        plannedStop.elapsedSeconds + scheduledIdleDurationSeconds / 2;
+      const qaMonster = createStationaryStopPatrolPreset(
+        plannedStop.caravanPosition,
+        contactAtSeconds,
+        selectedMonster,
+        elapsedSeconds,
+      );
+      const selectedMonsterIndex = snapshot.monsters.findIndex(
+        (monster) => monster.id === selectedMonster?.id,
+      );
+      if (selectedMonsterIndex >= 0) {
+        snapshot.monsters[selectedMonsterIndex] = qaMonster;
+      }
+      selectedMonster = qaMonster;
+    }
     const monsterContact = selectedMonster
       ? createMonsterContactSnapshot(
           plannedRoute,
@@ -495,6 +547,7 @@ function render() {
       cityDestination,
       stopLifecycle,
     );
+    const effectiveStopLifecycle = outcome.stopLifecycle ?? stopLifecycle;
     const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
     const rumorSearch = createRumorSearchSnapshot(
       snapshot.seed,
@@ -530,7 +583,7 @@ function render() {
       doctrine,
       outcome,
       resume ?? lifecycleResume,
-      stopLifecycle,
+      effectiveStopLifecycle,
     );
     const maximumElapsedSeconds = outcome.planned.atSeconds;
 
@@ -556,7 +609,7 @@ function render() {
       route,
       selectedMonster ?? null,
       monsterContact,
-      stopLifecycle,
+      effectiveStopLifecycle,
     );
     renderEventLog(eventLog, route);
 
@@ -873,12 +926,13 @@ function renderMonsterContact(snapshot, outcome) {
   }
 
   const resolution = outcome.monsterContactResolution;
+  const idleContact = contact.caravanActivity === "idle";
   contactTime.textContent = formatElapsed(contact.atSeconds);
   contactMonster.textContent = `${contact.monsterId} · PWR ${contact.monsterPower}`;
   contactPosition.textContent =
     contact.segmentIndex === null
-      ? `Финиш · ${formatNumber(contact.routeDistanceKilometers, 1)} км`
-      : `Сегмент ${contact.segmentIndex + 1} · ${formatNumber(contact.routeDistanceKilometers, 1)} км`;
+      ? `Финиш · ${formatNumber(contact.routeDistanceKilometers, 1)} км${idleContact ? " · STOP" : ""}`
+      : `Сегмент ${contact.segmentIndex + 1} · ${formatNumber(contact.routeDistanceKilometers, 1)} км${idleContact ? " · STOP" : ""}`;
   contactDistance.textContent = `${formatNumber(contact.separationMeters, 1)} м / ${formatNumber(contact.interactionRadiusMeters, 0)} м`;
   contactPlayerPower.textContent = String(resolution?.playerPower ?? 100);
   const playerPower = resolution?.playerPower ?? 100;
@@ -925,8 +979,12 @@ function renderMonsterContact(snapshot, outcome) {
       : "Караван сильнее патруля";
     contactDetail.textContent =
       occurred
-        ? "Player Power выше: монстр погиб, а караван продолжил исходный маршрут."
-        : "На границе 500 м Power сравнятся автоматически; остановки маршрута не будет.";
+        ? idleContact
+          ? "Player Power выше: монстр погиб, а караван продолжает запланированную стоянку."
+          : "Player Power выше: монстр погиб, а караван продолжил исходный маршрут."
+        : idleContact
+          ? "Патруль войдёт в радиус неподвижного каравана; победа не прервёт оставшуюся стоянку."
+          : "На границе 500 м Power сравнятся автоматически; остановки маршрута не будет.";
     return;
   }
 
@@ -950,7 +1008,7 @@ function renderMonsterContact(snapshot, outcome) {
       ? "Караван разорвал дистанцию"
       : "Караван быстрее патруля";
     contactDetail.textContent = flee
-      ? `${formatNumber(flee.caravanSpeedMetersPerSecond * 3.6, 1)} км/ч против ${formatNumber(flee.monsterSpeedMetersPerSecond * 3.6, 1)} км/ч: безопасная дистанция ${formatNumber(flee.safeSeparationMeters, 0)} м будет достигнута за ${formatDuration(flee.secondsToSafeSeparation ?? 0)}; исходный маршрут продолжается.`
+      ? `${formatNumber(flee.caravanSpeedMetersPerSecond * 3.6, 1)} км/ч против ${formatNumber(flee.monsterSpeedMetersPerSecond * 3.6, 1)} км/ч: безопасная дистанция ${formatNumber(flee.safeSeparationMeters, 0)} м будет достигнута за ${formatDuration(flee.secondsToSafeSeparation ?? 0)}; ${idleContact ? "остаток стоянки отменяется и исходный маршрут возобновляется" : "исходный маршрут продолжается"}.`
       : "FLEE разрешён успешно; исходный маршрут продолжается.";
     return;
   }
@@ -1062,7 +1120,9 @@ function eventTitle(event) {
       : "Доктрина: отметить и продолжить";
   }
   if (event.kind === "route-resumed") {
-    return "Маршрут возобновлён";
+    return event.resumeReason === "monster-contact"
+      ? "FLEE прервал стоянку"
+      : "Маршрут возобновлён";
   }
   if (event.kind === "monster-contact") {
     if (event.powerResolutionStatus === "monster-defeated") {
@@ -1116,23 +1176,28 @@ function eventDetail(event, route) {
       : "Цель добавлена в знания экспедиции; курс не изменён";
   }
   if (event.kind === "route-resumed") {
-    return `${event.idleDurationSeconds ? `Стоянка ${formatDuration(event.idleDurationSeconds)} завершена · ` : ""}${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
+    return event.resumeReason === "monster-contact"
+      ? `Патруль вынудил начать отход после ${formatDuration(event.idleDurationSeconds ?? 0)} стоянки · исходный маршрут открыт`
+      : `${event.idleDurationSeconds ? `Стоянка ${formatDuration(event.idleDurationSeconds)} завершена · ` : ""}${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
   }
   if (event.kind === "monster-contact") {
     const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
+    const activity = event.caravanActivity === "idle"
+      ? "контакт на стоянке · "
+      : "";
     if (event.powerResolutionStatus === "monster-defeated") {
-      return `${comparison} · монстр погиб, маршрут продолжается`;
+      return `${activity}${comparison} · монстр погиб, ${event.caravanActivity === "idle" ? "ожидание продолжается" : "маршрут продолжается"}`;
     }
     if (event.powerResolutionStatus === "flee-succeeded") {
-      return `${comparison} · ${formatNumber((event.fleeSpeedMetersPerSecond ?? 0) * 3.6, 1)} > ${formatNumber((event.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч · безопасная дистанция за ${formatDuration(event.secondsToSafeSeparation ?? 0)}`;
+      return `${activity}${comparison} · ${formatNumber((event.fleeSpeedMetersPerSecond ?? 0) * 3.6, 1)} > ${formatNumber((event.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч · безопасная дистанция за ${formatDuration(event.secondsToSafeSeparation ?? 0)}${event.caravanActivity === "idle" ? " · стоянка прервана" : ""}`;
     }
     if (event.powerResolutionStatus === "flee-failed") {
-      return `${comparison} · ${formatNumber((event.fleeSpeedMetersPerSecond ?? 0) * 3.6, 1)} ≤ ${formatNumber((event.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч · экспедиция погибла`;
+      return `${activity}${comparison} · ${formatNumber((event.fleeSpeedMetersPerSecond ?? 0) * 3.6, 1)} ≤ ${formatNumber((event.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч · экспедиция погибла`;
     }
     if (event.powerResolutionStatus === "flee-required") {
-      return `${comparison} · отход выбран, маршрут на паузе`;
+      return `${activity}${comparison} · отход выбран, маршрут на паузе`;
     }
-    return `${comparison} · ACCEPT_FIGHT, экспедиция погибла`;
+    return `${activity}${comparison} · ACCEPT_FIGHT, экспедиция погибла`;
   }
   if (event.kind === "search-missed") {
     return `Караван не вошёл в радиус 150 м от цели слуха`;
@@ -1188,7 +1253,9 @@ function renderRumorSearch(search, doctrine, outcome) {
         : waiting
           ? `STOP выполнена: стоянка ${formatDuration(outcome.idleElapsedSeconds)} / ${formatDuration(outcome.idleDurationSeconds)}, маршрутное время заморожено.`
           : resumed
-        ? `STOP исполнена и явно снята: цель уже отмечена, исходный маршрут снова открыт.`
+        ? outcome.stopInterruptedByContact
+          ? `STOP исполнена, но патруль вынудил досрочно начать FLEE; цель отмечена, исходный маршрут снова открыт.`
+          : `STOP исполнена и явно снята: цель уже отмечена, исходный маршрут снова открыт.`
         : doctrine.status === "stopped"
         ? `STOP выполнена: маршрут поставлен на паузу в точке обнаружения.`
         : `MARK_AND_CONTINUE выполнена: цель отмечена, караван продолжает маршрут.`;
@@ -1358,6 +1425,9 @@ function renderCaravanStatus(status) {
     status.doctrine?.status === "resumed-and-continuing" &&
     !waitingAtStop &&
     !idleFailure;
+  const stopInterruptedByContact = Boolean(
+    status.outcome?.stopInterruptedByContact,
+  );
   const doctrineContinues =
     status.doctrine?.status === "marked-and-continuing";
   const panelState = outcomeFailed
@@ -1388,7 +1458,9 @@ function renderCaravanStatus(status) {
         : waitingAtStop
           ? "Стоянка у найденной цели"
         : doctrineResumed
-          ? "Цель отмечена · маршрут возобновлён"
+          ? stopInterruptedByContact
+            ? "FLEE прервал стоянку · в пути"
+            : "Цель отмечена · маршрут возобновлён"
         : doctrineContinues
           ? "Цель отмечена · в пути"
         : monsterVictoryOccurred
@@ -1475,21 +1547,35 @@ function renderCaravanStatus(status) {
         ? "Сильный патруль остановил маршрут: для FLEE не переданы явные скорости."
         : "Караван ждёт у найденной цели; это не финальный исход.";
   } else if (waitingAtStop) {
-    const fatalBeforeResume =
+    const monsterWillDefeat =
+      status.outcome?.failureReason === "monster";
+    const fatalSupplyBeforeResume =
+      !monsterWillDefeat &&
       status.outcome?.planned.status === "failed" &&
       status.outcome.resumeAtSeconds !== null &&
       status.outcome.planned.atSeconds <=
         status.outcome.resumeAtSeconds + 1e-9;
-    forecastTitle.textContent = fatalBeforeResume
+    forecastTitle.textContent = monsterWillDefeat
+      ? "Патруль опаснее каравана"
+      : fatalSupplyBeforeResume
       ? "Запасов не хватит на стоянку"
+      : stopInterruptedByContact
+        ? "Патруль прервёт стоянку"
       : "Идёт стоянка у цели";
-    forecastDetail.textContent = fatalBeforeResume
+    forecastDetail.textContent = monsterWillDefeat
+      ? `Контакт на ${formatElapsed(status.outcome?.planned.atSeconds ?? 0)} завершит экспедицию выбранной доктриной.`
+      : fatalSupplyBeforeResume
       ? `${formatDepletionCause(status.outcome?.planned.failureCause ?? null)} закончатся на ${formatElapsed(status.outcome?.planned.atSeconds ?? 0)} до возобновления.`
+      : stopInterruptedByContact
+        ? `Успешный FLEE начнётся на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)} и отменит остаток ожидания.`
       : `Маршрутное время заморожено; idle-расход действует до ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}.`;
   } else if (doctrineResumed) {
-    forecastTitle.textContent = "Маршрут возобновлён";
-    forecastDetail.textContent =
-      "Найденная цель уже отмечена и не создаст повторный STOP; следующие границы рассчитываются по исходному маршруту.";
+    forecastTitle.textContent = stopInterruptedByContact
+      ? "Стоянка прервана патрулём"
+      : "Маршрут возобновлён";
+    forecastDetail.textContent = stopInterruptedByContact
+      ? `Успешный FLEE начался на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}; учтено только ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)} фактической стоянки.`
+      : "Найденная цель уже отмечена и не создаст повторный STOP; следующие границы рассчитываются по исходному маршруту.";
   } else if (monsterVictoryOccurred) {
     forecastTitle.textContent = "Слабый патруль уничтожен";
     forecastDetail.textContent = `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} > Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; караван продолжает маршрут.`;
@@ -1522,23 +1608,44 @@ function renderExpeditionOutcome(outcome) {
 
   if (outcome.status === "in-progress") {
     if (outcome.phase === "idle-at-stop") {
-      const fatalBeforeResume =
+      const patrolWillInterrupt = outcome.stopInterruptedByContact;
+      const monsterWillDefeat = outcome.failureReason === "monster";
+      const fatalSupplyBeforeResume =
+        !monsterWillDefeat &&
         outcome.resumeAtSeconds !== null &&
         outcome.planned.status === "failed" &&
         outcome.planned.atSeconds <= outcome.resumeAtSeconds + 1e-9;
       outcomePanel.dataset.state = "paused";
       outcomeState.textContent = "Стоянка";
-      outcomeTitle.textContent = fatalBeforeResume
+      outcomeTitle.textContent = monsterWillDefeat
+        ? "Патруль атакует на стоянке"
+        : fatalSupplyBeforeResume
         ? "Караван не переживёт стоянку"
+        : patrolWillInterrupt
+          ? "Патруль прервёт стоянку"
         : "Караван ждёт у найденной цели";
-      outcomeAction.textContent = fatalBeforeResume
+      outcomeAction.textContent = monsterWillDefeat
+        ? "DEV: к контакту"
+        : fatalSupplyBeforeResume
         ? "DEV: к гибели"
+        : patrolWillInterrupt
+          ? "DEV: к контакту"
         : "DEV: к возобновлению";
-      outcomeDetail.textContent = fatalBeforeResume
+      outcomeDetail.textContent = monsterWillDefeat
+        ? outcome.monsterContactResolution?.status === "flee-failed"
+          ? "Патруль войдёт в радиус неподвижного каравана; выбранной скорости FLEE не хватит для разрыва дистанции."
+          : "Патруль войдёт в радиус неподвижного каравана; ACCEPT_FIGHT против превосходящего Power станет терминальной границей."
+        : fatalSupplyBeforeResume
         ? `SIM-006 исчерпает ${formatDepletionCause(outcome.planned.failureCause).toLocaleLowerCase("ru-RU")} до окончания ожидания; маршрут останется в точке STOP.`
+        : patrolWillInterrupt
+          ? `Караван остаётся неподвижен до входа патруля в радиус; успешный FLEE отменит остаток запланированных ${formatDuration(outcome.scheduledIdleDurationSeconds)}.`
         : `Прошло ${formatDuration(outcome.idleElapsedSeconds)} из ${formatDuration(outcome.idleDurationSeconds)}; SIM-005 остаётся в точке STOP, SIM-006 расходует idle-запасы.`;
-      outcomeCause.textContent = fatalBeforeResume
+      outcomeCause.textContent = monsterWillDefeat
+        ? `Монстр · ${formatElapsed(outcome.planned.atSeconds)}`
+        : fatalSupplyBeforeResume
         ? `Гибель · ${formatElapsed(outcome.planned.atSeconds)}`
+        : patrolWillInterrupt
+          ? `Контакт и FLEE · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`
         : `Возобновление · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`;
       return;
     }

@@ -44,6 +44,39 @@ function crossingScenario(interactionRadiusMeters = 100) {
   };
 }
 
+function stationaryStopScenario(interactionRadiusMeters = 100) {
+  const stop = createWorldCoordinate(0, 0);
+  const south = destinationPoint(stop, 180, 1_000, PLANET_RADIUS_METERS);
+  const west = destinationPoint(stop, 270, 1_500, PLANET_RADIUS_METERS);
+  const expeditionRoute = createRoutePlan(
+    south,
+    [{ bearingDeg: 0, distanceMeters: 2_000 }],
+    SPEED_METERS_PER_SECOND,
+    PLANET_RADIUS_METERS,
+  );
+  const patrolRoute = createRoutePlan(
+    west,
+    [
+      { bearingDeg: 90, distanceMeters: 3_000 },
+      { bearingDeg: 270, distanceMeters: 3_000 },
+    ],
+    SPEED_METERS_PER_SECOND,
+    PLANET_RADIUS_METERS,
+  );
+
+  return {
+    expeditionRoute,
+    monster: {
+      id: "idle-patrol",
+      kind: "wandering-monster",
+      power: 110,
+      visionRadiusMeters: 300,
+      interactionRadiusMeters,
+      patrolRoute,
+    },
+  };
+}
+
 test("GAME-004: expedition contact preserves authoritative monster metadata", () => {
   const { expeditionRoute, monster } = crossingScenario();
   const contact = findFirstExpeditionMonsterContact(expeditionRoute, monster);
@@ -56,6 +89,7 @@ test("GAME-004: expedition contact preserves authoritative monster metadata", ()
   assert.equal(contact.atSeconds, contact.expeditionElapsedSeconds);
   assert.equal(contact.routeElapsedSeconds, contact.expeditionElapsedSeconds);
   assert.equal(contact.atSeconds, contact.monsterPatrolElapsedSeconds);
+  assert.equal(contact.caravanActivity, "moving");
 });
 
 test("GAME-009: an idle STOP shifts post-resume contact in world time only", () => {
@@ -107,6 +141,39 @@ test("GAME-009: a contact before STOP remains the first world boundary", () => {
   );
 
   assert.deepEqual(withLaterStop, uninterrupted);
+});
+
+test("GAME-010: a transient patrol contact is found while the caravan waits", () => {
+  const { expeditionRoute, monster } = stationaryStopScenario();
+  const contact = findFirstExpeditionMonsterContactWithIdleStop(
+    expeditionRoute,
+    monster,
+    100,
+    100,
+  );
+
+  assert.ok(contact);
+  assert.equal(contact.caravanActivity, "idle");
+  assert.equal(contact.routeElapsedSeconds, 100);
+  assert.ok(contact.expeditionElapsedSeconds > 100);
+  assert.ok(contact.expeditionElapsedSeconds < 200);
+  assert.ok(Math.abs(contact.expeditionElapsedSeconds - 140) < 0.00001);
+  assert.ok(Math.abs(contact.separationMeters - 100) < 0.0001);
+});
+
+test("GAME-010: contact exactly at resume belongs to moving execution", () => {
+  const { expeditionRoute, monster } = stationaryStopScenario();
+  const contact = findFirstExpeditionMonsterContactWithIdleStop(
+    expeditionRoute,
+    monster,
+    100,
+    40,
+  );
+
+  assert.ok(contact);
+  assert.equal(contact.caravanActivity, "moving");
+  assert.ok(Math.abs(contact.expeditionElapsedSeconds - 140) < 0.00001);
+  assert.ok(Math.abs(contact.routeElapsedSeconds - 100) < 0.00001);
 });
 
 test("GAME-004: delayed expedition route uses absolute patrol world time", () => {

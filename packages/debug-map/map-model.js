@@ -134,6 +134,8 @@ export function advanceSimulationClock(
  * @property {number} [safeSeparationMeters]
  * @property {number} [relativeSpeedMetersPerSecond]
  * @property {number | null} [secondsToSafeSeparation]
+ * @property {import("../sim-core/dist/src/index.js").CaravanActivity} [caravanActivity]
+ * @property {"scheduled" | "monster-contact"} [resumeReason]
  * @property {string} [cityId]
  * @property {string} [cityName]
  * @property {number} [cityRadiusMeters]
@@ -517,6 +519,91 @@ export function createMonsterInterceptRoutePreset(
       { bearingDeg: 0, distanceKilometers: 0 },
       { bearingDeg: 0, distanceKilometers: 0 },
     ],
+  };
+}
+
+/**
+ * GAME-010 DEV preset — replaces one selected patrol route with a closed
+ * great-circle pass whose first interaction-radius entry occurs at the exact
+ * requested world time beside a stationary discovery STOP. Power, speed and
+ * interaction metadata remain those of the selected generated monster.
+ *
+ * @param {WorldCoordinate} stopCoordinate
+ * @param {number} contactAtSeconds
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
+ * @param {number} [elapsedSeconds]
+ */
+export function createStationaryStopPatrolPreset(
+  stopCoordinate,
+  contactAtSeconds,
+  monster,
+  elapsedSeconds = 0,
+) {
+  assertPositiveFinite(contactAtSeconds, "contactAtSeconds");
+  assertNonNegativeFinite(elapsedSeconds, "elapsedSeconds");
+  const source = monster.authoritativeMonster;
+  const planetRadiusMeters = source.patrolRoute.planetRadiusMeters;
+  const speedMetersPerSecond = source.patrolRoute.speedMetersPerSecond;
+  const approachDistanceMeters =
+    contactAtSeconds * speedMetersPerSecond +
+    source.interactionRadiusMeters;
+  const start = destinationPoint(
+    stopCoordinate,
+    270,
+    approachDistanceMeters,
+    planetRadiusMeters,
+  );
+  const throughStopBearing = initialBearingDegrees(start, stopCoordinate);
+  const farSide = destinationPoint(
+    start,
+    throughStopBearing,
+    approachDistanceMeters * 2,
+    planetRadiusMeters,
+  );
+  const returnDistanceMeters = greatCircleDistance(
+    farSide,
+    start,
+    planetRadiusMeters,
+  );
+  const patrolRoute = createRoutePlan(
+    start,
+    [
+      {
+        bearingDeg: throughStopBearing,
+        distanceMeters: approachDistanceMeters * 2,
+      },
+      {
+        bearingDeg: initialBearingDegrees(farSide, start),
+        distanceMeters: returnDistanceMeters,
+      },
+    ],
+    speedMetersPerSecond,
+    planetRadiusMeters,
+  );
+  const authoritativeMonster = {
+    ...source,
+    patrolRoute,
+  };
+  const evaluated = wanderingMonsterPositionAtTime(
+    authoritativeMonster,
+    elapsedSeconds,
+  );
+  const patrolCoordinates = [
+    patrolRoute.start,
+    ...patrolRoute.segments.map((segment) => segment.end),
+  ];
+
+  return {
+    ...monster,
+    periodSeconds: patrolRoute.totalDurationSeconds,
+    cycleIndex: evaluated.cycleIndex,
+    segmentIndex: evaluated.segmentIndex,
+    position: evaluated.coordinate,
+    point: projectCoordinate(evaluated.coordinate),
+    patrolPaths: splitPathAtAntimeridian(patrolCoordinates),
+    authoritativeMonster,
+    qaStationaryStop: true,
+    qaContactAtSeconds: contactAtSeconds,
   };
 }
 
@@ -907,10 +994,10 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
 }
 
 /**
- * GAME-006/007 composes route ETA, supplies, discovery STOP and the first moving
- * contact with Power plus an explicit movement-based FLEE resolution. A weak
- * monster is defeated automatically; against a stronger monster a strictly
- * faster caravan escapes and continues, while an equal/slower caravan fails.
+ * GAME-006/007/010 composes route ETA, supplies, discovery STOP and the first
+ * moving or stationary contact with Power plus an explicit movement-based
+ * FLEE resolution. Successful FLEE during an idle STOP cancels its remainder
+ * and resumes the original route at the exact contact time.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
@@ -941,7 +1028,8 @@ export function createExpeditionOutcomeSnapshot(
   const completionAtSeconds = cityDestination
     ? cityDestination.arrival?.atSeconds ?? null
     : route.totalDurationSeconds;
-  const baselineEvaluation = stopLifecycle ??
+  let effectiveStopLifecycle = stopLifecycle;
+  let baselineEvaluation = effectiveStopLifecycle ??
     evaluateExpeditionOutcome(
       route.authoritativeRoute,
       initialSupplies,
@@ -950,7 +1038,7 @@ export function createExpeditionOutcomeSnapshot(
       doctrinePauseAtSeconds,
       completionAtSeconds,
     );
-  const evaluatedAtSeconds = stopLifecycle?.evaluatedAtSeconds ??
+  const evaluatedAtSeconds = effectiveStopLifecycle?.evaluatedAtSeconds ??
     route.position.elapsedSeconds;
   const contact = monsterContact?.contact ?? null;
   const fleeAttempt =
@@ -972,7 +1060,7 @@ export function createExpeditionOutcomeSnapshot(
         fleeAttempt,
       )
     : null;
-  const contactExecutes =
+  let contactExecutes =
     monsterPauseAtSeconds !== null &&
     monsterPauseAtSeconds <
       route.totalDurationSeconds +
@@ -984,6 +1072,39 @@ export function createExpeditionOutcomeSnapshot(
         monsterPauseAtSeconds - baselineEvaluation.planned.atSeconds,
       ) <= EVENT_TIME_EPSILON_SECONDS &&
         baselineEvaluation.planned.status === "paused"));
+  const stopInterruptedByContact = Boolean(
+    contactExecutes &&
+    effectiveStopLifecycle &&
+    contact?.caravanActivity === "idle" &&
+    contactResolution?.status === "flee-succeeded",
+  );
+  if (
+    stopInterruptedByContact &&
+    effectiveStopLifecycle &&
+    monsterPauseAtSeconds !== null
+  ) {
+    const effectiveIdleDurationSeconds = Math.max(
+      0,
+      monsterPauseAtSeconds - effectiveStopLifecycle.stopAtRouteSeconds,
+    );
+    effectiveStopLifecycle = evaluateDiscoveryStopLifecycle(
+      route.authoritativeRoute,
+      initialSupplies,
+      consumptionProfile,
+      evaluatedAtSeconds,
+      effectiveStopLifecycle.stopAtRouteSeconds,
+      effectiveIdleDurationSeconds,
+      completionAtSeconds,
+    );
+    baselineEvaluation = effectiveStopLifecycle;
+    contactExecutes =
+      monsterPauseAtSeconds <
+        baselineEvaluation.planned.atSeconds - EVENT_TIME_EPSILON_SECONDS ||
+      (Math.abs(
+        monsterPauseAtSeconds - baselineEvaluation.planned.atSeconds,
+      ) <= EVENT_TIME_EPSILON_SECONDS &&
+        baselineEvaluation.planned.status === "paused");
+  }
   const contactDisposition = contactExecutes
     ? contactResolution?.routeDisposition ?? null
     : null;
@@ -1040,7 +1161,7 @@ export function createExpeditionOutcomeSnapshot(
   }
   const boundaryMovementElapsedSeconds =
     contactBoundaryMovementSeconds ??
-    stopLifecycle?.planned.movementElapsedSeconds ??
+    effectiveStopLifecycle?.planned.movementElapsedSeconds ??
     evaluation.planned.atSeconds;
   const boundaryPosition = positionAtTime(
     route.authoritativeRoute,
@@ -1050,14 +1171,15 @@ export function createExpeditionOutcomeSnapshot(
     evaluatedAtSeconds,
     evaluation.planned.atSeconds,
   );
-  const idleElapsedSeconds = !stopLifecycle ||
-    stopLifecycle.resumeAtSeconds === null
+  const idleElapsedSeconds = !effectiveStopLifecycle ||
+    effectiveStopLifecycle.resumeAtSeconds === null
     ? 0
     : Math.min(
-        stopLifecycle.idleDurationSeconds,
+        effectiveStopLifecycle.idleDurationSeconds,
         Math.max(
           0,
-          evaluatedBoundarySeconds - stopLifecycle.stopAtRouteSeconds,
+          evaluatedBoundarySeconds -
+            effectiveStopLifecycle.stopAtRouteSeconds,
         ),
       );
   const supplies = projectMixedActivitySupplies(
@@ -1071,20 +1193,23 @@ export function createExpeditionOutcomeSnapshot(
     ...evaluation,
     phase:
       evaluation.status === "in-progress"
-        ? stopLifecycle?.phase ?? /** @type {const} */ ("moving-to-stop")
+        ? effectiveStopLifecycle?.phase ??
+          /** @type {const} */ ("moving-to-stop")
         : /** @type {const} */ ("ended"),
-    idleDurationSeconds: stopLifecycle?.idleDurationSeconds ?? 0,
+    scheduledIdleDurationSeconds: stopLifecycle?.idleDurationSeconds ?? 0,
+    idleDurationSeconds: effectiveStopLifecycle?.idleDurationSeconds ?? 0,
     idleElapsedSeconds,
-    resumeAtSeconds: stopLifecycle?.resumeAtSeconds ?? null,
+    resumeAtSeconds: effectiveStopLifecycle?.resumeAtSeconds ?? null,
     completionAtSeconds:
-      stopLifecycle?.completionAtSeconds ?? completionAtSeconds,
+      effectiveStopLifecycle?.completionAtSeconds ?? completionAtSeconds,
     failureActivity:
       interruptionCause === "monster-defeat"
         ? null
-        : stopLifecycle?.failureActivity ??
+        : effectiveStopLifecycle?.failureActivity ??
           (evaluation.planned.status === "failed" ? "moving" : null),
     supplies,
-    stopLifecycle,
+    stopLifecycle: effectiveStopLifecycle,
+    stopInterruptedByContact,
     interruptionCause,
     destinationCity: cityDestination?.city ?? null,
     cityArrivalRadiusMeters: cityDestination?.radiusMeters ?? null,
@@ -1358,6 +1483,7 @@ export function createExpeditionEventLogSnapshot(
     resume,
     expeditionDurationSeconds,
     stopLifecycle,
+    outcome,
   );
 
   if (outcome?.monsterContact && outcome.monsterContactResolution) {
@@ -1389,6 +1515,7 @@ export function createExpeditionEventLogSnapshot(
       secondsToSafeSeparation:
         outcome.monsterContactResolution.fleeResolution
           ?.secondsToSafeSeparation,
+      caravanActivity: outcome.monsterContact.caravanActivity,
       order: 18,
     });
   }
@@ -1527,6 +1654,8 @@ export function createExpeditionEventLogSnapshot(
     relativeSpeedMetersPerSecond:
       event.relativeSpeedMetersPerSecond ?? null,
     secondsToSafeSeparation: event.secondsToSafeSeparation ?? null,
+    caravanActivity: event.caravanActivity ?? null,
+    resumeReason: event.resumeReason ?? null,
     cityId: event.cityId ?? null,
     cityName: event.cityName ?? null,
     cityRadiusMeters: event.cityRadiusMeters ?? null,
@@ -1563,6 +1692,7 @@ export function createExpeditionEventLogSnapshot(
  * @param {ReturnType<typeof createDiscoveryResumeSnapshot> | null} resume
  * @param {number} routeDurationSeconds
  * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} stopLifecycle
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} outcome
  */
 function addRumorSearchEvent(
   events,
@@ -1571,6 +1701,7 @@ function addRumorSearchEvent(
   resume,
   routeDurationSeconds,
   stopLifecycle,
+  outcome,
 ) {
   if (!rumorSearch) return;
 
@@ -1610,8 +1741,9 @@ function addRumorSearchEvent(
         stopLifecycle?.planned.status === "failed" &&
         stopLifecycle.planned.atSeconds <=
           resumeAtSeconds + EVENT_TIME_EPSILON_SECONDS
-      );
+    );
     if (resume?.resumeDecision && resumeExecutes && resumeAtSeconds !== null) {
+      const contactResume = Boolean(outcome?.stopInterruptedByContact);
       events.push({
         id: "discovery-route-resumed",
         kind: "route-resumed",
@@ -1623,7 +1755,8 @@ function addRumorSearchEvent(
         objectId: resume.resumeDecision.objectId,
         objectKind: resume.resumeDecision.objectKind,
         idleDurationSeconds: stopLifecycle?.idleDurationSeconds ?? 0,
-        order: 17,
+        resumeReason: contactResume ? "monster-contact" : "scheduled",
+        order: contactResume ? 19 : 17,
       });
     }
     return;
