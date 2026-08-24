@@ -721,6 +721,11 @@ export function createSessionKnowledgeMapSnapshot(
     if (!Array.isArray(travelLedger.tracks)) {
       throw new TypeError("travelLedger.tracks must be an array");
     }
+    if (!Array.isArray(travelLedger.reachedCityLandmarks)) {
+      throw new TypeError(
+        "travelLedger.reachedCityLandmarks must be an array",
+      );
+    }
     if (travelLedger.worldSeed !== ledger.worldSeed) {
       throw new RangeError(
         "travelLedger.worldSeed must match the discovery ledger",
@@ -741,6 +746,9 @@ export function createSessionKnowledgeMapSnapshot(
         (entry) => entry.firstObservation.originCityId,
       ),
       ...(travelLedger?.tracks.map((track) => track.originCityId) ?? []),
+      ...(travelLedger?.reachedCityLandmarks.map(
+        (landmark) => landmark.originCityId,
+      ) ?? []),
     ]),
   ];
   if (
@@ -769,6 +777,11 @@ export function createSessionKnowledgeMapSnapshot(
         .filter((track) => track.originCityId === originCityId)
         .map(createLocalTravelTrack)
     : [];
+  const cityLandmarks = originCityId
+    ? (travelLedger?.reachedCityLandmarks ?? []).filter(
+        (landmark) => landmark.originCityId === originCityId,
+      )
+    : [];
   const furthestTrackPointMeters = Math.max(
     0,
     ...localTracks.flatMap((track) =>
@@ -780,6 +793,7 @@ export function createSessionKnowledgeMapSnapshot(
   const furthestDistanceMeters = Math.max(
     0,
     ...navigations.map((navigation) => navigation.command.distanceMeters),
+    ...cityLandmarks.map((landmark) => landmark.distanceMeters),
     furthestTrackPointMeters,
   );
   const scaleRadiusMeters =
@@ -827,6 +841,25 @@ export function createSessionKnowledgeMapSnapshot(
             : 0),
       })),
     })),
+    cityLandmarks: cityLandmarks.map((landmark) => ({
+      ...landmark,
+      x:
+        origin.x +
+        (scaleRadiusMeters > 0
+          ? (Math.sin((landmark.bearingDeg * Math.PI) / 180) *
+              landmark.distanceMeters /
+              scaleRadiusMeters) *
+            radiusPixels
+          : 0),
+      y:
+        origin.y -
+        (scaleRadiusMeters > 0
+          ? (Math.cos((landmark.bearingDeg * Math.PI) / 180) *
+              landmark.distanceMeters /
+              scaleRadiusMeters) *
+            radiusPixels
+          : 0),
+    })),
     entries: navigations.map((navigation) => {
       const angleRadians = (navigation.command.bearingDeg * Math.PI) / 180;
       const distancePixels =
@@ -846,6 +879,41 @@ export function createSessionKnowledgeMapSnapshot(
         y: origin.y - Math.cos(angleRadians) * distancePixels,
       };
     }),
+  };
+}
+
+/**
+ * GAME-016 exposes only the relative fix earned by an authoritative arrival.
+ * Planned or interrupted journeys return null and cannot create knowledge.
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
+ * @param {{id: string, position: WorldCoordinate}} originCity
+ * @param {number} expeditionNumber
+ */
+export function createReachedCityLandmarkInput(
+  outcome,
+  originCity,
+  expeditionNumber,
+) {
+  if (
+    outcome.status !== "completed" ||
+    !outcome.cityArrival ||
+    !outcome.destinationCity
+  ) {
+    return null;
+  }
+  return {
+    expeditionNumber,
+    originCityId: originCity.id,
+    cityId: outcome.destinationCity.id,
+    arrivedAtSeconds: outcome.cityArrival.atSeconds,
+    originBearingDeg: initialBearingDegrees(
+      originCity.position,
+      outcome.destinationCity.position,
+    ),
+    originDistanceMeters: greatCircleDistance(
+      originCity.position,
+      outcome.destinationCity.position,
+    ),
   };
 }
 

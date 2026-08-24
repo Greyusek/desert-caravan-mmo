@@ -25,6 +25,7 @@ import {
   createMonsterInterceptRoutePreset,
   createKnownObjectReturnRoutePreset,
   createRumorSearchSnapshot,
+  createReachedCityLandmarkInput,
   createSessionKnowledgeMapSnapshot,
   createStationaryStopPatrolPreset,
   projectCoordinate,
@@ -34,6 +35,7 @@ import {
   createPlayerTravelLedger,
   recordDirectDiscoveryObservation,
   recordExpeditionTravelProgress,
+  recordReachedCityLandmark,
   wasObjectKnownBeforeExpedition,
 } from "../sim-core/dist/src/index.js";
 
@@ -691,6 +693,14 @@ function render() {
       traveledDistanceMeters: route.position.traveledDistanceMeters,
     });
     travelLedger = recordedTravel.ledger;
+    const reachedCity = createReachedCityLandmarkInput(
+      outcome,
+      startCity,
+      expeditionNumber,
+    );
+    if (reachedCity) {
+      travelLedger = recordReachedCityLandmark(travelLedger, reachedCity);
+    }
     const rumorSearch = createRumorSearchSnapshot(
       snapshot.seed,
       startCity,
@@ -1479,6 +1489,9 @@ function renderDiscoveryLedger(ledger, travel, snapshot) {
         (entry) => entry.firstObservation.originCityId,
       ),
       ...travel.tracks.map((track) => track.originCityId),
+      ...travel.reachedCityLandmarks.map(
+        (landmark) => landmark.originCityId,
+      ),
     ].includes(selectedKnowledgeMapOriginCityId)
   ) {
     selectedKnowledgeMapOriginCityId = null;
@@ -1750,6 +1763,36 @@ function drawSessionKnowledgeMap(map, cities) {
     knowledgeMap.append(marker, label, distance);
   }
 
+  for (const landmark of map.cityLandmarks) {
+    const reachedCity = cities.find((candidate) => candidate.id === landmark.cityId);
+    const marker = svgElement("rect", {
+      class: "knowledge-map-marker knowledge-map-marker--city",
+      x: landmark.x - 6,
+      y: landmark.y - 6,
+      width: 12,
+      height: 12,
+      rx: 2,
+    });
+    marker.append(
+      svgTitle(
+        `${reachedCity?.name ?? landmark.cityId} · подтверждено прибытием · ${formatNumber(landmark.bearingDeg, 2)}° · ${formatNumber(landmark.distanceMeters / 1_000, 3)} км`,
+      ),
+    );
+    const label = svgElement("text", {
+      class: "knowledge-map-label",
+      x: landmark.x + 9,
+      y: landmark.y - 4,
+    });
+    label.textContent = reachedCity?.name ?? landmark.cityId;
+    const distance = svgElement("text", {
+      class: "knowledge-map-distance",
+      x: landmark.x + 9,
+      y: landmark.y + 9,
+    });
+    distance.textContent = `${formatNumber(landmark.bearingDeg, 1)}° · ${formatNumber(landmark.distanceMeters / 1_000, 2)} км`;
+    knowledgeMap.append(marker, label, distance);
+  }
+
   const origin = svgElement("circle", {
     class: "knowledge-map-origin",
     cx: map.origin.x,
@@ -1765,7 +1808,7 @@ function drawSessionKnowledgeMap(map, cities) {
   originLabel.textContent = city?.name ?? map.originCityId;
   knowledgeMap.append(origin, originLabel);
 
-  knowledgeMapScale.textContent = `Радиус ${formatNumber(map.scaleRadiusMeters / 1_000, 2)} км · точек ${map.entries.length} · путей ${map.tracks.length}`;
+  knowledgeMapScale.textContent = `Радиус ${formatNumber(map.scaleRadiusMeters / 1_000, 2)} км · объектов ${map.entries.length} · городов ${map.cityLandmarks.length} · путей ${map.tracks.length}`;
 }
 
 /** @param {readonly {x: number, y: number}[]} points */

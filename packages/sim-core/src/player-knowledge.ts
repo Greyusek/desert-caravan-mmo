@@ -74,6 +74,27 @@ export interface ExpeditionTravelTrack {
 export interface PlayerTravelLedger {
   readonly worldSeed: string;
   readonly tracks: readonly ExpeditionTravelTrack[];
+  readonly reachedCityLandmarks: readonly ReachedCityLandmark[];
+}
+
+export interface ReachedCityLandmark {
+  readonly expeditionNumber: number;
+  readonly originCityId: string;
+  readonly cityId: string;
+  readonly arrivedAtSeconds: DurationSeconds;
+  readonly bearingDeg: BearingDegrees;
+  readonly distanceMeters: DistanceMeters;
+  readonly source: "authoritative-arrival";
+  readonly confidence: PlayerKnowledgeConfidence;
+}
+
+export interface ReachedCityLandmarkInput {
+  readonly expeditionNumber: number;
+  readonly originCityId: string;
+  readonly cityId: string;
+  readonly arrivedAtSeconds: DurationSeconds;
+  readonly originBearingDeg: BearingDegrees;
+  readonly originDistanceMeters: DistanceMeters;
 }
 
 export interface ExpeditionTravelProgressInput {
@@ -116,7 +137,51 @@ export function createPlayerTravelLedger(
   worldSeed: string,
 ): PlayerTravelLedger {
   assertNonEmptyString(worldSeed, "worldSeed");
-  return { worldSeed, tracks: [] };
+  return { worldSeed, tracks: [], reachedCityLandmarks: [] };
+}
+
+/**
+ * GAME-016 — confirms a reached city only after authoritative arrival. The
+ * session ledger retains a relative fix from the expedition origin and never
+ * stores either city's server coordinate.
+ */
+export function recordReachedCityLandmark(
+  ledger: PlayerTravelLedger,
+  input: ReachedCityLandmarkInput,
+): PlayerTravelLedger {
+  assertTravelLedger(ledger);
+  assertPositiveSafeInteger(input.expeditionNumber, "expeditionNumber");
+  assertNonEmptyString(input.originCityId, "originCityId");
+  assertNonEmptyString(input.cityId, "cityId");
+  assertNonNegativeFinite(input.arrivedAtSeconds, "arrivedAtSeconds");
+  if (!Number.isFinite(input.originBearingDeg)) {
+    throw new TypeError("originBearingDeg must be a finite number");
+  }
+  assertNonNegativeFinite(input.originDistanceMeters, "originDistanceMeters");
+
+  const existing = ledger.reachedCityLandmarks.find(
+    (landmark) =>
+      landmark.expeditionNumber === input.expeditionNumber &&
+      landmark.cityId === input.cityId,
+  );
+  if (existing) return ledger;
+
+  return {
+    ...ledger,
+    reachedCityLandmarks: [
+      ...ledger.reachedCityLandmarks,
+      {
+        expeditionNumber: input.expeditionNumber,
+        originCityId: input.originCityId,
+        cityId: input.cityId,
+        arrivedAtSeconds: input.arrivedAtSeconds,
+        bearingDeg: normalizeBearing(input.originBearingDeg),
+        distanceMeters: input.originDistanceMeters,
+        source: "authoritative-arrival",
+        confidence: "confirmed",
+      },
+    ],
+  };
 }
 
 /**
@@ -217,7 +282,11 @@ export function recordExpeditionTravelProgress(
 
   if (!existing) {
     return {
-      ledger: { worldSeed: ledger.worldSeed, tracks: [...ledger.tracks, track] },
+      ledger: {
+        worldSeed: ledger.worldSeed,
+        tracks: [...ledger.tracks, track],
+        reachedCityLandmarks: ledger.reachedCityLandmarks,
+      },
       track,
       status: "first-progress",
     };
@@ -228,6 +297,7 @@ export function recordExpeditionTravelProgress(
       tracks: ledger.tracks.map((candidate, index) =>
         index === existingIndex ? track : candidate,
       ),
+      reachedCityLandmarks: ledger.reachedCityLandmarks,
     },
     track,
     status: "progressed",
@@ -368,6 +438,9 @@ function assertTravelLedger(ledger: PlayerTravelLedger): void {
   assertNonEmptyString(ledger.worldSeed, "ledger.worldSeed");
   if (!Array.isArray(ledger.tracks)) {
     throw new TypeError("ledger.tracks must be an array");
+  }
+  if (!Array.isArray(ledger.reachedCityLandmarks)) {
+    throw new TypeError("ledger.reachedCityLandmarks must be an array");
   }
 }
 

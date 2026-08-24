@@ -40,7 +40,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-013`: render confirmed ledger entries on a coordinate-free north-up session knowledge map, still without production physical-map ownership or database persistence.
 - [x] `GAME-014`: retain executed expedition tracks on that session map and reveal only actually travelled corridors, still without database persistence or the production physical-map item.
 - [x] `GAME-015`: reveal a physically scaled 300 m player-visibility corridor around actually travelled tracks as the first session fog-of-war slice.
-- [ ] `GAME-016`: after authoritative arrival, record the reached city as a confirmed relative personal-map landmark without exposing or globally joining server coordinates.
+- [x] `GAME-016`: after authoritative arrival, record the reached city as a confirmed relative personal-map landmark without exposing or globally joining server coordinates.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors
