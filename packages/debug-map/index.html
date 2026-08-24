@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 21 · UI-006</p>
+          <p class="eyebrow">Checkpoint 25 · GAME-011</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -161,6 +161,33 @@
             Координаты скрыты. Красная отметка цели существует только в DEV overlay.
           </p>
         </article>
+      </section>
+
+      <section class="knowledge-panel" aria-labelledby="knowledge-title">
+        <div class="knowledge-heading">
+          <div>
+            <p class="section-kicker">GAME-011 · Session discovery ledger</p>
+            <h2 id="knowledge-title">Журнал знаний игрока</h2>
+          </div>
+          <div class="knowledge-counters">
+            <output id="knowledge-expedition">Экспедиция #1</output>
+            <output id="knowledge-count">0</output>
+          </div>
+        </div>
+        <p id="knowledge-empty" class="knowledge-empty">
+          Подтверждённых открытий пока нет. Найденный объект останется здесь после
+          команды «Повторить экспедицию».
+        </p>
+        <ol id="knowledge-list" class="knowledge-list" hidden></ol>
+        <div class="knowledge-footer">
+          <p>
+            Только память текущей вкладки: без localStorage, базы данных,
+            глобальной синхронизации и абсолютных координат.
+          </p>
+          <button id="knowledge-reset" type="button">
+            Очистить сессионные знания
+          </button>
+        </div>
       </section>
 
       <section

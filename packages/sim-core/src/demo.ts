@@ -2,6 +2,7 @@ import {
   DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
+  createPlayerDiscoveryLedger,
   createRumorSearchScenario,
   createRoutePlan,
   createWorldCoordinate,
@@ -20,6 +21,7 @@ import {
   meters,
   positionAtTime,
   projectSupplies,
+  recordDirectDiscoveryObservation,
   resolveMonsterPowerContact,
   resumeStaticObjectDiscoveryDoctrine,
   timeToFirstDepletion,
@@ -39,7 +41,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 24 demo");
+console.log("Desert Caravan MMO — Checkpoint 25 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -196,6 +198,35 @@ if (rumorOrigin) {
     );
     console.log(
       `GAME-009 STOP lifecycle: phase=${stopLifecycle.phase}, world-time=${(stopLifecycle.evaluatedAtSeconds / 3_600).toFixed(6)} h, route-time=${(stopLifecycle.movementElapsedSeconds / 3_600).toFixed(6)} h, idle=${(stopLifecycle.idleElapsedSeconds / 3_600).toFixed(3)} / ${(idleDurationSeconds / 3_600).toFixed(3)} h`,
+    );
+    const firstLedgerRecord = recordDirectDiscoveryObservation(
+      createPlayerDiscoveryLedger(world.seed),
+      {
+        expeditionNumber: 1,
+        objectId: rumorDiscovery.object.id,
+        objectKind: rumorDiscovery.object.kind,
+        originCityId: rumorOrigin.id,
+        rumorId: rumorScenario.rumor.id,
+        observedAtSeconds: rumorDiscovery.elapsedSeconds,
+        segmentIndex: rumorDiscovery.segmentIndex,
+        routeDistanceMeters: rumorDiscovery.routeDistanceMeters,
+      },
+    );
+    const secondLedgerRecord = recordDirectDiscoveryObservation(
+      firstLedgerRecord.ledger,
+      {
+        expeditionNumber: 2,
+        objectId: rumorDiscovery.object.id,
+        objectKind: rumorDiscovery.object.kind,
+        originCityId: rumorOrigin.id,
+        rumorId: rumorScenario.rumor.id,
+        observedAtSeconds: rumorDiscovery.elapsedSeconds,
+        segmentIndex: rumorDiscovery.segmentIndex,
+        routeDistanceMeters: rumorDiscovery.routeDistanceMeters,
+      },
+    );
+    console.log(
+      `GAME-011 session knowledge: first=${firstLedgerRecord.status}, repeat=${secondLedgerRecord.status}, observations=${secondLedgerRecord.entry.observationCount}, coordinates-stored=false`,
     );
   }
 }
@@ -372,5 +403,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 24 stationary STOP contact: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 25 session discovery ledger: npm run debug-map -> http://127.0.0.1:4173",
 );

@@ -25,6 +25,11 @@ import {
   createStationaryStopPatrolPreset,
   projectCoordinate,
 } from "./map-model.js";
+import {
+  createPlayerDiscoveryLedger,
+  recordDirectDiscoveryObservation,
+  wasObjectKnownBeforeExpedition,
+} from "../sim-core/dist/src/index.js";
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const STATIC_KIND_LABELS = {
@@ -116,6 +121,17 @@ const doctrineMarkAndContinue = requireElement(
 );
 const rumorDevRoute = requireElement("rumor-dev-route", HTMLButtonElement);
 const rumorMap = requireElement("rumor-map", SVGSVGElement);
+const knowledgeCount = requireElement("knowledge-count", HTMLOutputElement);
+const knowledgeExpedition = requireElement(
+  "knowledge-expedition",
+  HTMLOutputElement,
+);
+const knowledgeEmpty = requireElement(
+  "knowledge-empty",
+  HTMLParagraphElement,
+);
+const knowledgeList = requireElement("knowledge-list", HTMLOListElement);
+const knowledgeReset = requireElement("knowledge-reset", HTMLButtonElement);
 const contactPanel = requireElement("contact-panel", HTMLElement);
 const contactState = requireElement("contact-state", HTMLParagraphElement);
 const contactTitle = requireElement("contact-title", HTMLHeadingElement);
@@ -172,6 +188,8 @@ let clockFrameId = null;
 let clockAnchorTimestampMilliseconds = null;
 let clockAnchorElapsedSeconds = 0;
 let supplySettings = readSupplySettings();
+let expeditionNumber = 1;
+let discoveryLedger = createPlayerDiscoveryLedger(seedInput.value.trim());
 /** @type {string | null} */
 let resumedDiscoveryObjectId = null;
 let stationaryStopQaEnabled = false;
@@ -186,6 +204,11 @@ let activeSnapshot = null;
 
 seedForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  const nextSeed = seedInput.value.trim();
+  if (nextSeed.length > 0 && nextSeed !== discoveryLedger.worldSeed) {
+    discoveryLedger = createPlayerDiscoveryLedger(nextSeed);
+    expeditionNumber = 1;
+  }
   resetSimulationClock();
   render();
 });
@@ -252,6 +275,14 @@ contactDoctrineFight.addEventListener("change", pauseClockAndRender);
 contactFleeSpeed.addEventListener("change", pauseClockAndRender);
 contactSpatialZoom.addEventListener("change", render);
 contactTimeZoom.addEventListener("change", render);
+knowledgeReset.addEventListener("click", () => {
+  const seed = seedInput.value.trim();
+  if (seed.length === 0) return;
+  discoveryLedger = createPlayerDiscoveryLedger(seed);
+  expeditionNumber = 1;
+  resetSimulationClock();
+  render();
+});
 
 outcomeAction.addEventListener("click", () => {
   if (!activeOutcome) return;
@@ -277,6 +308,7 @@ outcomeAction.addEventListener("click", () => {
         ? activeOutcome.resumeAtSeconds
         : activeOutcome.planned.atSeconds;
   } else {
+    expeditionNumber += 1;
     resetSimulationClock();
   }
   timeSlider.value = String(elapsedSeconds);
@@ -402,6 +434,20 @@ function render() {
       elapsedSeconds,
       2,
     );
+    if (discoveryLedger.worldSeed !== snapshot.seed) {
+      discoveryLedger = createPlayerDiscoveryLedger(snapshot.seed);
+      expeditionNumber = 1;
+    }
+    const knownObjectIds = discoveryLedger.entries
+      .filter(
+        (entry) =>
+          wasObjectKnownBeforeExpedition(
+            discoveryLedger,
+            entry.objectId,
+            expeditionNumber,
+          ),
+      )
+      .map((entry) => entry.objectId);
     syncCityOptions(snapshot.cities);
     syncContactMonsterOptions(snapshot.monsters);
     const startCity = snapshot.cities.find(
@@ -425,6 +471,7 @@ function render() {
       snapshot.seed,
       startCity,
       timelineRoute,
+      knownObjectIds,
     );
     const timelineDoctrine = createDiscoveryDoctrineSnapshot(
       timelineRoute,
@@ -455,6 +502,7 @@ function render() {
         snapshot.seed,
         startCity,
         stopRoute,
+        knownObjectIds,
       );
       const stoppedDoctrine = createDiscoveryDoctrineSnapshot(
         stopRoute,
@@ -488,6 +536,7 @@ function render() {
       snapshot.seed,
       startCity,
       plannedRoute,
+      knownObjectIds,
     );
     const proposedDoctrine = createDiscoveryDoctrineSnapshot(
       plannedRoute,
@@ -553,6 +602,7 @@ function render() {
       snapshot.seed,
       startCity,
       route,
+      knownObjectIds,
     );
     const doctrine = createDiscoveryDoctrineSnapshot(
       route,
@@ -564,6 +614,20 @@ function render() {
       resumedDiscoveryObjectId,
     );
     const effectiveDoctrine = resume ?? doctrine;
+    if (rumorSearch.status === "found" && rumorSearch.discovery) {
+      const recorded = recordDirectDiscoveryObservation(discoveryLedger, {
+        expeditionNumber,
+        objectId: rumorSearch.serverTruth.target.id,
+        objectKind: rumorSearch.rumor.targetKind,
+        originCityId: rumorSearch.originCity.id,
+        rumorId: rumorSearch.rumor.id,
+        observedAtSeconds: rumorSearch.discovery.atSeconds,
+        segmentIndex: rumorSearch.discovery.segmentIndex,
+        routeDistanceMeters:
+          rumorSearch.discovery.routeDistanceKilometers * 1_000,
+      });
+      discoveryLedger = recorded.ledger;
+    }
     const caravanStatus = createCaravanStatusSnapshot(
       route,
       supplySettings.initial,
@@ -602,6 +666,7 @@ function render() {
     timeOutput.textContent = formatElapsed(elapsedSeconds);
     routeSummary.textContent = formatRouteSummary(route);
     renderRumorSearch(rumorSearch, effectiveDoctrine, outcome);
+    renderDiscoveryLedger(discoveryLedger, snapshot);
     renderCaravanStatus(caravanStatus);
     renderExpeditionOutcome(outcome);
     renderMonsterContact(monsterContact, outcome);
@@ -1114,6 +1179,9 @@ function eventTitle(event) {
   if (event.kind === "target-discovered") {
     return `Обнаружен ${staticKindLabel(event.objectKind).toLocaleLowerCase("ru-RU")}`;
   }
+  if (event.kind === "known-target-observed") {
+    return `Подтверждён известный ${staticKindLabel(event.objectKind).toLocaleLowerCase("ru-RU")}`;
+  }
   if (event.kind === "doctrine-decision") {
     return event.doctrine === "STOP"
       ? "Доктрина: остановиться у цели"
@@ -1170,6 +1238,9 @@ function eventDetail(event, route) {
   if (event.kind === "target-discovered") {
     return `Сегмент ${(event.segmentIndex ?? 0) + 1} · ${formatNumber(event.distanceKilometers ?? 0, 1)} км пути`;
   }
+  if (event.kind === "known-target-observed") {
+    return `Запись ${event.objectId ?? "объекта"} уже была в сессионном журнале · STOP повторно не выполняется`;
+  }
   if (event.kind === "doctrine-decision") {
     return event.doctrine === "STOP"
       ? "Движение поставлено на паузу в точке обнаружения"
@@ -1218,6 +1289,7 @@ function eventDetail(event, route) {
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
  */
 function renderRumorSearch(search, doctrine, outcome) {
+  const knownTarget = search.targetKnowledge === "known";
   const waiting = outcome.phase === "idle-at-stop";
   const idleFailure =
     outcome.status === "failed" && outcome.failureActivity === "idle";
@@ -1226,29 +1298,36 @@ function renderRumorSearch(search, doctrine, outcome) {
     !waiting &&
     !idleFailure;
   rumorPanel.dataset.state = search.status;
-  rumorState.textContent =
-    search.status === "found"
-      ? idleFailure
+  rumorPanel.dataset.knowledge = search.targetKnowledge;
+  if (search.status === "found") {
+    rumorState.textContent = knownTarget
+      ? "Известная цель подтверждена"
+      : idleFailure
         ? "Стоянка прервана"
         : waiting
           ? "Стоянка у цели"
           : resumed
-        ? "Маршрут возобновлён"
-        : doctrine.status === "stopped"
-        ? "Караван остановлен"
-        : "Цель отмечена"
-      : search.status === "missed"
-        ? "Не найдено"
-        : "Идёт поиск";
+            ? "Маршрут возобновлён"
+            : doctrine.status === "stopped"
+              ? "Караван остановлен"
+              : "Цель отмечена";
+  } else if (search.status === "missed") {
+    rumorState.textContent = knownTarget ? "Не подтверждено" : "Не найдено";
+  } else {
+    rumorState.textContent = knownTarget ? "Цель уже известна" : "Идёт поиск";
+  }
   rumorOrigin.textContent = `${search.originCity.name} · ${search.originCity.id}`;
   rumorSector.textContent = `СЗ · ${formatNumber(search.rumor.bearingSector.minimumBearingDeg, 1)}°–${formatNumber(search.rumor.bearingSector.maximumBearingDeg, 1)}°`;
   rumorRange.textContent = `${formatNumber(search.rumor.distanceRange.minimumMeters / 1_000, 0)}–${formatNumber(search.rumor.distanceRange.maximumMeters / 1_000, 0)} км`;
   rumorText.textContent = `«К северо-западу от ${search.originCity.name} видели старый рудник — примерно в ${formatNumber(search.rumor.distanceRange.minimumMeters / 1_000, 0)}–${formatNumber(search.rumor.distanceRange.maximumMeters / 1_000, 0)} км»`;
 
   if (search.status === "found" && search.discovery) {
-    rumorResult.textContent = `Рудник обнаружен на ${formatElapsed(search.discovery.atSeconds)} · сегмент ${search.discovery.segmentIndex + 1} · ${formatNumber(search.discovery.routeDistanceKilometers, 1)} км пути.`;
-    doctrineResult.textContent =
-      idleFailure
+    rumorResult.textContent = knownTarget
+      ? `Известный рудник повторно подтверждён на ${formatElapsed(search.discovery.atSeconds)} · сегмент ${search.discovery.segmentIndex + 1} · ${formatNumber(search.discovery.routeDistanceKilometers, 1)} км пути.`
+      : `Рудник обнаружен на ${formatElapsed(search.discovery.atSeconds)} · сегмент ${search.discovery.segmentIndex + 1} · ${formatNumber(search.discovery.routeDistanceKilometers, 1)} км пути.`;
+    doctrineResult.textContent = knownTarget
+      ? "Сессионный журнал распознал цель: доктрина новых открытий не выполняется, караван продолжает маршрут."
+      : idleFailure
         ? `STOP выполнена, но критические запасы исчерпались во время стоянки до возобновления.`
         : waiting
           ? `STOP выполнена: стоянка ${formatDuration(outcome.idleElapsedSeconds)} / ${formatDuration(outcome.idleDurationSeconds)}, маршрутное время заморожено.`
@@ -1260,17 +1339,63 @@ function renderRumorSearch(search, doctrine, outcome) {
         ? `STOP выполнена: маршрут поставлен на паузу в точке обнаружения.`
         : `MARK_AND_CONTINUE выполнена: цель отмечена, караван продолжает маршрут.`;
   } else if (search.status === "missed") {
-    rumorResult.textContent = `Маршрут завершён: караван не вошёл в радиус ${formatNumber(search.discoveryRadiusMeters, 0)} м от скрытой цели.`;
-    doctrineResult.textContent = "Цель не обнаружена — доктрина не сработала.";
+    rumorResult.textContent = knownTarget
+      ? `Маршрут завершён без повторного подтверждения: караван не вошёл в радиус ${formatNumber(search.discoveryRadiusMeters, 0)} м от известной цели.`
+      : `Маршрут завершён: караван не вошёл в радиус ${formatNumber(search.discoveryRadiusMeters, 0)} м от скрытой цели.`;
+    doctrineResult.textContent = knownTarget
+      ? "Существующая запись сохранена; доктрина новых открытий не выполнялась."
+      : "Цель не обнаружена — доктрина не сработала.";
   } else {
-    rumorResult.textContent = `Проведите маршрут через отмеченный сектор. Обнаружение сработает в радиусе ${formatNumber(search.discoveryRadiusMeters, 0)} м.`;
-    doctrineResult.textContent =
-      doctrine.doctrine === "STOP"
+    rumorResult.textContent = knownTarget
+      ? `Рудник уже есть в сессионном журнале. Повторное сближение подтвердит запись в радиусе ${formatNumber(search.discoveryRadiusMeters, 0)} м.`
+      : `Проведите маршрут через отмеченный сектор. Обнаружение сработает в радиусе ${formatNumber(search.discoveryRadiusMeters, 0)} м.`;
+    doctrineResult.textContent = knownTarget
+      ? "STOP относится только к новым открытиям: известная цель не остановит караван повторно."
+      : doctrine.doctrine === "STOP"
         ? "При обнаружении караван автоматически остановится у цели."
         : "При обнаружении караван отметит цель и продолжит движение.";
   }
 
   drawRumorMap(search);
+}
+
+/**
+ * @param {import("../sim-core/dist/src/index.js").PlayerDiscoveryLedger} ledger
+ * @param {ReturnType<typeof createDebugMapSnapshot>} snapshot
+ */
+function renderDiscoveryLedger(ledger, snapshot) {
+  knowledgeCount.textContent = String(ledger.entries.length);
+  knowledgeExpedition.textContent = `Экспедиция #${expeditionNumber}`;
+  knowledgeEmpty.hidden = ledger.entries.length > 0;
+  knowledgeList.hidden = ledger.entries.length === 0;
+  knowledgeList.replaceChildren(
+    ...ledger.entries.map((entry) => {
+      const item = document.createElement("li");
+      item.className = "knowledge-item";
+
+      const heading = document.createElement("div");
+      heading.className = "knowledge-item__heading";
+      const title = document.createElement("strong");
+      title.textContent = `${staticKindLabel(entry.objectKind)} · ${entry.objectId}`;
+      const badge = document.createElement("span");
+      badge.textContent = "Подтверждено лично";
+      heading.append(title, badge);
+
+      const firstCity = snapshot.cities.find(
+        (city) => city.id === entry.firstObservation.originCityId,
+      );
+      const first = document.createElement("p");
+      first.textContent = `Впервые: экспедиция #${entry.firstObservation.expeditionNumber} · ${firstCity?.name ?? entry.firstObservation.originCityId} · ${formatElapsed(entry.firstObservation.observedAtSeconds)} · сегмент ${entry.firstObservation.segmentIndex + 1} · ${formatNumber(entry.firstObservation.routeDistanceMeters / 1_000, 1)} км пути.`;
+      const latest = document.createElement("p");
+      latest.textContent =
+        entry.observationCount === 1
+          ? "Наблюдений: 1 · источник: личное наблюдение · уверенность: подтверждено."
+          : `Наблюдений: ${entry.observationCount} · последнее в экспедиции #${entry.latestObservation.expeditionNumber} на ${formatElapsed(entry.latestObservation.observedAtSeconds)}.`;
+
+      item.append(heading, first, latest);
+      return item;
+    }),
+  );
 }
 
 /**
@@ -1357,7 +1482,13 @@ function drawRumorMap(search) {
     class: "rumor-target-marker",
     points: `${map.targetPoint.x},${map.targetPoint.y - 7} ${map.targetPoint.x + 7},${map.targetPoint.y} ${map.targetPoint.x},${map.targetPoint.y + 7} ${map.targetPoint.x - 7},${map.targetPoint.y}`,
   });
-  target.append(svgTitle("Точная цель — только DEV"));
+  target.append(
+    svgTitle(
+      search.targetKnowledge === "known"
+        ? "Известная цель из сессионного журнала"
+        : "Точная цель — только DEV",
+    ),
+  );
 
   const origin = svgElement("circle", {
     class: "rumor-origin-marker",
@@ -1429,7 +1560,10 @@ function renderCaravanStatus(status) {
     status.outcome?.stopInterruptedByContact,
   );
   const doctrineContinues =
-    status.doctrine?.status === "marked-and-continuing";
+    status.doctrine?.status === "marked-and-continuing" ||
+    status.doctrine?.status === "known-and-continuing";
+  const knownTargetContinues =
+    status.doctrine?.status === "known-and-continuing";
   const panelState = outcomeFailed
     ? "depleted"
     : outcomeCompleted
@@ -1462,7 +1596,9 @@ function renderCaravanStatus(status) {
             ? "FLEE прервал стоянку · в пути"
             : "Цель отмечена · маршрут возобновлён"
         : doctrineContinues
-          ? "Цель отмечена · в пути"
+          ? knownTargetContinues
+            ? "Известная цель подтверждена · в пути"
+            : "Цель отмечена · в пути"
         : monsterVictoryOccurred
           ? "Патруль побеждён · в пути"
         : fleeSucceededOccurred
@@ -2075,6 +2211,8 @@ function drawSnapshot(
         "Доктрина",
         doctrine.status === "resumed-and-continuing"
           ? "STOP · RESUMED"
+          : doctrine.status === "known-and-continuing"
+            ? `${doctrine.doctrine} · KNOWN`
           : doctrine.doctrine,
       ],
       ["Скорость", `${route.speedKilometersPerHour.toFixed(1)} км/ч`],

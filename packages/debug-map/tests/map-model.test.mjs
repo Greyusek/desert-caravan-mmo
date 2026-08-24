@@ -2645,3 +2645,92 @@ test("GAME-010: idle depletion wins an exact tie with stationary contact", () =>
     false,
   );
 });
+
+test("GAME-011: known target remains pending until the route reaches it", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5, 0);
+  const firstSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    plan,
+  );
+  const discoveryAtSeconds = firstSearch.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(discoveryAtSeconds);
+
+  const beforeRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    discoveryAtSeconds - 1,
+  );
+  const knownSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    beforeRoute,
+    [firstSearch.serverTruth.target.id],
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    beforeRoute,
+    knownSearch,
+    "STOP",
+  );
+
+  assert.equal(knownSearch.targetKnowledge, "known");
+  assert.equal(knownSearch.status, "searching");
+  assert.equal(doctrine.status, "pending");
+  assert.equal(doctrine.decision, null);
+});
+
+test("GAME-011: a known target is reobserved without executing STOP again", () => {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const plan = createFourSegmentRouteSnapshot(origin.position, commands, 5, 0);
+  const firstSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    plan,
+  );
+  const arrivedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    plan.totalDurationSeconds,
+  );
+  const knownSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    arrivedRoute,
+    [firstSearch.serverTruth.target.id],
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    arrivedRoute,
+    knownSearch,
+    "STOP",
+  );
+  const executedRoute = applyDiscoveryDoctrineToRoute(arrivedRoute, doctrine);
+  const log = createExpeditionEventLogSnapshot(
+    executedRoute,
+    searchSupplies,
+    searchConsumption,
+    knownSearch,
+    doctrine,
+  );
+
+  assert.equal(knownSearch.status, "found");
+  assert.equal(doctrine.status, "known-and-continuing");
+  assert.equal(doctrine.decision, null);
+  assert.equal(
+    doctrine.movementElapsedSeconds,
+    arrivedRoute.position.elapsedSeconds,
+  );
+  assert.equal(executedRoute.position.status, "arrived");
+  assert.equal(
+    log.events.some((event) => event.kind === "doctrine-decision"),
+    false,
+  );
+  assert.equal(
+    log.events.find((event) => event.kind === "known-target-observed")?.id,
+    "rumor-target-reobserved",
+  );
+});
