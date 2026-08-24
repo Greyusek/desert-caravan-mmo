@@ -33,6 +33,8 @@
 - сила игрока в заглушке боя: **100**;
 - слабый монстр: **90**;
 - сильный монстр: **110**;
+- раннее предупреждение о малом запасе: **25%**;
+- аварийная граница провизии GAME-017: **50%** еды или воды; более ранний порог нужен, чтобы прямой возврат при неизменных скорости и расходе оставался физически достижимым;
 - production-время: ориентир **1 игровой день ≈ 3–4 реальных часа**, окончательно после playtest;
 - для разработки обязательны ускорения x1 / x10 / x100 / x1000.
 
@@ -137,7 +139,7 @@ Production-time пока не фиксируем окончательно. Ра�
 
 - static object: `STOP | MARK_AND_CONTINUE`;
 - detected danger: `AVOID | CONTINUE`;
-- supplies below threshold: `RETURN_TO_LAST_KNOWN_CITY | CONTINUE`;
+- supplies below threshold: `RETURN_TO_LAST_KNOWN_CITY | CONTINUE`; в первом срезе GAME-017 последним известным безопасным городом считается город старта экспедиции, поэтому исполняется `RETURN_TO_ORIGIN | CONTINUE`;
 - in city + low supplies: `AUTO_BUY_IF_AVAILABLE | DO_NOT_BUY`;
 - city depleted + supplies critical: `MOVE_TO_NEAREST_KNOWN_CITY | STAY`;
 - arrival at waypoint: `CONTINUE | STOP`.
@@ -215,8 +217,8 @@ Production-time пока не фиксируем окончательно. Ра�
 
 ## 13. Definition of Done MVP-0
 
-- [ ] запустить проект одной понятной командой;
-- [ ] увидеть стартовый город;
+- [x] запустить проект одной понятной командой;
+- [x] увидеть стартовый город;
 - [x] получить слух;
 - [x] построить минимум 4-сегментный маршрут;
 - [x] запустить симуляцию;
@@ -227,8 +229,8 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] увидеть реакцию автоматической доктрины;
 - [x] завершить маршрут или погибнуть от истощения;
 - [x] вернуться именно в город;
-- [ ] перезапустить тот же seed и воспроизвести тестовый сценарий;
-- [ ] автоматические тесты геометрии проходят.
+- [x] перезапустить тот же seed и воспроизвести тестовый сценарий;
+- [x] автоматические тесты геометрии проходят.
 
 ## 14. Backlog
 
@@ -265,4 +267,9 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-013` — render confirmed entries on a coordinate-free north-up session knowledge map.
 - [x] `GAME-014` — retain executed expedition tracks and actually travelled corridors on the session knowledge map.
 - [x] `GAME-015` — reveal a 300 m player-visibility corridor around travelled tracks as session fog of war.
-- [ ] `GAME-016` — confirm an authoritatively reached city as a relative personal-map landmark.
+- [x] `GAME-016` — confirm an authoritatively reached city as a relative personal-map landmark.
+- [x] `CITY-001` — deterministic finite food/water stocks for every seeded city.
+- [x] `CITY-002` — aggregate NPC population consumes city stocks from authoritative world time.
+- [x] `CITY-003` — first shortage deterministically reduces population and later consumption.
+- [x] `GAME-017` — execute `RETURN_TO_ORIGIN | CONTINUE` when food or water reaches 50% during uninterrupted movement.
+- [ ] `GAME-018` — compose the 50% emergency boundary with discovery-STOP idle consumption and depart from the exact stop coordinate.

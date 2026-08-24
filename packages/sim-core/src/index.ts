@@ -16,3 +16,4 @@ export * from "./city-arrival.js";
 export * from "./stop-lifecycle.js";
 export * from "./player-knowledge.js";
 export * from "./city-resources.js";
+export * from "./emergency-return.js";

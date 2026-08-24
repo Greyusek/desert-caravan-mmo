@@ -22,6 +22,7 @@ import {
   greatCircleDistance,
   kilometers,
   positionAtTime,
+  planEmergencySupplyReturn,
   projectCitySettlementAtTime,
   projectMixedActivitySupplies,
   resolveMonsterPowerContact,
@@ -113,7 +114,7 @@ export function advanceSimulationClock(
 }
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-low" | "supplies-depleted" | "target-discovered" | "known-target-observed" | "doctrine-decision" | "route-resumed" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-emergency-doctrine" | "supplies-low" | "supplies-depleted" | "target-discovered" | "known-target-observed" | "doctrine-decision" | "route-resumed" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -149,6 +150,9 @@ export function advanceSimulationClock(
  * @property {import("../sim-core/dist/src/index.js").CityArrivalKind} [arrivalKind]
  * @property {number} [idleDurationSeconds]
  * @property {import("../sim-core/dist/src/index.js").CaravanActivity | null} [failureActivity]
+ * @property {import("../sim-core/dist/src/index.js").SupplyEmergencyDoctrine} [supplyEmergencyDoctrine]
+ * @property {number} [remainingFraction]
+ * @property {number} [returnDistanceKilometers]
  */
 
 /**
@@ -1005,13 +1009,24 @@ export function createFourSegmentRouteSnapshot(
     }),
     (speedKilometersPerHour * 1_000) / 3_600,
   );
+  return createRoutePlanSnapshot(route, elapsedSeconds);
+}
+
+/**
+ * Resolves a server RoutePlan into the shared DEV presentation shape.
+ * GAME-017 may add a fifth, automatic return leg outside the four-leg editor.
+ * @param {import("../sim-core/dist/src/index.js").RoutePlan} route
+ * @param {number} [elapsedSeconds]
+ */
+export function createRoutePlanSnapshot(route, elapsedSeconds = 0) {
+  assertNonNegativeFinite(elapsedSeconds, "elapsedSeconds");
   const evaluated = positionAtTime(route, elapsedSeconds);
   const coordinates = sampleRouteCoordinates(route);
 
   return {
     start: route.start,
     end: route.end,
-    speedKilometersPerHour,
+    speedKilometersPerHour: route.speedMetersPerSecond * 3.6,
     totalDistanceKilometers: route.totalDistanceMeters / 1_000,
     totalDurationSeconds: route.totalDurationSeconds,
     routePaths: splitPathAtAntimeridian(coordinates),
@@ -1031,6 +1046,88 @@ export function createFourSegmentRouteSnapshot(
       point: projectCoordinate(evaluated.coordinate),
     },
     authoritativeRoute: route,
+  };
+}
+
+/**
+ * GAME-017 prepares one uninterrupted emergency-return route. A discovery STOP
+ * that occurs first keeps priority; idle-threshold composition remains a later
+ * explicit checkpoint instead of silently changing GAME-009 semantics.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {SupplyStock} initialSupplies
+ * @param {ConsumptionProfile} consumptionProfile
+ * @param {import("../sim-core/dist/src/index.js").SupplyEmergencyDoctrine} doctrine
+ * @param {number | null} [pauseAtRouteSeconds]
+ */
+export function createEmergencySupplyDoctrineSnapshot(
+  route,
+  initialSupplies,
+  consumptionProfile,
+  doctrine,
+  pauseAtRouteSeconds = null,
+) {
+  const plan = planEmergencySupplyReturn(
+    route.authoritativeRoute,
+    initialSupplies,
+    consumptionProfile,
+    doctrine,
+  );
+  const triggerAtSeconds = plan.triggersBeforeRouteEnd
+    ? plan.threshold?.atSeconds ?? null
+    : null;
+  const blockedByEarlierPause =
+    triggerAtSeconds !== null &&
+    pauseAtRouteSeconds !== null &&
+    pauseAtRouteSeconds <= triggerAtSeconds + EVENT_TIME_EPSILON_SECONDS;
+  const appliesReturn =
+    doctrine === "RETURN_TO_ORIGIN" &&
+    plan.returnSegmentIndex !== null &&
+    !blockedByEarlierPause;
+  const effectiveRoute = appliesReturn
+    ? createRoutePlanSnapshot(
+        plan.effectiveRoute,
+        route.position.elapsedSeconds,
+      )
+    : route;
+  const evaluatedAtSeconds = route.position.elapsedSeconds;
+  const decisionOccurred =
+    triggerAtSeconds !== null &&
+    evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >= triggerAtSeconds;
+  const status = triggerAtSeconds === null
+    ? /** @type {const} */ ("not-triggered")
+    : blockedByEarlierPause
+      ? /** @type {const} */ ("blocked-by-earlier-pause")
+      : !decisionOccurred
+        ? /** @type {const} */ ("pending")
+        : doctrine === "CONTINUE"
+          ? /** @type {const} */ ("continued")
+          : evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
+              (plan.returnToOriginAtSeconds ?? Number.POSITIVE_INFINITY)
+            ? /** @type {const} */ ("returned")
+            : /** @type {const} */ ("returning");
+
+  return {
+    doctrine,
+    status,
+    threshold: plan.threshold,
+    triggerAtSeconds,
+    triggerSegmentIndex: plan.triggerSegmentIndex,
+    triggerRouteDistanceKilometers:
+      plan.triggerRouteDistanceMeters === null
+        ? null
+        : plan.triggerRouteDistanceMeters / 1_000,
+    blockedByEarlierPause,
+    appliesReturn,
+    returnSegmentIndex: appliesReturn ? plan.returnSegmentIndex : null,
+    returnBearingDeg: appliesReturn ? plan.returnBearingDeg : null,
+    returnDistanceKilometers:
+      appliesReturn && plan.returnDistanceMeters !== null
+        ? plan.returnDistanceMeters / 1_000
+        : null,
+    returnToOriginAtSeconds: appliesReturn
+      ? plan.returnToOriginAtSeconds
+      : null,
+    effectiveRoute,
   };
 }
 
@@ -1667,6 +1764,7 @@ export function createCaravanStatusSnapshot(
     outcome,
     route: {
       status: route.position.status,
+      segmentCount: route.authoritativeRoute.segments.length,
       segmentIndex: route.position.segmentIndex,
       segmentProgress: route.position.segmentProgress,
       progress: routeProgress,
@@ -1729,6 +1827,7 @@ export function createCaravanStatusSnapshot(
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} [outcome]
  * @param {ReturnType<typeof createDiscoveryResumeSnapshot> | null} [resume]
  * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
+ * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot> | null} [supplyEmergency]
  */
 export function createExpeditionEventLogSnapshot(
   route,
@@ -1739,6 +1838,7 @@ export function createExpeditionEventLogSnapshot(
   outcome = null,
   resume = null,
   stopLifecycle = null,
+  supplyEmergency = null,
 ) {
   /** @param {number} routeElapsedSeconds */
   const routeToExpeditionTime = (routeElapsedSeconds) =>
@@ -1825,6 +1925,28 @@ export function createExpeditionEventLogSnapshot(
     stopLifecycle,
     outcome,
   );
+
+  if (
+    supplyEmergency?.triggerAtSeconds !== null &&
+    supplyEmergency?.triggerAtSeconds !== undefined &&
+    !supplyEmergency.blockedByEarlierPause
+  ) {
+    events.push({
+      id: "supplies-emergency-doctrine",
+      kind: "supplies-emergency-doctrine",
+      atSeconds: supplyEmergency.triggerAtSeconds,
+      segmentIndex: supplyEmergency.triggerSegmentIndex,
+      cause: supplyEmergency.threshold?.cause ?? null,
+      distanceKilometers:
+        supplyEmergency.triggerRouteDistanceKilometers,
+      supplyEmergencyDoctrine: supplyEmergency.doctrine,
+      remainingFraction:
+        supplyEmergency.threshold?.remainingFraction ?? undefined,
+      returnDistanceKilometers:
+        supplyEmergency.returnDistanceKilometers ?? undefined,
+      order: 11,
+    });
+  }
 
   if (outcome?.monsterContact && outcome.monsterContactResolution) {
     events.push({
@@ -2003,6 +2125,9 @@ export function createExpeditionEventLogSnapshot(
     arrivalKind: event.arrivalKind ?? null,
     idleDurationSeconds: event.idleDurationSeconds ?? null,
     failureActivity: event.failureActivity ?? null,
+    supplyEmergencyDoctrine: event.supplyEmergencyDoctrine ?? null,
+    remainingFraction: event.remainingFraction ?? null,
+    returnDistanceKilometers: event.returnDistanceKilometers ?? null,
     distanceKilometers: event.distanceKilometers,
     occurred: index <= activeEventIndex,
     active: index === activeEventIndex,

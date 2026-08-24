@@ -21,6 +21,7 @@ import {
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
   createDiscoveryStopLifecycleSnapshot,
+  createEmergencySupplyDoctrineSnapshot,
   createExpeditionEventLogSnapshot,
   createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
@@ -98,6 +99,89 @@ test("UI-005: zero wall time preserves the paused simulation instant", () => {
     elapsedSeconds: 123.456,
     reachedBoundary: false,
   });
+});
+
+test("GAME-017: DEV snapshot replaces future legs with an emergency return", () => {
+  const route = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    [
+      { bearingDeg: 90, distanceKilometers: 100 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+    36,
+    3_000,
+  );
+  const emergency = createEmergencySupplyDoctrineSnapshot(
+    route,
+    { foodUnits: 100, waterUnits: 1_000 },
+    {
+      moving: { foodUnitsPerHour: 72, waterUnitsPerHour: 1 },
+      idle: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+    },
+    "RETURN_TO_ORIGIN",
+  );
+
+  assert.equal(emergency.triggerAtSeconds, 2_500);
+  assert.equal(emergency.status, "returning");
+  assert.equal(emergency.appliesReturn, true);
+  assert.equal(emergency.effectiveRoute.segments.length, 2);
+  approx(emergency.returnDistanceKilometers, 25, 1e-7);
+  approx(
+    emergency.effectiveRoute.position.traveledDistanceMeters,
+    30_000,
+    1e-7,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    emergency.effectiveRoute,
+    { foodUnits: 100, waterUnits: 1_000 },
+    {
+      moving: { foodUnitsPerHour: 72, waterUnitsPerHour: 1 },
+      idle: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    emergency,
+  );
+  const decision = log.events.find(
+    (event) => event.kind === "supplies-emergency-doctrine",
+  );
+  assert.equal(decision?.atSeconds, 2_500);
+  assert.equal(decision?.supplyEmergencyDoctrine, "RETURN_TO_ORIGIN");
+  assert.equal(decision?.remainingFraction, 0.5);
+  approx(decision?.returnDistanceKilometers, 25, 1e-7);
+});
+
+test("GAME-017: an earlier discovery pause keeps priority over emergency return", () => {
+  const route = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    [
+      { bearingDeg: 90, distanceKilometers: 100 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+    36,
+    3_000,
+  );
+  const emergency = createEmergencySupplyDoctrineSnapshot(
+    route,
+    { foodUnits: 100, waterUnits: 1_000 },
+    {
+      moving: { foodUnitsPerHour: 72, waterUnitsPerHour: 1 },
+      idle: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+    },
+    "RETURN_TO_ORIGIN",
+    2_000,
+  );
+
+  assert.equal(emergency.status, "blocked-by-earlier-pause");
+  assert.equal(emergency.appliesReturn, false);
+  assert.equal(emergency.effectiveRoute, route);
 });
 
 test("UI-005: clock inputs and speed choices are validated", () => {

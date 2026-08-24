@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.34 — Checkpoint 34
+
+- Added `GAME-017`: food or water reaching the explicit 50% emergency threshold now invokes `RETURN_TO_ORIGIN | CONTINUE` during uninterrupted movement.
+- Preserved the executed outbound prefix and replaced only future commands with one shortest great-circle return leg when return is selected.
+- Kept the existing 25% supply warning separate from the earlier safety decision, so the default return remains physically achievable at unchanged speed and consumption.
+- Made re-entry into the expedition's origin-city radius the authoritative successful outcome of an emergency return.
+- Added the doctrine choice, deterministic three-click DEV scenario and a dedicated decision event to the debug map and journal.
+- Kept discovery-STOP idle composition, automatic buying, money, city stock transfer, persistence and database work outside this checkpoint.
+- Added ten GAME-017 regressions; repository verification now runs 294 tests.
+
 ## 0.0.33 — Checkpoint 33
 
 - Added `CITY-003`: the first food or water shortage now reduces aggregate city population deterministically from authoritative world time.
