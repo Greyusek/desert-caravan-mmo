@@ -39,6 +39,10 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [ ] `GAME-012`: prepare a return expedition from a selected known-object ledger entry using relative navigation data, still without database persistence.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
+## Future R&D anchors
+
+- [ ] `DESIGN-AI-001`: integrate the autonomous «Искины» direction into GDD/ROADMAP when the core player Action API is mature enough for AI-player experiments. Preserve the concept in [`docs/AI_ISKINS_CONCEPT.md`](docs/AI_ISKINS_CONCEPT.md); do not move it ahead of the current MVP checkpoints merely because it is documented.
+
 ## Maintenance rules
 
 - Keep tasks small enough for one feature or fix branch and one pull request.
