@@ -42,7 +42,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 29 demo");
+console.log("Desert Caravan MMO — Checkpoint 30 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -415,5 +415,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 29 physical visibility corridors: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 30 reached-city landmarks: npm run debug-map -> http://127.0.0.1:4173",
 );
