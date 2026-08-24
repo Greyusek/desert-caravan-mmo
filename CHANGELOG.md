@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.33 — Checkpoint 33
+
+- Added `CITY-003`: the first food or water shortage now reduces aggregate city population deterministically from authoritative world time.
+- Set an explicit provisional loss rate of 1% of the remaining population per game day, compounded continuously from the exact depletion boundary.
+- Integrated declining population into later consumption so a shrinking city uses any surviving stock more slowly.
+- Preserved the full population before and exactly at first depletion, and retained a minimum of one inhabitant until a later abandonment rule exists.
+- Exposed current/initial population, losses, shortage duration and the provisional rate in DEV city details and the checkpoint demo.
+- Kept replenishment, migration, trade, production chains, prices and persistence outside this checkpoint.
+- Added six CITY-003 regressions; repository verification now runs 284 tests.
+
 ## 0.0.32 — Checkpoint 32
 
 - Added `CITY-002`: every seeded city now has a deterministic aggregate NPC population of 100–500 inhabitants.

@@ -1,2872 +1,67 @@
-// @ts-check
-
-import {
-  CONTACT_ZOOM_HEIGHT,
-  CONTACT_ZOOM_WIDTH,
-  DEBUG_MAP_HEIGHT,
-  DEBUG_MAP_WIDTH,
-  KNOWLEDGE_MAP_HEIGHT,
-  KNOWLEDGE_MAP_WIDTH,
-  SIMULATION_CLOCK_SPEED_MULTIPLIERS,
-  advanceSimulationClock,
-  applyExpeditionOutcomeToRoute,
-  createCaravanStatusSnapshot,
-  createCityArrivalRoutePreset,
-  createCityArrivalSnapshot,
-  createContactZoomSnapshot,
-  createDebugMapSnapshot,
-  createDiscoveryDoctrineSnapshot,
-  createDiscoveryResumeSnapshot,
-  createDiscoveryStopLifecycleSnapshot,
-  createExpeditionEventLogSnapshot,
-  createExpeditionOutcomeSnapshot,
-  createFourSegmentRouteSnapshot,
-  createMonsterContactSnapshot,
-  createMonsterInterceptRoutePreset,
-  createKnownObjectReturnRoutePreset,
-  createRumorSearchSnapshot,
-  createReachedCityLandmarkInput,
-  createSessionKnowledgeMapSnapshot,
-  createStationaryStopPatrolPreset,
-  projectCoordinate,
-} from "./map-model.js";
-import {
-  createPlayerDiscoveryLedger,
-  createPlayerTravelLedger,
-  recordDirectDiscoveryObservation,
-  recordExpeditionTravelProgress,
-  recordReachedCityLandmark,
-  wasObjectKnownBeforeExpedition,
-} from "../sim-core/dist/src/index.js";
-
-const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
-const STATIC_KIND_LABELS = {
-  oasis: "ĞĞ°Ğ·Ğ¸Ñ",
-  mine: "Ğ ÑƒĞ´Ğ½Ğ¸Ğº",
-  ruins: "Ğ ÑƒĞ¸Ğ½Ñ‹",
-  cave: "ĞŸĞµÑ‰ĞµÑ€Ğ°",
-};
-
-const seedForm = requireElement("seed-form", HTMLFormElement);
-const seedInput = requireElement("seed-input", HTMLInputElement);
-const timeSlider = requireElement("time-slider", HTMLInputElement);
-const timeOutput = requireElement("time-output", HTMLOutputElement);
-const clockToggle = requireElement("clock-toggle", HTMLButtonElement);
-const clockToggleIcon = requireElement("clock-toggle-icon", HTMLSpanElement);
-const clockToggleLabel = requireElement("clock-toggle-label", HTMLSpanElement);
-const clockSpeed = requireElement("clock-speed", HTMLSelectElement);
-const clockStatus = requireElement("clock-status", HTMLOutputElement);
-const worldMap = requireElement("world-map", SVGSVGElement);
-const errorMessage = requireElement("error-message", HTMLParagraphElement);
-const mapTitle = requireElement("map-title", HTMLHeadingElement);
-const cityCount = requireElement("city-count", HTMLElement);
-const objectCount = requireElement("object-count", HTMLElement);
-const monsterCount = requireElement("monster-count", HTMLElement);
-const detailTitle = requireElement("detail-title", HTMLParagraphElement);
-const detailList = requireElement("detail-list", HTMLDListElement);
-const routeForm = requireElement("route-form", HTMLFormElement);
-const routeStartCity = requireElement("route-start-city", HTMLSelectElement);
-const routeDestinationCity = requireElement(
-  "route-destination-city",
-  HTMLSelectElement,
-);
-const routeSpeed = requireElement("route-speed", HTMLInputElement);
-const cityDevRoute = requireElement("city-dev-route", HTMLButtonElement);
-const routeSummary = requireElement("route-summary", HTMLOutputElement);
-const routeBearingInputs = [1, 2, 3, 4].map((index) =>
-  requireElement(`route-bearing-${index}`, HTMLInputElement),
-);
-const routeDistanceInputs = [1, 2, 3, 4].map((index) =>
-  requireElement(`route-distance-${index}`, HTMLInputElement),
-);
-const caravanPanel = requireElement("caravan-panel", HTMLElement);
-const caravanStateLabel = requireElement("caravan-state-label", HTMLParagraphElement);
-const caravanRouteStatus = requireElement("caravan-route-status", HTMLElement);
-const caravanDistance = requireElement("caravan-distance", HTMLParagraphElement);
-const routeProgress = requireElement("route-progress", HTMLProgressElement);
-const routeProgressLabel = requireElement("route-progress-label", HTMLParagraphElement);
-const foodCard = requireElement("food-card", HTMLElement);
-const foodRemaining = requireElement("food-remaining", HTMLElement);
-const foodProgress = requireElement("food-progress", HTMLProgressElement);
-const foodMeta = requireElement("food-meta", HTMLParagraphElement);
-const waterCard = requireElement("water-card", HTMLElement);
-const waterRemaining = requireElement("water-remaining", HTMLElement);
-const waterProgress = requireElement("water-progress", HTMLProgressElement);
-const waterMeta = requireElement("water-meta", HTMLParagraphElement);
-const forecastTitle = requireElement("forecast-title", HTMLElement);
-const forecastDetail = requireElement("forecast-detail", HTMLParagraphElement);
-const outcomePanel = requireElement("outcome-panel", HTMLElement);
-const outcomeTitle = requireElement("outcome-title", HTMLHeadingElement);
-const outcomeDetail = requireElement("outcome-detail", HTMLParagraphElement);
-const outcomeState = requireElement("outcome-state", HTMLParagraphElement);
-const outcomeTime = requireElement("outcome-time", HTMLElement);
-const outcomeCause = requireElement("outcome-cause", HTMLElement);
-const outcomePosition = requireElement("outcome-position", HTMLElement);
-const outcomeAction = requireElement("outcome-action", HTMLButtonElement);
-const stopIdleHours = requireElement("stop-idle-hours", HTMLInputElement);
-const supplyForm = requireElement("supply-form", HTMLFormElement);
-const initialFood = requireElement("initial-food", HTMLInputElement);
-const initialWater = requireElement("initial-water", HTMLInputElement);
-const movingFoodRate = requireElement("moving-food-rate", HTMLInputElement);
-const movingWaterRate = requireElement("moving-water-rate", HTMLInputElement);
-const idleFoodRate = requireElement("idle-food-rate", HTMLInputElement);
-const idleWaterRate = requireElement("idle-water-rate", HTMLInputElement);
-const eventLogCount = requireElement("event-log-count", HTMLOutputElement);
-const eventLogNext = requireElement("event-log-next", HTMLParagraphElement);
-const eventLogList = requireElement("event-log-list", HTMLOListElement);
-const rumorPanel = requireElement("rumor-panel", HTMLElement);
-const rumorState = requireElement("rumor-state", HTMLParagraphElement);
-const rumorText = requireElement("rumor-text", HTMLElement);
-const rumorOrigin = requireElement("rumor-origin", HTMLElement);
-const rumorSector = requireElement("rumor-sector", HTMLElement);
-const rumorRange = requireElement("rumor-range", HTMLElement);
-const rumorResult = requireElement("rumor-result", HTMLParagraphElement);
-const doctrineResult = requireElement("doctrine-result", HTMLParagraphElement);
-const doctrineStop = requireElement("doctrine-stop", HTMLInputElement);
-const doctrineMarkAndContinue = requireElement(
-  "doctrine-mark-and-continue",
-  HTMLInputElement,
-);
-const rumorDevRoute = requireElement("rumor-dev-route", HTMLButtonElement);
-const rumorMap = requireElement("rumor-map", SVGSVGElement);
-const knowledgeCount = requireElement("knowledge-count", HTMLOutputElement);
-const knowledgeTrackCount = requireElement(
-  "knowledge-track-count",
-  HTMLOutputElement,
-);
-const knowledgeExpedition = requireElement(
-  "knowledge-expedition",
-  HTMLOutputElement,
-);
-const knowledgeEmpty = requireElement(
-  "knowledge-empty",
-  HTMLParagraphElement,
-);
-const knowledgeList = requireElement("knowledge-list", HTMLOListElement);
-const knowledgeMap = requireElement("knowledge-map", SVGSVGElement);
-const knowledgeMapOrigin = requireElement(
-  "knowledge-map-origin",
-  HTMLSelectElement,
-);
-const knowledgeMapScale = requireElement(
-  "knowledge-map-scale",
-  HTMLOutputElement,
-);
-const knowledgeMapVisibility = requireElement(
-  "knowledge-map-visibility",
-  HTMLOutputElement,
-);
-const knowledgeRouteStatus = requireElement(
-  "knowledge-route-status",
-  HTMLOutputElement,
-);
-const knowledgeReset = requireElement("knowledge-reset", HTMLButtonElement);
-const contactPanel = requireElement("contact-panel", HTMLElement);
-const contactState = requireElement("contact-state", HTMLParagraphElement);
-const contactTitle = requireElement("contact-title", HTMLHeadingElement);
-const contactDetail = requireElement("contact-detail", HTMLParagraphElement);
-const contactTime = requireElement("contact-time", HTMLElement);
-const contactMonster = requireElement("contact-monster", HTMLElement);
-const contactPosition = requireElement("contact-position", HTMLElement);
-const contactDistance = requireElement("contact-distance", HTMLElement);
-const contactPlayerPower = requireElement("contact-player-power", HTMLElement);
-const contactPowerComparison = requireElement(
-  "contact-power-comparison",
-  HTMLElement,
-);
-const contactMonsterSpeed = requireElement("contact-monster-speed", HTMLElement);
-const contactFleeResult = requireElement("contact-flee-result", HTMLElement);
-const contactMonsterSelect = requireElement(
-  "contact-monster-select",
-  HTMLSelectElement,
-);
-const contactFleeSpeed = requireElement(
-  "contact-flee-speed",
-  HTMLInputElement,
-);
-const contactDoctrineFlee = requireElement(
-  "contact-doctrine-flee",
-  HTMLInputElement,
-);
-const contactDoctrineFight = requireElement(
-  "contact-doctrine-fight",
-  HTMLInputElement,
-);
-const contactDevRoute = requireElement("contact-dev-route", HTMLButtonElement);
-const contactStopDevRoute = requireElement(
-  "contact-stop-dev-route",
-  HTMLButtonElement,
-);
-const contactSpatialZoom = requireElement(
-  "contact-spatial-zoom",
-  HTMLSelectElement,
-);
-const contactTimeZoom = requireElement("contact-time-zoom", HTMLSelectElement);
-const contactZoomMap = requireElement("contact-zoom-map", SVGSVGElement);
-const contactZoomCaption = requireElement(
-  "contact-zoom-caption",
-  HTMLParagraphElement,
-);
-
-let elapsedSeconds = 0;
-let clockRunning = false;
-let clockSpeedMultiplier = readClockSpeedMultiplier();
-/** @type {number | null} */
-let clockFrameId = null;
-/** @type {number | null} */
-let clockAnchorTimestampMilliseconds = null;
-let clockAnchorElapsedSeconds = 0;
-let supplySettings = readSupplySettings();
-let expeditionNumber = 1;
-let discoveryLedger = createPlayerDiscoveryLedger(seedInput.value.trim());
-let travelLedger = createPlayerTravelLedger(seedInput.value.trim());
-/** @type {string | null} */
-let preparedKnowledgeObjectId = null;
-/** @type {string | null} */
-let selectedKnowledgeMapOriginCityId = null;
-/** @type {string | null} */
-let resumedDiscoveryObjectId = null;
-let stationaryStopQaEnabled = false;
-/** @type {ReturnType<typeof createRumorSearchSnapshot> | null} */
-let activeRumorSearch = null;
-/** @type {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} */
-let activeDoctrine = null;
-/** @type {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} */
-let activeOutcome = null;
-/** @type {ReturnType<typeof createDebugMapSnapshot> | null} */
-let activeSnapshot = null;
-
-seedForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const nextSeed = seedInput.value.trim();
-  if (nextSeed.length > 0 && nextSeed !== discoveryLedger.worldSeed) {
-    discoveryLedger = createPlayerDiscoveryLedger(nextSeed);
-    travelLedger = createPlayerTravelLedger(nextSeed);
-    expeditionNumber = 1;
-    preparedKnowledgeObjectId = null;
-    selectedKnowledgeMapOriginCityId = null;
-  }
-  resetSimulationClock();
-  render();
-});
-
-timeSlider.addEventListener("input", () => {
-  pauseSimulationClock();
-  elapsedSeconds = Number(timeSlider.value);
-  render();
-});
-
-clockToggle.addEventListener("click", () => {
-  if (clockRunning) {
-    synchronizeSimulationClock(performance.now());
-    pauseSimulationClock();
-    return;
-  }
-
-  startSimulationClock();
-});
-
-clockSpeed.addEventListener("change", () => {
-  const nextMultiplier = readClockSpeedMultiplier();
-  if (clockRunning) {
-    const timestampMilliseconds = performance.now();
-    const reachedBoundary = synchronizeSimulationClock(timestampMilliseconds);
-    clockSpeedMultiplier = nextMultiplier;
-    if (reachedBoundary) {
-      pauseSimulationClock();
-      return;
-    }
-    clockAnchorElapsedSeconds = elapsedSeconds;
-    clockAnchorTimestampMilliseconds = timestampMilliseconds;
-  } else {
-    clockSpeedMultiplier = nextMultiplier;
-  }
-  updateClockControls();
-});
-
-routeForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  beginNewExpeditionIfTravelled();
-  preparedKnowledgeObjectId = null;
-  resetSimulationClock();
-  render();
-});
-
-supplyForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  supplySettings = readSupplySettings();
-  resetSimulationClock();
-  render();
-});
-
-doctrineStop.addEventListener("change", clearDiscoveryResumeAndRender);
-doctrineMarkAndContinue.addEventListener(
-  "change",
-  clearDiscoveryResumeAndRender,
-);
-stopIdleHours.addEventListener("change", clearDiscoveryResumeAndRender);
-contactMonsterSelect.addEventListener("change", () => {
-  resetSimulationClock();
-  render();
-});
-contactDoctrineFlee.addEventListener("change", pauseClockAndRender);
-contactDoctrineFight.addEventListener("change", pauseClockAndRender);
-contactFleeSpeed.addEventListener("change", pauseClockAndRender);
-contactSpatialZoom.addEventListener("change", render);
-contactTimeZoom.addEventListener("change", render);
-knowledgeMapOrigin.addEventListener("change", () => {
-  selectedKnowledgeMapOriginCityId = knowledgeMapOrigin.value || null;
-  render();
-});
-knowledgeReset.addEventListener("click", () => {
-  const seed = seedInput.value.trim();
-  if (seed.length === 0) return;
-  discoveryLedger = createPlayerDiscoveryLedger(seed);
-  travelLedger = createPlayerTravelLedger(seed);
-  expeditionNumber = 1;
-  preparedKnowledgeObjectId = null;
-  selectedKnowledgeMapOriginCityId = null;
-  resetSimulationClock();
-  render();
-});
-
-knowledgeList.addEventListener("click", (event) => {
-  if (!(event.target instanceof Element)) return;
-  const button = event.target.closest("button[data-knowledge-object-id]");
-  if (!(button instanceof HTMLButtonElement)) return;
-  const objectId = button.dataset.knowledgeObjectId;
-  if (!objectId) return;
-
-  const preset = createKnownObjectReturnRoutePreset(
-    discoveryLedger,
-    objectId,
-  );
-  stationaryStopQaEnabled = false;
-  expeditionNumber += 1;
-  preparedKnowledgeObjectId = preset.objectId;
-  selectedKnowledgeMapOriginCityId = preset.originCityId;
-  routeStartCity.value = preset.originCityId;
-  routeBearingInputs.forEach((input, index) => {
-    input.value = preset.commands[index]?.bearingDeg.toFixed(6) ?? "0";
-  });
-  routeDistanceInputs.forEach((input, index) => {
-    input.value =
-      preset.commands[index]?.distanceKilometers.toFixed(6) ?? "0";
-  });
-  resetSimulationClock();
-  render();
-});
-
-outcomeAction.addEventListener("click", () => {
-  if (!activeOutcome) return;
-  pauseSimulationClock();
-  if (
-    activeOutcome.status === "paused" &&
-    activeOutcome.interruptionCause === "doctrine-stop" &&
-    activeDoctrine?.decision
-  ) {
-    resumedDiscoveryObjectId = activeDoctrine.decision.objectId;
-    render();
-    return;
-  }
-  if (activeOutcome.status === "in-progress") {
-    elapsedSeconds =
-      activeOutcome.phase === "idle-at-stop" &&
-      activeOutcome.resumeAtSeconds !== null &&
-      !(
-        activeOutcome.planned.status === "failed" &&
-        activeOutcome.planned.atSeconds <=
-          activeOutcome.resumeAtSeconds + 1e-9
-      )
-        ? activeOutcome.resumeAtSeconds
-        : activeOutcome.planned.atSeconds;
-  } else {
-    expeditionNumber += 1;
-    resetSimulationClock();
-  }
-  timeSlider.value = String(elapsedSeconds);
-  render();
-});
-
-rumorDevRoute.addEventListener("click", () => {
-  if (!activeRumorSearch) return;
-
-  beginNewExpeditionIfTravelled();
-  stationaryStopQaEnabled = false;
-  preparedKnowledgeObjectId = null;
-  const { exactBearingDeg, exactDistanceKilometers } =
-    activeRumorSearch.serverTruth;
-  routeBearingInputs.forEach((input, index) => {
-    input.value = index === 0 ? exactBearingDeg.toFixed(6) : "0";
-  });
-  routeDistanceInputs.forEach((input, index) => {
-    input.value = index === 0 ? exactDistanceKilometers.toFixed(6) : "0";
-  });
-  resetSimulationClock();
-  render();
-});
-
-contactDevRoute.addEventListener("click", () => {
-  const monster = activeSnapshot?.monsters.find(
-    (candidate) => candidate.id === contactMonsterSelect.value,
-  );
-  if (!activeSnapshot || !monster) return;
-
-  beginNewExpeditionIfTravelled();
-
-  const candidates = activeSnapshot.cities.map((city) => ({
-    city,
-    preset: createMonsterInterceptRoutePreset(city.position, monster),
-  }));
-  candidates.sort(
-    (left, right) =>
-      left.preset.commands[0].distanceKilometers -
-        right.preset.commands[0].distanceKilometers ||
-      left.city.id.localeCompare(right.city.id),
-  );
-  const selected = candidates[0];
-  if (!selected) return;
-
-  stationaryStopQaEnabled = false;
-  preparedKnowledgeObjectId = null;
-  routeStartCity.value = selected.city.id;
-  routeSpeed.value = selected.preset.speedKilometersPerHour.toFixed(6);
-  routeBearingInputs.forEach((input, index) => {
-    input.value = selected.preset.commands[index]?.bearingDeg.toFixed(6) ?? "0";
-  });
-  routeDistanceInputs.forEach((input, index) => {
-    input.value =
-      selected.preset.commands[index]?.distanceKilometers.toFixed(6) ?? "0";
-  });
-  resetSimulationClock();
-  render();
-});
-
-contactStopDevRoute.addEventListener("click", () => {
-  if (!activeRumorSearch) return;
-
-  beginNewExpeditionIfTravelled();
-  preparedKnowledgeObjectId = null;
-  const { exactBearingDeg, exactDistanceKilometers } =
-    activeRumorSearch.serverTruth;
-  routeBearingInputs.forEach((input, index) => {
-    input.value = index === 0 ? exactBearingDeg.toFixed(6) : "0";
-  });
-  routeDistanceInputs.forEach((input, index) => {
-    input.value = index === 0 ? exactDistanceKilometers.toFixed(6) : "0";
-  });
-  doctrineStop.checked = true;
-  stopIdleHours.value = "6";
-  stationaryStopQaEnabled = true;
-  resetSimulationClock();
-  render();
-});
-
-cityDevRoute.addEventListener("click", () => {
-  const startCity = activeSnapshot?.cities.find(
-    (city) => city.id === routeStartCity.value,
-  );
-  const destinationCity = activeSnapshot?.cities.find(
-    (city) => city.id === routeDestinationCity.value,
-  );
-  if (!startCity || !destinationCity) return;
-
-  beginNewExpeditionIfTravelled();
-  stationaryStopQaEnabled = false;
-  preparedKnowledgeObjectId = null;
-  const preset = createCityArrivalRoutePreset(
-    startCity.position,
-    destinationCity,
-  );
-  routeBearingInputs.forEach((input, index) => {
-    input.value = preset.commands[index]?.bearingDeg.toFixed(6) ?? "0";
-  });
-  routeDistanceInputs.forEach((input, index) => {
-    input.value =
-      preset.commands[index]?.distanceKilometers.toFixed(6) ?? "0";
-  });
-  doctrineMarkAndContinue.checked = true;
-  const weakMonster = activeSnapshot?.monsters.find(
-    (monster) => monster.power < 100,
-  );
-  if (weakMonster) contactMonsterSelect.value = weakMonster.id;
-  resetSimulationClock();
-  render();
-});
-
-worldMap.addEventListener("click", (event) => {
-  if (!(event.target instanceof Element)) return;
-  const marker = event.target.closest("[data-detail-title]");
-  if (!marker) return;
-
-  const title = marker.getAttribute("data-detail-title");
-  const rows = marker.getAttribute("data-detail-rows");
-  if (!title || !rows) return;
-
-  showDetails(title, JSON.parse(rows));
-});
-
-render();
-
-/** @returns {void} */
-function render() {
-  try {
-    const snapshot = createDebugMapSnapshot(
-      seedInput.value.trim(),
-      elapsedSeconds,
-      2,
-    );
-    if (discoveryLedger.worldSeed !== snapshot.seed) {
-      discoveryLedger = createPlayerDiscoveryLedger(snapshot.seed);
-      travelLedger = createPlayerTravelLedger(snapshot.seed);
-      expeditionNumber = 1;
-      preparedKnowledgeObjectId = null;
-      selectedKnowledgeMapOriginCityId = null;
-    }
-    const knownObjectIds = discoveryLedger.entries
-      .filter(
-        (entry) =>
-          wasObjectKnownBeforeExpedition(
-            discoveryLedger,
-            entry.objectId,
-            expeditionNumber,
-          ),
-      )
-      .map((entry) => entry.objectId);
-    syncCityOptions(snapshot.cities);
-    syncContactMonsterOptions(snapshot.monsters);
-    const startCity = snapshot.cities.find(
-      (city) => city.id === routeStartCity.value,
-    );
-    if (!startCity) throw new Error("Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ ÑÑƒÑ‰ĞµÑÑ‚Ğ²ÑƒÑÑ‰Ğ¸Ğ¹ ÑÑ‚Ğ°Ñ€Ñ‚Ğ¾Ğ²Ñ‹Ğ¹ Ğ³Ğ¾Ñ€Ğ¾Ğ´");
-    const destinationCity = snapshot.cities.find(
-      (city) => city.id === routeDestinationCity.value,
-    );
-    if (!destinationCity) {
-      throw new Error("Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ ÑÑƒÑ‰ĞµÑÑ‚Ğ²ÑƒÑÑ‰Ğ¸Ğ¹ Ğ³Ğ¾Ñ€Ğ¾Ğ´ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ");
-    }
-
-    const timelineRoute = createFourSegmentRouteSnapshot(
-      startCity.position,
-      readRouteCommands(),
-      routeSpeed.valueAsNumber,
-      elapsedSeconds,
-    );
-    const timelineRumorSearch = createRumorSearchSnapshot(
-      snapshot.seed,
-      startCity,
-      timelineRoute,
-      knownObjectIds,
-    );
-    const timelineDoctrine = createDiscoveryDoctrineSnapshot(
-      timelineRoute,
-      timelineRumorSearch,
-      readDiscoveryDoctrine(),
-    );
-    const timelineResume = createDiscoveryResumeSnapshot(
-      timelineDoctrine,
-      resumedDiscoveryObjectId,
-    );
-    const cityTimelineDestination = createCityArrivalSnapshot(
-      timelineRoute,
-      destinationCity,
-    );
-    let lifecycleResume = timelineResume;
-    if (
-      lifecycleResume === null &&
-      resumedDiscoveryObjectId !== null &&
-      timelineRumorSearch.serverTruth.plannedDiscoveryAtSeconds !== null
-    ) {
-      const stopRoute = createFourSegmentRouteSnapshot(
-        startCity.position,
-        readRouteCommands(),
-        routeSpeed.valueAsNumber,
-        timelineRumorSearch.serverTruth.plannedDiscoveryAtSeconds,
-      );
-      const stopSearch = createRumorSearchSnapshot(
-        snapshot.seed,
-        startCity,
-        stopRoute,
-        knownObjectIds,
-      );
-      const stoppedDoctrine = createDiscoveryDoctrineSnapshot(
-        stopRoute,
-        stopSearch,
-        readDiscoveryDoctrine(),
-      );
-      lifecycleResume = createDiscoveryResumeSnapshot(
-        stoppedDoctrine,
-        resumedDiscoveryObjectId,
-      );
-    }
-    const scheduledIdleDurationSeconds = readStopIdleDurationSeconds();
-    const stopLifecycle = createDiscoveryStopLifecycleSnapshot(
-      timelineRoute,
-      supplySettings.initial,
-      supplySettings.profile,
-      lifecycleResume,
-      scheduledIdleDurationSeconds,
-      elapsedSeconds,
-      cityTimelineDestination,
-    );
-    const plannedRoute = stopLifecycle
-      ? createFourSegmentRouteSnapshot(
-          startCity.position,
-          readRouteCommands(),
-          routeSpeed.valueAsNumber,
-          stopLifecycle.movementElapsedSeconds,
-        )
-      : timelineRoute;
-    const plannedRumorSearch = createRumorSearchSnapshot(
-      snapshot.seed,
-      startCity,
-      plannedRoute,
-      knownObjectIds,
-    );
-    const proposedDoctrine = createDiscoveryDoctrineSnapshot(
-      plannedRoute,
-      plannedRumorSearch,
-      readDiscoveryDoctrine(),
-    );
-    const proposedResume = createDiscoveryResumeSnapshot(
-      proposedDoctrine,
-      resumedDiscoveryObjectId,
-    );
-    let selectedMonster = snapshot.monsters.find(
-      (monster) => monster.id === contactMonsterSelect.value,
-    );
-    const plannedStop =
-      timelineRumorSearch.serverTruth.plannedDiscovery ?? null;
-    if (
-      stationaryStopQaEnabled &&
-      selectedMonster &&
-      plannedStop &&
-      scheduledIdleDurationSeconds > 0
-    ) {
-      const contactAtSeconds =
-        plannedStop.elapsedSeconds + scheduledIdleDurationSeconds / 2;
-      const qaMonster = createStationaryStopPatrolPreset(
-        plannedStop.caravanPosition,
-        contactAtSeconds,
-        selectedMonster,
-        elapsedSeconds,
-      );
-      const selectedMonsterIndex = snapshot.monsters.findIndex(
-        (monster) => monster.id === selectedMonster?.id,
-      );
-      if (selectedMonsterIndex >= 0) {
-        snapshot.monsters[selectedMonsterIndex] = qaMonster;
-      }
-      selectedMonster = qaMonster;
-    }
-    const monsterContact = selectedMonster
-      ? createMonsterContactSnapshot(
-          plannedRoute,
-          selectedMonster,
-          stopLifecycle,
-        )
-      : null;
-    const cityDestination = createCityArrivalSnapshot(
-      plannedRoute,
-      destinationCity,
-    );
-    const outcome = createExpeditionOutcomeSnapshot(
-      plannedRoute,
-      supplySettings.initial,
-      supplySettings.profile,
-      proposedResume ?? proposedDoctrine,
-      monsterContact,
-      readStrongMonsterDoctrine(),
-      contactFleeSpeed.valueAsNumber / 3.6,
-      cityDestination,
-      stopLifecycle,
-    );
-    const effectiveStopLifecycle = outcome.stopLifecycle ?? stopLifecycle;
-    const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
-    const recordedTravel = recordExpeditionTravelProgress(travelLedger, {
-      expeditionNumber,
-      originCityId: startCity.id,
-      routeCommands: route.authoritativeRoute.segments.map((segment) => ({
-        bearingDeg: segment.bearingDeg,
-        distanceMeters: segment.distanceMeters,
-      })),
-      traveledDistanceMeters: route.position.traveledDistanceMeters,
-    });
-    travelLedger = recordedTravel.ledger;
-    const reachedCity = createReachedCityLandmarkInput(
-      outcome,
-      startCity,
-      expeditionNumber,
-    );
-    if (reachedCity) {
-      travelLedger = recordReachedCityLandmark(travelLedger, reachedCity);
-    }
-    const rumorSearch = createRumorSearchSnapshot(
-      snapshot.seed,
-      startCity,
-      route,
-      knownObjectIds,
-    );
-    const doctrine = createDiscoveryDoctrineSnapshot(
-      route,
-      rumorSearch,
-      readDiscoveryDoctrine(),
-    );
-    const resume = createDiscoveryResumeSnapshot(
-      doctrine,
-      resumedDiscoveryObjectId,
-    );
-    const effectiveDoctrine = resume ?? doctrine;
-    if (rumorSearch.status === "found" && rumorSearch.discovery) {
-      const recorded = recordDirectDiscoveryObservation(discoveryLedger, {
-        expeditionNumber,
-        objectId: rumorSearch.serverTruth.target.id,
-        objectKind: rumorSearch.rumor.targetKind,
-        originCityId: rumorSearch.originCity.id,
-        rumorId: rumorSearch.rumor.id,
-        observedAtSeconds: rumorSearch.discovery.atSeconds,
-        segmentIndex: rumorSearch.discovery.segmentIndex,
-        routeDistanceMeters:
-          rumorSearch.discovery.routeDistanceKilometers * 1_000,
-        originBearingDeg: rumorSearch.serverTruth.exactBearingDeg,
-        originDistanceMeters:
-          rumorSearch.serverTruth.exactDistanceKilometers * 1_000,
-      });
-      discoveryLedger = recorded.ledger;
-    }
-    const caravanStatus = createCaravanStatusSnapshot(
-      route,
-      supplySettings.initial,
-      supplySettings.profile,
-      effectiveDoctrine,
-      outcome,
-    );
-    activeRumorSearch = rumorSearch;
-    activeDoctrine = doctrine;
-    activeOutcome = outcome;
-    activeSnapshot = snapshot;
-    const eventLog = createExpeditionEventLogSnapshot(
-      route,
-      supplySettings.initial,
-      supplySettings.profile,
-      rumorSearch,
-      doctrine,
-      outcome,
-      resume ?? lifecycleResume,
-      effectiveStopLifecycle,
-    );
-    const maximumElapsedSeconds = outcome.planned.atSeconds;
-
-    if (elapsedSeconds > maximumElapsedSeconds) {
-      elapsedSeconds = maximumElapsedSeconds;
-      timeSlider.value = String(elapsedSeconds);
-      render();
-      return;
-    }
-
-    errorMessage.hidden = true;
-    mapTitle.textContent = `Seed: ${snapshot.seed}`;
-    cityCount.textContent = String(snapshot.cities.length);
-    objectCount.textContent = String(snapshot.staticObjects.length + 1);
-    monsterCount.textContent = String(snapshot.monsters.length);
-    timeOutput.textContent = formatElapsed(elapsedSeconds);
-    routeSummary.textContent = formatRouteSummary(route);
-    renderRumorSearch(rumorSearch, effectiveDoctrine, outcome);
-    renderDiscoveryLedger(discoveryLedger, travelLedger, snapshot);
-    renderCaravanStatus(caravanStatus);
-    renderExpeditionOutcome(outcome);
-    renderMonsterContact(monsterContact, outcome);
-    renderContactZoom(
-      route,
-      selectedMonster ?? null,
-      monsterContact,
-      effectiveStopLifecycle,
-    );
-    renderEventLog(eventLog, route);
-
-    timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
-    timeSlider.value = String(elapsedSeconds);
-    updateClockControls();
-
-    drawSnapshot(
-      snapshot,
-      route,
-      rumorSearch,
-      effectiveDoctrine,
-      outcome,
-      monsterContact,
-    );
-  } catch (error) {
-    activeRumorSearch = null;
-    activeDoctrine = null;
-    activeOutcome = null;
-    activeSnapshot = null;
-    contactZoomMap.replaceChildren();
-    contactZoomCaption.textContent = "Ğ›Ğ¾ĞºĞ°Ğ»ÑŒĞ½Ğ¾Ğµ Ğ¾ĞºĞ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ¾.";
-    pauseSimulationClock();
-    errorMessage.textContent = error instanceof Error ? error.message : String(error);
-    errorMessage.hidden = false;
-  }
-}
-
-/** @returns {void} */
-function startSimulationClock() {
-  if (!activeOutcome || activeOutcome.status !== "in-progress") {
-    updateClockControls();
-    return;
-  }
-
-  clockRunning = true;
-  clockAnchorElapsedSeconds = elapsedSeconds;
-  clockAnchorTimestampMilliseconds = performance.now();
-  clockFrameId = requestAnimationFrame(runSimulationClockFrame);
-  updateClockControls();
-}
-
-/** @param {number} timestampMilliseconds @returns {void} */
-function runSimulationClockFrame(timestampMilliseconds) {
-  clockFrameId = null;
-  if (!clockRunning) return;
-
-  const reachedBoundary = synchronizeSimulationClock(timestampMilliseconds);
-  if (
-    reachedBoundary ||
-    !activeOutcome ||
-    activeOutcome.status !== "in-progress"
-  ) {
-    pauseSimulationClock();
-    return;
-  }
-
-  clockFrameId = requestAnimationFrame(runSimulationClockFrame);
-}
-
-/**
- * Re-evaluates elapsed simulation time from one stable play anchor, making the
- * result independent from animation-frame partitioning.
- * @param {number} timestampMilliseconds
- * @returns {boolean}
- */
-function synchronizeSimulationClock(timestampMilliseconds) {
-  if (
-    !clockRunning ||
-    !activeOutcome ||
-    clockAnchorTimestampMilliseconds === null
-  ) {
-    return false;
-  }
-
-  const realElapsedSeconds = Math.max(
-    0,
-    (timestampMilliseconds - clockAnchorTimestampMilliseconds) / 1_000,
-  );
-  const advanced = advanceSimulationClock(
-    clockAnchorElapsedSeconds,
-    realElapsedSeconds,
-    clockSpeedMultiplier,
-    activeOutcome.planned.atSeconds,
-  );
-  elapsedSeconds = advanced.elapsedSeconds;
-  timeSlider.value = String(elapsedSeconds);
-  render();
-  return (
-    advanced.reachedBoundary ||
-    !activeOutcome ||
-    activeOutcome.status !== "in-progress"
-  );
-}
-
-/** @returns {void} */
-function pauseSimulationClock() {
-  clockRunning = false;
-  clockAnchorTimestampMilliseconds = null;
-  clockAnchorElapsedSeconds = elapsedSeconds;
-  if (clockFrameId !== null) {
-    cancelAnimationFrame(clockFrameId);
-    clockFrameId = null;
-  }
-  updateClockControls();
-}
-
-/** @returns {void} */
-function resetSimulationClock() {
-  pauseSimulationClock();
-  elapsedSeconds = 0;
-  resumedDiscoveryObjectId = null;
-  timeSlider.value = "0";
-}
-
-/** Starts a distinct expedition before replacing a route that already moved. */
-function beginNewExpeditionIfTravelled() {
-  if (
-    travelLedger.tracks.some(
-      (track) => track.expeditionNumber === expeditionNumber,
-    )
-  ) {
-    expeditionNumber += 1;
-  }
-}
-
-/** @returns {void} */
-function pauseClockAndRender() {
-  pauseSimulationClock();
-  render();
-}
-
-/** @returns {void} */
-function clearDiscoveryResumeAndRender() {
-  resumedDiscoveryObjectId = null;
-  pauseClockAndRender();
-}
-
-/** @returns {number} */
-function readClockSpeedMultiplier() {
-  const speedMultiplier = Number(clockSpeed.value);
-  if (!SIMULATION_CLOCK_SPEED_MULTIPLIERS.includes(speedMultiplier)) {
-    throw new RangeError("Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ x1, x10, x100 Ğ¸Ğ»Ğ¸ x1000");
-  }
-  return speedMultiplier;
-}
-
-/** @returns {void} */
-function updateClockControls() {
-  const canRun = activeOutcome?.status === "in-progress";
-  clockToggle.disabled = !canRun;
-  clockToggle.setAttribute("aria-pressed", String(clockRunning));
-  clockToggleIcon.textContent = clockRunning ? "âšâš" : "â–¶";
-  clockToggleLabel.textContent = clockRunning ? "ĞŸĞ°ÑƒĞ·Ğ°" : "Ğ—Ğ°Ğ¿ÑƒÑÑ‚Ğ¸Ñ‚ÑŒ";
-
-  const state = clockRunning
-    ? "running"
-    : activeOutcome && activeOutcome.status !== "in-progress"
-      ? "boundary"
-      : "paused";
-  clockStatus.dataset.state = state;
-  clockStatus.textContent = `${
-    state === "running"
-      ? "Ğ˜Ğ´Ñ‘Ñ‚"
-      : state === "boundary"
-        ? "Ğ“Ñ€Ğ°Ğ½Ğ¸Ñ†Ğ° Ğ´Ğ¾ÑÑ‚Ğ¸Ğ³Ğ½ÑƒÑ‚Ğ°"
-        : "ĞÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¾"
-  } Â· x${clockSpeedMultiplier}`;
-}
-
-/**
- * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
- * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number] | null} monster
- * @param {ReturnType<typeof createMonsterContactSnapshot> | null} contact
- * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} stopLifecycle
- */
-function renderContactZoom(route, monster, contact, stopLifecycle) {
-  contactZoomMap.replaceChildren();
-  if (!monster) {
-    contactZoomCaption.textContent = "Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ´Ğ»Ñ Ğ»Ğ¾ĞºĞ°Ğ»ÑŒĞ½Ğ¾Ğ³Ğ¾ Ğ¾ĞºĞ½Ğ°.";
-    return;
-  }
-
-  const snapshot = createContactZoomSnapshot(
-    route,
-    monster,
-    contact,
-    Number(contactSpatialZoom.value),
-    Number(contactTimeZoom.value),
-    stopLifecycle,
-  );
-  const centerX = CONTACT_ZOOM_WIDTH / 2;
-  const centerY = CONTACT_ZOOM_HEIGHT / 2;
-  const maximumRingPixels = snapshot.spatialRadiusMeters / snapshot.metersPerPixel;
-
-  contactZoomMap.append(
-    svgElement("line", {
-      class: "contact-zoom-crosshair",
-      x1: 0,
-      x2: CONTACT_ZOOM_WIDTH,
-      y1: centerY,
-      y2: centerY,
-    }),
-    svgElement("line", {
-      class: "contact-zoom-crosshair",
-      x1: centerX,
-      x2: centerX,
-      y1: 0,
-      y2: CONTACT_ZOOM_HEIGHT,
-    }),
-  );
-
-  for (const ratio of [0.5, 1]) {
-    contactZoomMap.append(
-      svgElement("circle", {
-        class: "contact-zoom-grid",
-        cx: centerX,
-        cy: centerY,
-        r: maximumRingPixels * ratio,
-      }),
-    );
-    const label = svgElement("text", {
-      class: "contact-zoom-label",
-      x: centerX + 6,
-      y: centerY - maximumRingPixels * ratio + 12,
-    });
-    label.textContent = `${formatNumber(
-      (snapshot.spatialRadiusMeters * ratio) / 1_000,
-      1,
-    )} ĞºĞ¼`;
-    contactZoomMap.append(label);
-  }
-
-  const caravanPath = svgElement("polyline", {
-    class: "contact-zoom-caravan-path",
-    points: snapshot.caravanPath
-      .map(({ point }) => `${point.x},${point.y}`)
-      .join(" "),
-  });
-  caravanPath.append(svgTitle("Ğ¢Ñ€Ğ°ĞµĞºÑ‚Ğ¾Ñ€Ğ¸Ñ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½Ğ° Ğ²Ğ¾ Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾Ğ¼ Ğ¾ĞºĞ½Ğµ"));
-  const monsterPath = svgElement("polyline", {
-    class: "contact-zoom-monster-path",
-    points: snapshot.monsterPath
-      .map(({ point }) => `${point.x},${point.y}`)
-      .join(" "),
-  });
-  monsterPath.append(svgTitle("Ğ¢Ñ€Ğ°ĞµĞºÑ‚Ğ¾Ñ€Ğ¸Ñ Ñ†Ğ¸ĞºĞ»Ğ¸Ñ‡ĞµÑĞºĞ¾Ğ³Ğ¾ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ Ğ²Ğ¾ Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾Ğ¼ Ğ¾ĞºĞ½Ğµ"));
-  const interactionRadius = svgElement("circle", {
-    class: "contact-zoom-interaction-radius",
-    cx: snapshot.focusMonster.point.x,
-    cy: snapshot.focusMonster.point.y,
-    r: snapshot.interactionRadiusPixels,
-  });
-  interactionRadius.append(
-    svgTitle(`Interaction radius ${snapshot.interactionRadiusMeters} Ğ¼`),
-  );
-  contactZoomMap.append(caravanPath, monsterPath, interactionRadius);
-
-  const caravanMarker = svgElement("circle", {
-    class: "contact-zoom-caravan-marker",
-    cx: snapshot.focusCaravan.point.x,
-    cy: snapshot.focusCaravan.point.y,
-    r: 6,
-  });
-  caravanMarker.append(svgTitle(`ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Â· ${formatElapsed(snapshot.focusAtSeconds)}`));
-  const monsterMarker = svgElement("polygon", {
-    class: "contact-zoom-monster-marker",
-    points: `${snapshot.focusMonster.point.x},${snapshot.focusMonster.point.y - 7} ${snapshot.focusMonster.point.x + 7},${snapshot.focusMonster.point.y + 6} ${snapshot.focusMonster.point.x - 7},${snapshot.focusMonster.point.y + 6}`,
-  });
-  monsterMarker.append(
-    svgTitle(`${monster.id} Â· PWR ${monster.power} Â· ${formatElapsed(snapshot.focusAtSeconds)}`),
-  );
-  contactZoomMap.append(caravanMarker, monsterMarker);
-
-  const northLabel = svgElement("text", {
-    class: "contact-zoom-label",
-    x: 12,
-    y: 19,
-  });
-  northLabel.textContent = "â†‘ N";
-  const focusLabel = svgElement("text", {
-    class: "contact-zoom-label",
-    x: 12,
-    y: CONTACT_ZOOM_HEIGHT - 12,
-  });
-  focusLabel.textContent =
-    snapshot.focusKind === "contact" ? "FOCUS: CONTACT" : "FOCUS: PATROL";
-  contactZoomMap.append(northLabel, focusLabel);
-
-  const spatialLabel = formatNumber(snapshot.spatialRadiusMeters / 1_000, 0);
-  const timeLabel =
-    snapshot.timeRadiusSeconds >= 3_600
-      ? `${formatNumber(snapshot.timeRadiusSeconds / 3_600, 0)} Ñ‡`
-      : `${formatNumber(snapshot.timeRadiusSeconds / 60, 0)} Ğ¼Ğ¸Ğ½`;
-  contactZoomCaption.textContent = `${
-    snapshot.focusKind === "contact" ? "ĞŸĞ»Ğ°Ğ½Ğ¾Ğ²Ñ‹Ğ¹ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚" : "Ğ¢ĞµĞºÑƒÑ‰Ğ¸Ğ¹ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»ÑŒ"
-  } Â· ${formatElapsed(snapshot.focusAtSeconds)} Â· Ğ¿Ñ€Ğ¾ÑÑ‚Ñ€Ğ°Ğ½ÑÑ‚Ğ²Ğ¾ Â±${spatialLabel} ĞºĞ¼ Â· Ğ²Ñ€ĞµĞ¼Ñ Â±${timeLabel} (${formatElapsed(snapshot.windowStartSeconds)} â€” ${formatElapsed(snapshot.windowEndSeconds)}).`;
-  contactZoomMap.setAttribute(
-    "aria-label",
-    `Ğ›Ğ¾ĞºĞ°Ğ»ÑŒĞ½Ğ°Ñ ĞºĞ°Ñ€Ñ‚Ğ° ${snapshot.focusKind === "contact" ? "Ğ¿Ğ»Ğ°Ğ½Ğ¾Ğ²Ğ¾Ğ³Ğ¾ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°" : "Ñ‚ĞµĞºÑƒÑ‰ĞµĞ³Ğ¾ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ"} Ğ² ${formatElapsed(snapshot.focusAtSeconds)}`,
-  );
-}
-
-/**
- * @param {ReturnType<typeof createMonsterContactSnapshot> | null} snapshot
- * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
- */
-function renderMonsterContact(snapshot, outcome) {
-  const contact = snapshot?.contact ?? null;
-  if (!contact) {
-    contactPanel.dataset.state = "clear";
-    contactState.textContent = "Ğ§Ğ¸ÑÑ‚Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚";
-    contactTitle.textContent = "ĞšĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ° Ğ½Ğ° Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğµ Ğ½ĞµÑ‚";
-    contactDetail.textContent =
-      "SIM-008 Ğ½Ğµ Ğ½Ğ°ÑˆÑ‘Ğ» ÑĞ±Ğ»Ğ¸Ğ¶ĞµĞ½Ğ¸Ñ Ñ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ‘Ğ¼ Ğ²Ğ½ÑƒÑ‚Ñ€Ğ¸ Ñ€Ğ°Ğ´Ğ¸ÑƒÑĞ° Ğ²Ğ·Ğ°Ğ¸Ğ¼Ğ¾Ğ´ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ñ.";
-    contactTime.textContent = "â€”";
-    contactMonster.textContent = "â€”";
-    contactPosition.textContent = "â€”";
-    contactDistance.textContent = "â€”";
-    contactPlayerPower.textContent = "100";
-    contactPowerComparison.textContent = "â€”";
-    contactMonsterSpeed.textContent = "â€”";
-    contactFleeResult.textContent = "â€”";
-    return;
-  }
-
-  const resolution = outcome.monsterContactResolution;
-  const idleContact = contact.caravanActivity === "idle";
-  contactTime.textContent = formatElapsed(contact.atSeconds);
-  contactMonster.textContent = `${contact.monsterId} Â· PWR ${contact.monsterPower}`;
-  contactPosition.textContent =
-    contact.segmentIndex === null
-      ? `Ğ¤Ğ¸Ğ½Ğ¸Ñˆ Â· ${formatNumber(contact.routeDistanceKilometers, 1)} ĞºĞ¼${idleContact ? " Â· STOP" : ""}`
-      : `Ğ¡ĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${contact.segmentIndex + 1} Â· ${formatNumber(contact.routeDistanceKilometers, 1)} ĞºĞ¼${idleContact ? " Â· STOP" : ""}`;
-  contactDistance.textContent = `${formatNumber(contact.separationMeters, 1)} Ğ¼ / ${formatNumber(contact.interactionRadiusMeters, 0)} Ğ¼`;
-  contactPlayerPower.textContent = String(resolution?.playerPower ?? 100);
-  const playerPower = resolution?.playerPower ?? 100;
-  const comparison = playerPower > contact.monsterPower
-    ? ">"
-    : playerPower < contact.monsterPower
-      ? "<"
-      : "=";
-  contactPowerComparison.textContent = `${playerPower} ${comparison} ${contact.monsterPower}`;
-  contactMonsterSpeed.textContent = `${formatNumber(contact.monsterSpeedMetersPerSecond * 3.6, 1)} ĞºĞ¼/Ñ‡`;
-  contactFleeResult.textContent = !resolution
-    ? "ĞĞµ Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚ÑÑ"
-    : resolution.status === "monster-defeated"
-      ? "ĞĞµ Ñ‚Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ"
-      : resolution.status === "flee-succeeded"
-        ? "Ğ£ÑĞ¿ĞµÑ…"
-        : resolution.status === "flee-failed"
-          ? "ĞŸÑ€Ğ¾Ğ²Ğ°Ğ»"
-          : resolution.status === "flee-required"
-            ? "ĞĞ¶Ğ¸Ğ´Ğ°ĞµÑ‚ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…"
-            : "ĞĞµ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½";
-
-  if (!outcome.monsterContact || !resolution) {
-    contactPanel.dataset.state = "bypassed";
-    contactState.textContent = "ĞĞµ Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚ÑÑ";
-    contactTitle.textContent = "ĞŸĞµÑ€ĞµÑ…Ğ²Ğ°Ñ‚ ĞµÑÑ‚ÑŒ Ğ² Ğ¿Ğ»Ğ°Ğ½Ğµ, Ğ½Ğ¾ Ğ½Ğµ Ğ² Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ¸Ğ¸";
-    contactDetail.textContent =
-      outcome.planned.status === "failed"
-        ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ğ¾Ğ³Ğ¸Ğ±Ğ½ĞµÑ‚ Ğ¾Ñ‚ Ğ¸ÑÑ‚Ğ¾Ñ‰ĞµĞ½Ğ¸Ñ Ñ€Ğ°Ğ½ÑŒÑˆĞµ Ñ€Ğ°ÑÑÑ‡Ğ¸Ñ‚Ğ°Ğ½Ğ½Ğ¾Ğ³Ğ¾ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°."
-        : outcome.planned.status === "paused"
-          ? outcome.interruptionCause === "route-end"
-            ? "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ·Ğ°ĞºĞ¾Ğ½Ñ‡Ğ¸Ñ‚ÑÑ Ğ²Ğ½Ğµ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ° Ñ€Ğ°Ğ½ÑŒÑˆĞµ Ñ€Ğ°ÑÑÑ‡Ğ¸Ñ‚Ğ°Ğ½Ğ½Ğ¾Ğ³Ğ¾ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°."
-            : "Ğ”Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ° STOP Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ñ€Ğ°Ğ½ÑŒÑˆĞµ Ñ€Ğ°ÑÑÑ‡Ğ¸Ñ‚Ğ°Ğ½Ğ½Ğ¾Ğ³Ğ¾ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°."
-          : "Ğ¡Ğ±Ğ»Ğ¸Ğ¶ĞµĞ½Ğ¸Ğµ Ğ¿Ñ€Ğ¸Ñ…Ğ¾Ğ´Ğ¸Ñ‚ÑÑ Ğ½Ğ° Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ñƒ Ğ¿Ñ€Ğ¸Ğ±Ñ‹Ñ‚Ğ¸Ñ Ğ¸ Ğ½Ğµ Ğ¿Ñ€ĞµÑ€Ñ‹Ğ²Ğ°ĞµÑ‚ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚.";
-    return;
-  }
-
-  const occurred = snapshot?.status === "contact";
-  if (resolution.status === "monster-defeated") {
-    contactPanel.dataset.state = occurred ? "victory" : "forecast";
-    contactState.textContent = occurred ? "ĞŸĞ¾Ğ±ĞµĞ´Ğ°" : "ĞŸĞ¾Ğ±ĞµĞ´Ğ° Ñ€Ğ°ÑÑÑ‡Ğ¸Ñ‚Ğ°Ğ½Ğ°";
-    contactTitle.textContent = occurred
-      ? "Ğ¡Ğ»Ğ°Ğ±Ñ‹Ğ¹ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»ÑŒ ÑƒĞ½Ğ¸Ñ‡Ñ‚Ğ¾Ğ¶ĞµĞ½"
-      : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ ÑĞ¸Ğ»ÑŒĞ½ĞµĞµ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ";
-    contactDetail.textContent =
-      occurred
-        ? idleContact
-          ? "Player Power Ğ²Ñ‹ÑˆĞµ: Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ Ğ¿Ğ¾Ğ³Ğ¸Ğ±, Ğ° ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ Ğ·Ğ°Ğ¿Ğ»Ğ°Ğ½Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½ÑƒÑ ÑÑ‚Ğ¾ÑĞ½ĞºÑƒ."
-          : "Player Power Ğ²Ñ‹ÑˆĞµ: Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ Ğ¿Ğ¾Ğ³Ğ¸Ğ±, Ğ° ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ğ» Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚."
-        : idleContact
-          ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ²Ğ¾Ğ¹Ğ´Ñ‘Ñ‚ Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑ Ğ½ĞµĞ¿Ğ¾Ğ´Ğ²Ğ¸Ğ¶Ğ½Ğ¾Ğ³Ğ¾ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½Ğ°; Ğ¿Ğ¾Ğ±ĞµĞ´Ğ° Ğ½Ğµ Ğ¿Ñ€ĞµÑ€Ğ²Ñ‘Ñ‚ Ğ¾ÑÑ‚Ğ°Ğ²ÑˆÑƒÑÑÑ ÑÑ‚Ğ¾ÑĞ½ĞºÑƒ."
-          : "ĞĞ° Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğµ 500 Ğ¼ Power ÑÑ€Ğ°Ğ²Ğ½ÑÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸; Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²ĞºĞ¸ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ° Ğ½Ğµ Ğ±ÑƒĞ´ĞµÑ‚.";
-    return;
-  }
-
-  if (resolution.status === "flee-required") {
-    contactPanel.dataset.state = occurred ? "flee" : "danger";
-    contactState.textContent = occurred ? "ĞÑ‚Ñ…Ğ¾Ğ´" : "ĞĞ¿Ğ°ÑĞ½Ñ‹Ğ¹ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚";
-    contactTitle.textContent = occurred
-      ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ» FLEE"
-      : "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ ÑĞ¸Ğ»ÑŒĞ½ĞµĞµ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½Ğ°";
-    contactDetail.textContent = occurred
-      ? "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¿Ğ¾ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½ Ğ½Ğ° Ğ¿Ğ°ÑƒĞ·Ñƒ: Ğ´Ğ»Ñ Ñ€Ğ°Ğ·Ñ€ĞµÑˆĞµĞ½Ğ¸Ñ FLEE Ğ½Ğµ Ğ¿ĞµÑ€ĞµĞ´Ğ°Ğ½Ñ‹ ÑĞ²Ğ½Ñ‹Ğµ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚Ğ¸."
-      : "ĞĞ° Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğµ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ° FLEE Ğ¿Ğ¾Ñ‚Ñ€ĞµĞ±ÑƒĞµÑ‚ ÑĞ²Ğ½Ñ‹Ñ… ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚ĞµĞ¹ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½Ğ° Ğ¸ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ.";
-    return;
-  }
-
-  if (resolution.status === "flee-succeeded") {
-    const flee = resolution.fleeResolution;
-    contactPanel.dataset.state = occurred ? "victory" : "forecast";
-    contactState.textContent = occurred ? "ĞÑ‚Ñ…Ğ¾Ğ´ ÑƒÑĞ¿ĞµÑˆĞµĞ½" : "ĞÑ‚Ñ…Ğ¾Ğ´ Ñ€Ğ°ÑÑÑ‡Ğ¸Ñ‚Ğ°Ğ½";
-    contactTitle.textContent = occurred
-      ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ñ€Ğ°Ğ·Ğ¾Ñ€Ğ²Ğ°Ğ» Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ñ"
-      : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ±Ñ‹ÑÑ‚Ñ€ĞµĞµ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ";
-    contactDetail.textContent = flee
-      ? `${formatNumber(flee.caravanSpeedMetersPerSecond * 3.6, 1)} ĞºĞ¼/Ñ‡ Ğ¿Ñ€Ğ¾Ñ‚Ğ¸Ğ² ${formatNumber(flee.monsterSpeedMetersPerSecond * 3.6, 1)} ĞºĞ¼/Ñ‡: Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ°Ñ Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ñ ${formatNumber(flee.safeSeparationMeters, 0)} Ğ¼ Ğ±ÑƒĞ´ĞµÑ‚ Ğ´Ğ¾ÑÑ‚Ğ¸Ğ³Ğ½ÑƒÑ‚Ğ° Ğ·Ğ° ${formatDuration(flee.secondsToSafeSeparation ?? 0)}; ${idleContact ? "Ğ¾ÑÑ‚Ğ°Ñ‚Ğ¾Ğº ÑÑ‚Ğ¾ÑĞ½ĞºĞ¸ Ğ¾Ñ‚Ğ¼ĞµĞ½ÑĞµÑ‚ÑÑ Ğ¸ Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ÑĞµÑ‚ÑÑ" : "Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ÑÑ"}.`
-      : "FLEE Ñ€Ğ°Ğ·Ñ€ĞµÑˆÑ‘Ğ½ ÑƒÑĞ¿ĞµÑˆĞ½Ğ¾; Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ÑÑ.";
-    return;
-  }
-
-  if (resolution.status === "flee-failed") {
-    const flee = resolution.fleeResolution;
-    contactPanel.dataset.state = occurred ? "defeat" : "danger";
-    contactState.textContent = occurred ? "ĞŸĞ¾Ñ€Ğ°Ğ¶ĞµĞ½Ğ¸Ğµ" : "ĞŸĞ¾Ğ±ĞµĞ³ Ğ½ĞµĞ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶ĞµĞ½";
-    contactTitle.textContent = occurred
-      ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ½Ğ°ÑÑ‚Ğ¸Ğ³ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½"
-      : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ½Ğµ Ğ±Ñ‹ÑÑ‚Ñ€ĞµĞµ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ";
-    contactDetail.textContent = flee
-      ? `${formatNumber(flee.caravanSpeedMetersPerSecond * 3.6, 1)} ĞºĞ¼/Ñ‡ Ğ¿Ñ€Ğ¾Ñ‚Ğ¸Ğ² ${formatNumber(flee.monsterSpeedMetersPerSecond * 3.6, 1)} ĞºĞ¼/Ñ‡: Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ñ Ğ½Ğµ Ñ€Ğ°ÑÑ‚Ñ‘Ñ‚, Ğ¿Ğ¾ÑÑ‚Ğ¾Ğ¼Ñƒ FLEE Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞ¸Ñ‚ ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ½Ğ° Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğµ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°.`
-      : "FLEE Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞ¸Ñ‚ÑÑ Ğ¿Ğ¾Ñ€Ğ°Ğ¶ĞµĞ½Ğ¸ĞµĞ¼ Ğ½Ğ° Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğµ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°.";
-    return;
-  }
-
-  contactPanel.dataset.state = occurred ? "defeat" : "danger";
-  contactState.textContent = occurred ? "ĞŸĞ¾Ñ€Ğ°Ğ¶ĞµĞ½Ğ¸Ğµ" : "Ğ¡Ğ¼ĞµÑ€Ñ‚ĞµĞ»ÑŒĞ½Ñ‹Ğ¹ Ñ€Ğ¸ÑĞº";
-  contactTitle.textContent = occurred
-    ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ñ€Ğ¸Ğ½ÑĞ» Ğ¿Ñ€Ğ¾Ğ¸Ğ³Ñ€Ñ‹ÑˆĞ½Ñ‹Ğ¹ Ğ±Ğ¾Ğ¹"
-    : "ACCEPT_FIGHT Ğ¿Ñ€Ğ¸Ğ²ĞµĞ´Ñ‘Ñ‚ Ğº Ğ³Ğ¸Ğ±ĞµĞ»Ğ¸";
-  contactDetail.textContent = occurred
-    ? "Monster Power Ğ²Ñ‹ÑˆĞµ: ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ¿Ğ¾Ğ³Ğ¸Ğ±Ğ»Ğ° Ğ½Ğ° Ñ‚Ğ¾Ñ‡Ğ½Ğ¾Ğ¹ Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğµ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°."
-    : "Ğ’Ñ‹Ğ±Ñ€Ğ°Ğ½ ACCEPT_FIGHT; ĞµÑĞ»Ğ¸ Ğ¿Ñ€Ğ¸ĞºĞ°Ğ· Ğ½Ğµ Ğ¸Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ, ÑĞ¸Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ ÑƒĞ½Ğ¸Ñ‡Ñ‚Ğ¾Ğ¶Ğ¸Ñ‚ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½.";
-}
-
-/**
- * @param {ReturnType<typeof createExpeditionEventLogSnapshot>} log
- * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
- */
-function renderEventLog(log, route) {
-  eventLogCount.textContent = `${log.occurredCount} / ${log.totalCount}`;
-  const nextEvent = log.events.find((event) => event.id === log.nextEventId);
-  eventLogNext.textContent = nextEvent
-    ? `Ğ¡Ğ»ĞµĞ´ÑƒÑÑ‰ĞµĞµ: ${eventTitle(nextEvent)} Â· ${formatElapsed(nextEvent.atSeconds)}`
-    : log.executionStatus === "stopped" || log.executionStatus === "paused"
-      ? activeOutcome?.interruptionCause === "route-end"
-        ? "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ·Ğ°ĞºĞ¾Ğ½Ñ‡Ğ¸Ğ»ÑÑ Ğ²Ğ½Ğµ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ğ¾Ğ³Ğ¾ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°"
-        : activeOutcome?.interruptionCause === "monster-contact"
-        ? "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ¾Ğ¼ Ñ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ¾Ğ¼"
-        : "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¿Ğ¾ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½ Ğ½Ğ° Ğ¿Ğ°ÑƒĞ·Ñƒ Ğ´Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ¾Ğ¹"
-      : log.executionStatus === "failed"
-        ? activeOutcome?.failureReason === "monster"
-          ? "Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ ÑƒĞ½Ğ¸Ñ‡Ñ‚Ğ¾Ğ¶ĞµĞ½Ğ° ÑĞ¸Ğ»ÑŒĞ½Ñ‹Ğ¼ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ¾Ğ¼"
-          : "Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞµĞ½Ğ° Ğ³Ğ¸Ğ±ĞµĞ»ÑŒÑ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½Ğ°"
-        : log.executionStatus === "completed"
-          ? "Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ ÑƒÑĞ¿ĞµÑˆĞ½Ğ¾ Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞµĞ½Ğ°"
-          : "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ·Ğ°Ğ²ĞµÑ€ÑˆÑ‘Ğ½";
-
-  eventLogList.replaceChildren(
-    ...log.events.map((event) => {
-      const item = document.createElement("li");
-      item.className = "event-log-item";
-      item.dataset.state = event.active
-        ? "active"
-        : event.occurred
-          ? "occurred"
-          : "future";
-      item.dataset.kind = event.kind;
-
-      const marker = document.createElement("span");
-      marker.className = "event-log-marker";
-      marker.setAttribute("aria-hidden", "true");
-
-      const content = document.createElement("div");
-      content.className = "event-log-content";
-      const time = document.createElement("time");
-      time.textContent = formatElapsed(event.atSeconds);
-      const title = document.createElement("strong");
-      title.textContent = eventTitle(event);
-      const detail = document.createElement("span");
-      detail.textContent = eventDetail(event, route);
-      content.append(time, title, detail);
-
-      if (event.active) {
-        const current = document.createElement("span");
-        current.className = "event-log-current";
-        current.textContent = "ÑĞµĞ¹Ñ‡Ğ°Ñ";
-        content.append(current);
-      }
-
-      item.append(marker, content);
-      return item;
-    }),
-  );
-}
-
-/**
- * @param {ReturnType<typeof createExpeditionEventLogSnapshot>["events"][number]} event
- */
-function eventTitle(event) {
-  if (event.kind === "departure") return "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ²Ñ‹ÑˆĞµĞ» Ğ² Ğ¿ÑƒÑ‚ÑŒ";
-  if (event.kind === "segment-completed") {
-    return `Ğ—Ğ°Ğ²ĞµÑ€ÑˆÑ‘Ğ½ ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${(event.segmentIndex ?? 0) + 1}`;
-  }
-  if (event.kind === "supplies-low") {
-    return `${formatDepletionCause(event.cause)}: Ğ¾ÑÑ‚Ğ°Ğ»Ğ¾ÑÑŒ 25%`;
-  }
-  if (event.kind === "supplies-depleted") {
-    return "ĞšÑ€Ğ¸Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ Ğ·Ğ°Ğ¿Ğ°ÑÑ‹ Ğ¸ÑÑ‡ĞµÑ€Ğ¿Ğ°Ğ½Ñ‹";
-  }
-  if (event.kind === "target-discovered") {
-    return `ĞĞ±Ğ½Ğ°Ñ€ÑƒĞ¶ĞµĞ½ ${staticKindLabel(event.objectKind).toLocaleLowerCase("ru-RU")}`;
-  }
-  if (event.kind === "known-target-observed") {
-    return `ĞŸĞ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´Ñ‘Ğ½ Ğ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ñ‹Ğ¹ ${staticKindLabel(event.objectKind).toLocaleLowerCase("ru-RU")}`;
-  }
-  if (event.kind === "doctrine-decision") {
-    return event.doctrine === "STOP"
-      ? "Ğ”Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ°: Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒÑÑ Ñƒ Ñ†ĞµĞ»Ğ¸"
-      : "Ğ”Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ°: Ğ¾Ñ‚Ğ¼ĞµÑ‚Ğ¸Ñ‚ÑŒ Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ";
-  }
-  if (event.kind === "route-resumed") {
-    return event.resumeReason === "monster-contact"
-      ? "FLEE Ğ¿Ñ€ĞµÑ€Ğ²Ğ°Ğ» ÑÑ‚Ğ¾ÑĞ½ĞºÑƒ"
-      : "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½";
-  }
-  if (event.kind === "monster-contact") {
-    if (event.powerResolutionStatus === "monster-defeated") {
-      return `ĞŸĞ¾Ğ±ĞµĞ´Ğ° Ğ½Ğ°Ğ´ ${event.monsterId ?? "Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ¾Ğ¼"}`;
-    }
-    if (event.powerResolutionStatus === "flee-succeeded") {
-      return `Ğ£ÑĞ¿ĞµÑˆĞ½Ñ‹Ğ¹ Ğ¾Ñ‚Ñ…Ğ¾Ğ´ Ğ¾Ñ‚ ${event.monsterId ?? "Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ°"}`;
-    }
-    if (event.powerResolutionStatus === "flee-failed") {
-      return `ĞĞµÑƒĞ´Ğ°Ñ‡Ğ½Ñ‹Ğ¹ Ğ¾Ñ‚Ñ…Ğ¾Ğ´ Ğ¾Ñ‚ ${event.monsterId ?? "Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ°"}`;
-    }
-    if (event.powerResolutionStatus === "flee-required") {
-      return `FLEE Ğ¾Ñ‚ ${event.monsterId ?? "Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ°"}`;
-    }
-    return `Ğ“Ğ¸Ğ±ĞµĞ»ÑŒ Ğ¾Ñ‚ ${event.monsterId ?? "Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ°"}`;
-  }
-  if (event.kind === "search-missed") {
-    return "ĞŸĞ¾Ğ¸ÑĞº Ğ·Ğ°Ğ²ĞµÑ€ÑˆÑ‘Ğ½ Ğ±ĞµĞ· Ğ½Ğ°Ñ…Ğ¾Ğ´ĞºĞ¸";
-  }
-  if (event.kind === "route-ended") {
-    return "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ·Ğ°ĞºĞ¾Ğ½Ñ‡Ğ¸Ğ»ÑÑ Ğ²Ğ½Ğµ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°";
-  }
-  return event.cityName
-    ? `ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ñ€Ğ¸Ğ±Ñ‹Ğ» Ğ² ${event.cityName}`
-    : "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ´Ğ¾ÑÑ‚Ğ¸Ğ³ Ñ„Ğ¸Ğ½Ğ¸ÑˆĞ°";
-}
-
-/**
- * @param {ReturnType<typeof createExpeditionEventLogSnapshot>["events"][number]} event
- * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
- */
-function eventDetail(event, route) {
-  if (event.kind === "departure") {
-    return `${formatNumber(route.totalDistanceKilometers, 1)} ĞºĞ¼ Â· ${formatNumber(route.speedKilometersPerHour, 1)} ĞºĞ¼/Ñ‡`;
-  }
-  if (event.kind === "segment-completed") {
-    return `${formatNumber(event.distanceKilometers ?? 0, 1)} ĞºĞ¼ Ğ¿Ñ€Ğ¾Ğ¹Ğ´ĞµĞ½Ğ¾`;
-  }
-  if (event.kind === "supplies-low") {
-    return "ĞŸĞ¾Ñ€Ğ¾Ğ³ Ñ€Ğ°Ğ½Ğ½ĞµĞ³Ğ¾ Ğ¿Ñ€ĞµĞ´ÑƒĞ¿Ñ€ĞµĞ¶Ğ´ĞµĞ½Ğ¸Ñ";
-  }
-  if (event.kind === "supplies-depleted") {
-    return `${formatDepletionCause(event.cause)} Â· ${event.failureActivity === "idle" ? "Ğ³Ğ¸Ğ±ĞµĞ»ÑŒ Ğ½Ğ° ÑÑ‚Ğ¾ÑĞ½ĞºĞµ" : "Ğ³Ğ¸Ğ±ĞµĞ»ÑŒ Ğ² Ğ¿ÑƒÑ‚Ğ¸"} Â· ${formatNumber(event.distanceKilometers ?? 0, 1)} ĞºĞ¼ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ°`;
-  }
-  if (event.kind === "target-discovered") {
-    return `Ğ¡ĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${(event.segmentIndex ?? 0) + 1} Â· ${formatNumber(event.distanceKilometers ?? 0, 1)} ĞºĞ¼ Ğ¿ÑƒÑ‚Ğ¸`;
-  }
-  if (event.kind === "known-target-observed") {
-    return `Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ ${event.objectId ?? "Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ°"} ÑƒĞ¶Ğµ Ğ±Ñ‹Ğ»Ğ° Ğ² ÑĞµÑÑĞ¸Ğ¾Ğ½Ğ½Ğ¾Ğ¼ Ğ¶ÑƒÑ€Ğ½Ğ°Ğ»Ğµ Â· STOP Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ¾ Ğ½Ğµ Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ÑĞµÑ‚ÑÑ`;
-  }
-  if (event.kind === "doctrine-decision") {
-    return event.doctrine === "STOP"
-      ? "Ğ”Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸Ğµ Ğ¿Ğ¾ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½Ğ¾ Ğ½Ğ° Ğ¿Ğ°ÑƒĞ·Ñƒ Ğ² Ñ‚Ğ¾Ñ‡ĞºĞµ Ğ¾Ğ±Ğ½Ğ°Ñ€ÑƒĞ¶ĞµĞ½Ğ¸Ñ"
-      : "Ğ¦ĞµĞ»ÑŒ Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ»ĞµĞ½Ğ° Ğ² Ğ·Ğ½Ğ°Ğ½Ğ¸Ñ ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ğ¸; ĞºÑƒÑ€Ñ Ğ½Ğµ Ğ¸Ğ·Ğ¼ĞµĞ½Ñ‘Ğ½";
-  }
-  if (event.kind === "route-resumed") {
-    return event.resumeReason === "monster-contact"
-      ? `ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ²Ñ‹Ğ½ÑƒĞ´Ğ¸Ğ» Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ğ¾Ñ‚Ñ…Ğ¾Ğ´ Ğ¿Ğ¾ÑĞ»Ğµ ${formatDuration(event.idleDurationSeconds ?? 0)} ÑÑ‚Ğ¾ÑĞ½ĞºĞ¸ Â· Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚`
-      : `${event.idleDurationSeconds ? `Ğ¡Ñ‚Ğ¾ÑĞ½ĞºĞ° ${formatDuration(event.idleDurationSeconds)} Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞµĞ½Ğ° Â· ` : ""}${event.objectId ?? "Ğ¦ĞµĞ»ÑŒ"} ÑƒĞ¶Ğµ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ° Â· Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ñ‹Ğ¹ STOP Ğ¿Ğ¾Ğ´Ğ°Ğ²Ğ»ĞµĞ½`;
-  }
-  if (event.kind === "monster-contact") {
-    const comparison = `PWR ${event.playerPower ?? "â€”"} / ${event.monsterPower ?? "â€”"}`;
-    const activity = event.caravanActivity === "idle"
-      ? "ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚ Ğ½Ğ° ÑÑ‚Ğ¾ÑĞ½ĞºĞµ Â· "
-      : "";
-    if (event.powerResolutionStatus === "monster-defeated") {
-      return `${activity}${comparison} Â· Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ Ğ¿Ğ¾Ğ³Ğ¸Ğ±, ${event.caravanActivity === "idle" ? "Ğ¾Ğ¶Ğ¸Ğ´Ğ°Ğ½Ğ¸Ğµ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ÑÑ" : "Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ÑÑ"}`;
-    }
-    if (event.powerResolutionStatus === "flee-succeeded") {
-      return `${activity}${comparison} Â· ${formatNumber((event.fleeSpeedMetersPerSecond ?? 0) * 3.6, 1)} > ${formatNumber((event.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} ĞºĞ¼/Ñ‡ Â· Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ°Ñ Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ñ Ğ·Ğ° ${formatDuration(event.secondsToSafeSeparation ?? 0)}${event.caravanActivity === "idle" ? " Â· ÑÑ‚Ğ¾ÑĞ½ĞºĞ° Ğ¿Ñ€ĞµÑ€Ğ²Ğ°Ğ½Ğ°" : ""}`;
-    }
-    if (event.powerResolutionStatus === "flee-failed") {
-      return `${activity}${comparison} Â· ${formatNumber((event.fleeSpeedMetersPerSecond ?? 0) * 3.6, 1)} â‰¤ ${formatNumber((event.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} ĞºĞ¼/Ñ‡ Â· ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ¿Ğ¾Ğ³Ğ¸Ğ±Ğ»Ğ°`;
-    }
-    if (event.powerResolutionStatus === "flee-required") {
-      return `${activity}${comparison} Â· Ğ¾Ñ‚Ñ…Ğ¾Ğ´ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½, Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ½Ğ° Ğ¿Ğ°ÑƒĞ·Ğµ`;
-    }
-    return `${activity}${comparison} Â· ACCEPT_FIGHT, ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ¿Ğ¾Ğ³Ğ¸Ğ±Ğ»Ğ°`;
-  }
-  if (event.kind === "search-missed") {
-    return `ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ½Ğµ Ğ²Ğ¾ÑˆÑ‘Ğ» Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑ 150 Ğ¼ Ğ¾Ñ‚ Ñ†ĞµĞ»Ğ¸ ÑĞ»ÑƒÑ…Ğ°`;
-  }
-  if (event.kind === "route-ended") {
-    return `${formatNumber(event.distanceToCityMeters ?? 0, 0)} Ğ¼ Ğ´Ğ¾ ${event.cityName ?? "Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°"} Â· ÑƒÑĞ¿ĞµÑ… Ğ½Ğµ Ğ·Ğ°ÑÑ‡Ğ¸Ñ‚Ğ°Ğ½`;
-  }
-  if (event.kind === "arrival" && event.cityName) {
-    const movement = event.arrivalKind === "reentry" ? "Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ" : "Ğ¿Ñ€Ğ¸Ğ±Ñ‹Ñ‚Ğ¸Ğµ";
-    return `${movement} Â· Ñ€Ğ°Ğ´Ğ¸ÑƒÑ ${formatNumber(event.cityRadiusMeters ?? 0, 0)} Ğ¼ Â· ${formatNumber(event.distanceKilometers ?? 0, 1)} ĞºĞ¼ Ğ¿ÑƒÑ‚Ğ¸`;
-  }
-  return `${formatNumber(event.distanceKilometers ?? 0, 1)} ĞºĞ¼ Â· ETA ${formatDuration(route.totalDurationSeconds)}`;
-}
-
-/**
- * @param {ReturnType<typeof createRumorSearchSnapshot>} search
- * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | NonNullable<ReturnType<typeof createDiscoveryResumeSnapshot>>} doctrine
- * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
- */
-function renderRumorSearch(search, doctrine, outcome) {
-  const knownTarget = search.targetKnowledge === "known";
-  const waiting = outcome.phase === "idle-at-stop";
-  const idleFailure =
-    outcome.status === "failed" && outcome.failureActivity === "idle";
-  const resumed =
-    doctrine.status === "resumed-and-continuing" &&
-    !waiting &&
-    !idleFailure;
-  rumorPanel.dataset.state = search.status;
-  rumorPanel.dataset.knowledge = search.targetKnowledge;
-  if (search.status === "found") {
-    rumorState.textContent = knownTarget
-      ? "Ğ˜Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ°Ñ Ñ†ĞµĞ»ÑŒ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ°"
-      : idleFailure
-        ? "Ğ¡Ñ‚Ğ¾ÑĞ½ĞºĞ° Ğ¿Ñ€ĞµÑ€Ğ²Ğ°Ğ½Ğ°"
-        : waiting
-          ? "Ğ¡Ñ‚Ğ¾ÑĞ½ĞºĞ° Ñƒ Ñ†ĞµĞ»Ğ¸"
-          : resumed
-            ? "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½"
-            : doctrine.status === "stopped"
-              ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½"
-              : "Ğ¦ĞµĞ»ÑŒ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ°";
-  } else if (search.status === "missed") {
-    rumorState.textContent = knownTarget ? "ĞĞµ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¾" : "ĞĞµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾";
-  } else {
-    rumorState.textContent = knownTarget ? "Ğ¦ĞµĞ»ÑŒ ÑƒĞ¶Ğµ Ğ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ°" : "Ğ˜Ğ´Ñ‘Ñ‚ Ğ¿Ğ¾Ğ¸ÑĞº";
-  }
-  rumorOrigin.textContent = `${search.originCity.name} Â· ${search.originCity.id}`;
-  rumorSector.textContent = `Ğ¡Ğ— Â· ${formatNumber(search.rumor.bearingSector.minimumBearingDeg, 1)}Â°â€“${formatNumber(search.rumor.bearingSector.maximumBearingDeg, 1)}Â°`;
-  rumorRange.textContent = `${formatNumber(search.rumor.distanceRange.minimumMeters / 1_000, 0)}â€“${formatNumber(search.rumor.distanceRange.maximumMeters / 1_000, 0)} ĞºĞ¼`;
-  rumorText.textContent = `Â«Ğš ÑĞµĞ²ĞµÑ€Ğ¾-Ğ·Ğ°Ğ¿Ğ°Ğ´Ñƒ Ğ¾Ñ‚ ${search.originCity.name} Ğ²Ğ¸Ğ´ĞµĞ»Ğ¸ ÑÑ‚Ğ°Ñ€Ñ‹Ğ¹ Ñ€ÑƒĞ´Ğ½Ğ¸Ğº â€” Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€Ğ½Ğ¾ Ğ² ${formatNumber(search.rumor.distanceRange.minimumMeters / 1_000, 0)}â€“${formatNumber(search.rumor.distanceRange.maximumMeters / 1_000, 0)} ĞºĞ¼Â»`;
-
-  if (search.status === "found" && search.discovery) {
-    rumorResult.textContent = knownTarget
-      ? `Ğ˜Ğ·Ğ²ĞµÑÑ‚Ğ½Ñ‹Ğ¹ Ñ€ÑƒĞ´Ğ½Ğ¸Ğº Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ¾ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´Ñ‘Ğ½ Ğ½Ğ° ${formatElapsed(search.discovery.atSeconds)} Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${search.discovery.segmentIndex + 1} Â· ${formatNumber(search.discovery.routeDistanceKilometers, 1)} ĞºĞ¼ Ğ¿ÑƒÑ‚Ğ¸.`
-      : `Ğ ÑƒĞ´Ğ½Ğ¸Ğº Ğ¾Ğ±Ğ½Ğ°Ñ€ÑƒĞ¶ĞµĞ½ Ğ½Ğ° ${formatElapsed(search.discovery.atSeconds)} Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${search.discovery.segmentIndex + 1} Â· ${formatNumber(search.discovery.routeDistanceKilometers, 1)} ĞºĞ¼ Ğ¿ÑƒÑ‚Ğ¸.`;
-    doctrineResult.textContent = knownTarget
-      ? "Ğ¡ĞµÑÑĞ¸Ğ¾Ğ½Ğ½Ñ‹Ğ¹ Ğ¶ÑƒÑ€Ğ½Ğ°Ğ» Ñ€Ğ°ÑĞ¿Ğ¾Ğ·Ğ½Ğ°Ğ» Ñ†ĞµĞ»ÑŒ: Ğ´Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ° Ğ½Ğ¾Ğ²Ñ‹Ñ… Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚Ğ¸Ğ¹ Ğ½Ğµ Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ÑĞµÑ‚ÑÑ, ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚."
-      : idleFailure
-        ? `STOP Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ°, Ğ½Ğ¾ ĞºÑ€Ğ¸Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ Ğ·Ğ°Ğ¿Ğ°ÑÑ‹ Ğ¸ÑÑ‡ĞµÑ€Ğ¿Ğ°Ğ»Ğ¸ÑÑŒ Ğ²Ğ¾ Ğ²Ñ€ĞµĞ¼Ñ ÑÑ‚Ğ¾ÑĞ½ĞºĞ¸ Ğ´Ğ¾ Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ.`
-        : waiting
-          ? `STOP Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ°: ÑÑ‚Ğ¾ÑĞ½ĞºĞ° ${formatDuration(outcome.idleElapsedSeconds)} / ${formatDuration(outcome.idleDurationSeconds)}, Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ½Ğ¾Ğµ Ğ²Ñ€ĞµĞ¼Ñ Ğ·Ğ°Ğ¼Ğ¾Ñ€Ğ¾Ğ¶ĞµĞ½Ğ¾.`
-          : resumed
-        ? outcome.stopInterruptedByContact
-          ? `STOP Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ°, Ğ½Ğ¾ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ²Ñ‹Ğ½ÑƒĞ´Ğ¸Ğ» Ğ´Ğ¾ÑÑ€Ğ¾Ñ‡Ğ½Ğ¾ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ FLEE; Ñ†ĞµĞ»ÑŒ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ°, Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ ÑĞ½Ğ¾Ğ²Ğ° Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚.`
-          : `STOP Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ° Ğ¸ ÑĞ²Ğ½Ğ¾ ÑĞ½ÑÑ‚Ğ°: Ñ†ĞµĞ»ÑŒ ÑƒĞ¶Ğµ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ°, Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ ÑĞ½Ğ¾Ğ²Ğ° Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚.`
-        : doctrine.status === "stopped"
-        ? `STOP Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ°: Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¿Ğ¾ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½ Ğ½Ğ° Ğ¿Ğ°ÑƒĞ·Ñƒ Ğ² Ñ‚Ğ¾Ñ‡ĞºĞµ Ğ¾Ğ±Ğ½Ğ°Ñ€ÑƒĞ¶ĞµĞ½Ğ¸Ñ.`
-        : `MARK_AND_CONTINUE Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ°: Ñ†ĞµĞ»ÑŒ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ°, ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚.`;
-  } else if (search.status === "missed") {
-    rumorResult.textContent = knownTarget
-      ? `ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ·Ğ°Ğ²ĞµÑ€ÑˆÑ‘Ğ½ Ğ±ĞµĞ· Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ¾Ğ³Ğ¾ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¸Ñ: ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ½Ğµ Ğ²Ğ¾ÑˆÑ‘Ğ» Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑ ${formatNumber(search.discoveryRadiusMeters, 0)} Ğ¼ Ğ¾Ñ‚ Ğ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ¾Ğ¹ Ñ†ĞµĞ»Ğ¸.`
-      : `ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ·Ğ°Ğ²ĞµÑ€ÑˆÑ‘Ğ½: ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ½Ğµ Ğ²Ğ¾ÑˆÑ‘Ğ» Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑ ${formatNumber(search.discoveryRadiusMeters, 0)} Ğ¼ Ğ¾Ñ‚ ÑĞºÑ€Ñ‹Ñ‚Ğ¾Ğ¹ Ñ†ĞµĞ»Ğ¸.`;
-    doctrineResult.textContent = knownTarget
-      ? "Ğ¡ÑƒÑ‰ĞµÑÑ‚Ğ²ÑƒÑÑ‰Ğ°Ñ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ°; Ğ´Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ° Ğ½Ğ¾Ğ²Ñ‹Ñ… Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚Ğ¸Ğ¹ Ğ½Ğµ Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ÑĞ»Ğ°ÑÑŒ."
-      : "Ğ¦ĞµĞ»ÑŒ Ğ½Ğµ Ğ¾Ğ±Ğ½Ğ°Ñ€ÑƒĞ¶ĞµĞ½Ğ° â€” Ğ´Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ° Ğ½Ğµ ÑÑ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ğ»Ğ°.";
-  } else {
-    rumorResult.textContent = knownTarget
-      ? `Ğ ÑƒĞ´Ğ½Ğ¸Ğº ÑƒĞ¶Ğµ ĞµÑÑ‚ÑŒ Ğ² ÑĞµÑÑĞ¸Ğ¾Ğ½Ğ½Ğ¾Ğ¼ Ğ¶ÑƒÑ€Ğ½Ğ°Ğ»Ğµ. ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ¾Ğµ ÑĞ±Ğ»Ğ¸Ğ¶ĞµĞ½Ğ¸Ğµ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ´Ğ¸Ñ‚ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑĞµ ${formatNumber(search.discoveryRadiusMeters, 0)} Ğ¼.`
-      : `ĞŸÑ€Ğ¾Ğ²ĞµĞ´Ğ¸Ñ‚Ğµ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ñ‡ĞµÑ€ĞµĞ· Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ½Ñ‹Ğ¹ ÑĞµĞºÑ‚Ğ¾Ñ€. ĞĞ±Ğ½Ğ°Ñ€ÑƒĞ¶ĞµĞ½Ğ¸Ğµ ÑÑ€Ğ°Ğ±Ğ¾Ñ‚Ğ°ĞµÑ‚ Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑĞµ ${formatNumber(search.discoveryRadiusMeters, 0)} Ğ¼.`;
-    doctrineResult.textContent = knownTarget
-      ? "STOP Ğ¾Ñ‚Ğ½Ğ¾ÑĞ¸Ñ‚ÑÑ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğº Ğ½Ğ¾Ğ²Ñ‹Ğ¼ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚Ğ¸ÑĞ¼: Ğ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ°Ñ Ñ†ĞµĞ»ÑŒ Ğ½Ğµ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ¾."
-      : doctrine.doctrine === "STOP"
-        ? "ĞŸÑ€Ğ¸ Ğ¾Ğ±Ğ½Ğ°Ñ€ÑƒĞ¶ĞµĞ½Ğ¸Ğ¸ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑÑ Ñƒ Ñ†ĞµĞ»Ğ¸."
-        : "ĞŸÑ€Ğ¸ Ğ¾Ğ±Ğ½Ğ°Ñ€ÑƒĞ¶ĞµĞ½Ğ¸Ğ¸ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¾Ñ‚Ğ¼ĞµÑ‚Ğ¸Ñ‚ Ñ†ĞµĞ»ÑŒ Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸Ğµ.";
-  }
-
-  drawRumorMap(search);
-}
-
-/**
- * @param {import("../sim-core/dist/src/index.js").PlayerDiscoveryLedger} ledger
- * @param {import("../sim-core/dist/src/index.js").PlayerTravelLedger} travel
- * @param {ReturnType<typeof createDebugMapSnapshot>} snapshot
- */
-function renderDiscoveryLedger(ledger, travel, snapshot) {
-  if (
-    selectedKnowledgeMapOriginCityId !== null &&
-    ![
-      ...ledger.entries.map(
-        (entry) => entry.firstObservation.originCityId,
-      ),
-      ...travel.tracks.map((track) => track.originCityId),
-      ...travel.reachedCityLandmarks.map(
-        (landmark) => landmark.originCityId,
-      ),
-    ].includes(selectedKnowledgeMapOriginCityId)
-  ) {
-    selectedKnowledgeMapOriginCityId = null;
-  }
-  const map = createSessionKnowledgeMapSnapshot(
-    ledger,
-    selectedKnowledgeMapOriginCityId,
-    travel,
-  );
-  selectedKnowledgeMapOriginCityId = map.originCityId;
-  syncKnowledgeMapOriginOptions(map, snapshot.cities);
-  drawSessionKnowledgeMap(map, snapshot.cities);
-
-  knowledgeCount.textContent = String(ledger.entries.length);
-  knowledgeTrackCount.textContent = `ĞŸÑƒÑ‚ĞµĞ¹: ${travel.tracks.length}`;
-  knowledgeExpedition.textContent = `Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ #${expeditionNumber}`;
-  const preparedEntry = ledger.entries.find(
-    (entry) => entry.objectId === preparedKnowledgeObjectId,
-  );
-  const preparedCity = preparedEntry
-    ? snapshot.cities.find(
-        (city) => city.id === preparedEntry.firstObservation.originCityId,
-      )
-    : null;
-  knowledgeRouteStatus.textContent = preparedEntry
-    ? `Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ #${expeditionNumber} Ğ¿Ğ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ»ĞµĞ½Ğ°: ${preparedCity?.name ?? preparedEntry.firstObservation.originCityId} â†’ ${staticKindLabel(preparedEntry.objectKind)}.`
-    : "ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ ĞµÑ‰Ñ‘ Ğ½Ğµ Ğ¿Ğ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ»ĞµĞ½.";
-  knowledgeEmpty.hidden = ledger.entries.length > 0;
-  knowledgeList.hidden = ledger.entries.length === 0;
-  knowledgeList.replaceChildren(
-    ...ledger.entries.map((entry) => {
-      const item = document.createElement("li");
-      item.className = "knowledge-item";
-      item.dataset.prepared = String(
-        entry.objectId === preparedKnowledgeObjectId,
-      );
-
-      const heading = document.createElement("div");
-      heading.className = "knowledge-item__heading";
-      const title = document.createElement("strong");
-      title.textContent = `${staticKindLabel(entry.objectKind)} Â· ${entry.objectId}`;
-      const badge = document.createElement("span");
-      badge.textContent = "ĞŸĞ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¾ Ğ»Ğ¸Ñ‡Ğ½Ğ¾";
-      heading.append(title, badge);
-
-      const firstCity = snapshot.cities.find(
-        (city) => city.id === entry.firstObservation.originCityId,
-      );
-      const first = document.createElement("p");
-      first.textContent = `Ğ’Ğ¿ĞµÑ€Ğ²Ñ‹Ğµ: ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ #${entry.firstObservation.expeditionNumber} Â· ${firstCity?.name ?? entry.firstObservation.originCityId} Â· ${formatElapsed(entry.firstObservation.observedAtSeconds)} Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${entry.firstObservation.segmentIndex + 1} Â· ${formatNumber(entry.firstObservation.routeDistanceMeters / 1_000, 1)} ĞºĞ¼ Ğ¿ÑƒÑ‚Ğ¸.`;
-      const latest = document.createElement("p");
-      latest.textContent =
-        entry.observationCount === 1
-          ? "ĞĞ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ğ¹: 1 Â· Ğ¸ÑÑ‚Ğ¾Ñ‡Ğ½Ğ¸Ğº: Ğ»Ğ¸Ñ‡Ğ½Ğ¾Ğµ Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ğµ Â· ÑƒĞ²ĞµÑ€ĞµĞ½Ğ½Ğ¾ÑÑ‚ÑŒ: Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¾."
-          : `ĞĞ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ğ¹: ${entry.observationCount} Â· Ğ¿Ğ¾ÑĞ»ĞµĞ´Ğ½ĞµĞµ Ğ² ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ğ¸ #${entry.latestObservation.expeditionNumber} Ğ½Ğ° ${formatElapsed(entry.latestObservation.observedAtSeconds)}.`;
-
-      const navigation = document.createElement("p");
-      navigation.className = "knowledge-item__navigation";
-      navigation.textContent = `ĞĞ°Ğ²Ğ¸Ğ³Ğ°Ñ†Ğ¸Ñ Ğ¾Ñ‚ ${firstCity?.name ?? entry.firstObservation.originCityId}: Ğ°Ğ·Ğ¸Ğ¼ÑƒÑ‚ ${formatNumber(entry.firstObservation.originBearingDeg, 2)}Â° Â· ${formatNumber(entry.firstObservation.originDistanceMeters / 1_000, 3)} ĞºĞ¼.`;
-
-      const action = document.createElement("div");
-      action.className = "knowledge-item__action";
-      const returnButton = document.createElement("button");
-      returnButton.type = "button";
-      returnButton.dataset.knowledgeObjectId = entry.objectId;
-      returnButton.textContent =
-        entry.objectId === preparedKnowledgeObjectId
-          ? "ĞŸĞ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ¸Ñ‚ÑŒ ĞµÑ‰Ñ‘ Ğ¾Ğ´Ğ¸Ğ½ Ğ¿Ğ¾Ñ…Ğ¾Ğ´"
-          : "ĞŸĞ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ¿Ğ¾Ñ…Ğ¾Ğ´ Ğº Ğ¾Ğ±ÑŠĞµĞºÑ‚Ñƒ";
-      action.append(returnButton);
-
-      item.append(heading, first, latest, navigation, action);
-      return item;
-    }),
-  );
-}
-
-/**
- * @param {ReturnType<typeof createSessionKnowledgeMapSnapshot>} map
- * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
- */
-function syncKnowledgeMapOriginOptions(map, cities) {
-  const cityNames = new Map(cities.map((city) => [city.id, city.name]));
-  if (map.originCityIds.length === 0) {
-    const empty = document.createElement("option");
-    empty.value = "";
-    empty.textContent = "ĞĞµÑ‚ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…";
-    knowledgeMapOrigin.replaceChildren(empty);
-    knowledgeMapOrigin.disabled = true;
-    return;
-  }
-
-  knowledgeMapOrigin.replaceChildren(
-    ...map.originCityIds.map((cityId) => {
-      const option = document.createElement("option");
-      option.value = cityId;
-      option.textContent = cityNames.get(cityId) ?? cityId;
-      return option;
-    }),
-  );
-  knowledgeMapOrigin.disabled = map.originCityIds.length <= 1;
-  knowledgeMapOrigin.value = map.originCityId ?? "";
-}
-
-/**
- * @param {ReturnType<typeof createSessionKnowledgeMapSnapshot>} map
- * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
- */
-function drawSessionKnowledgeMap(map, cities) {
-  knowledgeMap.replaceChildren();
-  const city = cities.find((candidate) => candidate.id === map.originCityId);
-  knowledgeMapVisibility.textContent = `ĞĞ±Ğ·Ğ¾Ñ€ ${formatNumber(map.visibilityRadiusMeters, 0)} Ğ¼`;
-
-  if (!map.originCityId) {
-    const empty = svgElement("text", {
-      class: "knowledge-map-empty-label",
-      x: KNOWLEDGE_MAP_WIDTH / 2,
-      y: KNOWLEDGE_MAP_HEIGHT / 2,
-    });
-    empty.textContent = "ĞÑ‚ĞºÑ€Ñ‹Ñ‚Ğ¸Ğ¹ Ğ¸ Ğ¿Ñ€Ğ¾Ğ¹Ğ´ĞµĞ½Ğ½Ñ‹Ñ… Ğ¿ÑƒÑ‚ĞµĞ¹ Ğ¿Ğ¾ĞºĞ° Ğ½ĞµÑ‚";
-    knowledgeMap.append(empty);
-    knowledgeMapScale.textContent = "ĞœĞ°ÑÑˆÑ‚Ğ°Ğ± Ğ¿Ğ¾ÑĞ²Ğ¸Ñ‚ÑÑ Ğ¿Ğ¾ÑĞ»Ğµ Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸Ñ";
-    return;
-  }
-
-  for (const fraction of [0.25, 0.5, 0.75, 1]) {
-    knowledgeMap.append(
-      svgElement("circle", {
-        class: "knowledge-map-grid",
-        cx: map.origin.x,
-        cy: map.origin.y,
-        r: map.radiusPixels * fraction,
-      }),
-    );
-  }
-  knowledgeMap.append(
-    svgElement("line", {
-      class: "knowledge-map-axis",
-      x1: map.origin.x - map.radiusPixels,
-      x2: map.origin.x + map.radiusPixels,
-      y1: map.origin.y,
-      y2: map.origin.y,
-    }),
-    svgElement("line", {
-      class: "knowledge-map-axis",
-      x1: map.origin.x,
-      x2: map.origin.x,
-      y1: map.origin.y - map.radiusPixels,
-      y2: map.origin.y + map.radiusPixels,
-    }),
-  );
-
-  if (map.tracks.length > 0) {
-    const maskId = "knowledge-map-visibility-mask";
-    const definitions = svgElement("defs");
-    const mask = svgElement("mask", {
-      id: maskId,
-      x: 0,
-      y: 0,
-      width: map.width,
-      height: map.height,
-      maskUnits: "userSpaceOnUse",
-      "mask-type": "luminance",
-    });
-    mask.append(
-      svgElement("rect", {
-        x: 0,
-        y: 0,
-        width: map.width,
-        height: map.height,
-        fill: "white",
-      }),
-      ...map.tracks.map((track) =>
-        svgElement("polyline", {
-          points: knowledgeMapPoints(track.points),
-          fill: "none",
-          stroke: "black",
-          "stroke-width": map.visibilityDiameterPixels,
-          "stroke-linecap": "round",
-          "stroke-linejoin": "round",
-        }),
-      ),
-    );
-    definitions.append(mask);
-    const fog = svgElement("rect", {
-      class: "knowledge-map-fog",
-      x: 0,
-      y: 0,
-      width: map.width,
-      height: map.height,
-      mask: `url(#${maskId})`,
-    });
-    knowledgeMap.append(definitions, fog);
-  }
-
-  for (const track of map.tracks) {
-    const points = knowledgeMapPoints(track.points);
-    const corridor = svgElement("polyline", {
-      class: "knowledge-map-corridor",
-      points,
-      "stroke-width": map.visibilityDiameterPixels,
-    });
-    const path = svgElement("polyline", {
-      class: "knowledge-map-track",
-      points,
-      "data-current": String(
-        track.expeditionNumber === expeditionNumber,
-      ),
-    });
-    path.append(
-      svgTitle(
-        `Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ #${track.expeditionNumber} Â· Ğ¿Ñ€Ğ¾Ğ¹Ğ´ĞµĞ½Ğ¾ ${formatNumber(track.traveledDistanceMeters / 1_000, 2)} ĞºĞ¼`,
-      ),
-    );
-    const end = track.points.at(-1);
-    knowledgeMap.append(corridor, path);
-    if (end) {
-      const endMarker = svgElement("circle", {
-        class: "knowledge-map-track-end",
-        cx: end.x,
-        cy: end.y,
-        r: 3.5,
-      });
-      endMarker.append(
-        svgTitle(
-          `ĞšĞ¾Ğ½ĞµÑ† Ğ¿Ñ€Ğ¾Ğ¹Ğ´ĞµĞ½Ğ½Ğ¾Ğ³Ğ¾ Ğ¿ÑƒÑ‚Ğ¸ ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ğ¸ #${track.expeditionNumber}`,
-        ),
-      );
-      knowledgeMap.append(endMarker);
-    }
-  }
-
-  for (const entry of map.entries) {
-    const rightSide = entry.x >= map.origin.x;
-    knowledgeMap.append(
-      svgElement("line", {
-        class: "knowledge-map-bearing",
-        x1: map.origin.x,
-        y1: map.origin.y,
-        x2: entry.x,
-        y2: entry.y,
-      }),
-    );
-    const marker = svgElement("circle", {
-      class: `knowledge-map-marker knowledge-map-marker--${entry.objectKind}`,
-      cx: entry.x,
-      cy: entry.y,
-      r: 5.5,
-    });
-    marker.append(
-      svgTitle(
-        `${staticKindLabel(entry.objectKind)} Â· ${formatNumber(entry.bearingDeg, 2)}Â° Â· ${formatNumber(entry.distanceMeters / 1_000, 3)} ĞºĞ¼`,
-      ),
-    );
-    const label = svgElement("text", {
-      class: "knowledge-map-label",
-      x: entry.x + (rightSide ? 9 : -9),
-      y: entry.y - 3,
-      "text-anchor": rightSide ? "start" : "end",
-    });
-    label.textContent = staticKindLabel(entry.objectKind);
-    const distance = svgElement("text", {
-      class: "knowledge-map-distance",
-      x: entry.x + (rightSide ? 9 : -9),
-      y: entry.y + 9,
-      "text-anchor": rightSide ? "start" : "end",
-    });
-    distance.textContent = `${formatNumber(entry.bearingDeg, 1)}Â° Â· ${formatNumber(entry.distanceMeters / 1_000, 2)} ĞºĞ¼`;
-    knowledgeMap.append(marker, label, distance);
-  }
-
-  for (const landmark of map.cityLandmarks) {
-    const reachedCity = cities.find((candidate) => candidate.id === landmark.cityId);
-    const marker = svgElement("rect", {
-      class: "knowledge-map-marker knowledge-map-marker--city",
-      x: landmark.x - 6,
-      y: landmark.y - 6,
-      width: 12,
-      height: 12,
-      rx: 2,
-    });
-    marker.append(
-      svgTitle(
-        `${reachedCity?.name ?? landmark.cityId} Â· Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¾ Ğ¿Ñ€Ğ¸Ğ±Ñ‹Ñ‚Ğ¸ĞµĞ¼ Â· ${formatNumber(landmark.bearingDeg, 2)}Â° Â· ${formatNumber(landmark.distanceMeters / 1_000, 3)} ĞºĞ¼`,
-      ),
-    );
-    const label = svgElement("text", {
-      class: "knowledge-map-label",
-      x: landmark.x + 9,
-      y: landmark.y - 4,
-    });
-    label.textContent = reachedCity?.name ?? landmark.cityId;
-    const distance = svgElement("text", {
-      class: "knowledge-map-distance",
-      x: landmark.x + 9,
-      y: landmark.y + 9,
-    });
-    distance.textContent = `${formatNumber(landmark.bearingDeg, 1)}Â° Â· ${formatNumber(landmark.distanceMeters / 1_000, 2)} ĞºĞ¼`;
-    knowledgeMap.append(marker, label, distance);
-  }
-
-  const origin = svgElement("circle", {
-    class: "knowledge-map-origin",
-    cx: map.origin.x,
-    cy: map.origin.y,
-    r: 6.5,
-  });
-  origin.append(svgTitle(city?.name ?? map.originCityId));
-  const originLabel = svgElement("text", {
-    class: "knowledge-map-label",
-    x: map.origin.x + 10,
-    y: map.origin.y - 9,
-  });
-  originLabel.textContent = city?.name ?? map.originCityId;
-  knowledgeMap.append(origin, originLabel);
-
-  knowledgeMapScale.textContent = `Ğ Ğ°Ğ´Ğ¸ÑƒÑ ${formatNumber(map.scaleRadiusMeters / 1_000, 2)} ĞºĞ¼ Â· Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ² ${map.entries.length} Â· Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ¾Ğ² ${map.cityLandmarks.length} Â· Ğ¿ÑƒÑ‚ĞµĞ¹ ${map.tracks.length}`;
-}
-
-/** @param {readonly {x: number, y: number}[]} points */
-function knowledgeMapPoints(points) {
-  return points.map((point) => `${point.x},${point.y}`).join(" ");
-}
-
-/**
- * @param {ReturnType<typeof createRumorSearchSnapshot>} search
- */
-function drawRumorMap(search) {
-  const map = search.localMap;
-  rumorMap.replaceChildren();
-
-  for (const offset of [40, 80, 120, 160, 200, 240, 280, 320, 360]) {
-    rumorMap.append(
-      svgElement("line", {
-        class: "rumor-map-grid",
-        x1: offset,
-        x2: offset,
-        y1: 0,
-        y2: map.height,
-      }),
-    );
-  }
-  for (const offset of [40, 80, 120, 160, 200]) {
-    rumorMap.append(
-      svgElement("line", {
-        class: "rumor-map-grid",
-        x1: 0,
-        x2: map.width,
-        y1: offset,
-        y2: offset,
-      }),
-    );
-  }
-
-  rumorMap.append(
-    svgElement("circle", {
-      class: "rumor-ring",
-      cx: map.originPoint.x,
-      cy: map.originPoint.y,
-      r: map.minimumRangePixels,
-    }),
-    svgElement("circle", {
-      class: "rumor-ring",
-      cx: map.originPoint.x,
-      cy: map.originPoint.y,
-      r: map.maximumRangePixels,
-    }),
-    svgElement("polygon", {
-      class: "rumor-clue-area",
-      points: map.clueAreaPoints.map((point) => `${point.x},${point.y}`).join(" "),
-    }),
-    svgElement("polyline", {
-      class: "rumor-local-route",
-      points: map.routePoints.map((point) => `${point.x},${point.y}`).join(" "),
-    }),
-  );
-
-  const minimumLabel = svgElement("text", {
-    class: "rumor-range-label",
-    x: map.originPoint.x + map.minimumRangePixels + 3,
-    y: map.originPoint.y - 3,
-  });
-  minimumLabel.textContent = `${formatNumber(search.rumor.distanceRange.minimumMeters / 1_000, 0)} ĞºĞ¼`;
-  const maximumLabel = svgElement("text", {
-    class: "rumor-range-label",
-    x: map.originPoint.x + map.maximumRangePixels + 3,
-    y: map.originPoint.y - 3,
-  });
-  maximumLabel.textContent = `${formatNumber(search.rumor.distanceRange.maximumMeters / 1_000, 0)} ĞºĞ¼`;
-
-  const clue = svgElement("circle", {
-    class: "rumor-clue-marker",
-    cx: map.cluePoint.x,
-    cy: map.cluePoint.y,
-    r: 10,
-  });
-  const clueLabel = svgElement("text", {
-    class: "rumor-map-label",
-    x: map.cluePoint.x,
-    y: map.cluePoint.y + 3,
-    "text-anchor": "middle",
-  });
-  clueLabel.textContent = "?";
-
-  const target = svgElement("polygon", {
-    class: "rumor-target-marker",
-    points: `${map.targetPoint.x},${map.targetPoint.y - 7} ${map.targetPoint.x + 7},${map.targetPoint.y} ${map.targetPoint.x},${map.targetPoint.y + 7} ${map.targetPoint.x - 7},${map.targetPoint.y}`,
-  });
-  target.append(
-    svgTitle(
-      search.targetKnowledge === "known"
-        ? "Ğ˜Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ°Ñ Ñ†ĞµĞ»ÑŒ Ğ¸Ğ· ÑĞµÑÑĞ¸Ğ¾Ğ½Ğ½Ğ¾Ğ³Ğ¾ Ğ¶ÑƒÑ€Ğ½Ğ°Ğ»Ğ°"
-        : "Ğ¢Ğ¾Ñ‡Ğ½Ğ°Ñ Ñ†ĞµĞ»ÑŒ â€” Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ DEV",
-    ),
-  );
-
-  const origin = svgElement("circle", {
-    class: "rumor-origin-marker",
-    cx: map.originPoint.x,
-    cy: map.originPoint.y,
-    r: 6,
-  });
-  const originLabel = svgElement("text", {
-    class: "rumor-map-label",
-    x: map.originPoint.x + 9,
-    y: map.originPoint.y + 3,
-  });
-  originLabel.textContent = search.originCity.name;
-
-  const caravan = svgElement("circle", {
-    class: "rumor-caravan-marker",
-    cx: map.caravanPoint.x,
-    cy: map.caravanPoint.y,
-    r: 7,
-  });
-  caravan.append(svgTitle("ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½"));
-
-  rumorMap.append(
-    minimumLabel,
-    maximumLabel,
-    clue,
-    clueLabel,
-    target,
-    origin,
-    originLabel,
-    caravan,
-  );
-}
-
-/**
- * @param {ReturnType<typeof createCaravanStatusSnapshot>} status
- */
-function renderCaravanStatus(status) {
-  const outcomeFailed = status.outcome?.status === "failed";
-  const outcomeCompleted = status.outcome?.status === "completed";
-  const paused = status.outcome?.status === "paused";
-  const waitingAtStop = status.outcome?.phase === "idle-at-stop";
-  const idleFailure =
-    outcomeFailed && status.outcome?.failureActivity === "idle";
-  const monsterDefeat =
-    outcomeFailed && status.outcome?.failureReason === "monster";
-  const fleeFailed =
-    monsterDefeat &&
-    status.outcome?.monsterContactResolution?.status === "flee-failed";
-  const monsterContactPause =
-    paused && status.outcome?.interruptionCause === "monster-contact";
-  const routeEnded =
-    paused && status.outcome?.interruptionCause === "route-end";
-  const monsterVictoryOccurred =
-    status.outcome?.monsterContactResolution?.status === "monster-defeated" &&
-    status.outcome.monsterContact !== null &&
-    status.route.evaluatedAtSeconds + 1e-9 >=
-      status.outcome.monsterContact.expeditionElapsedSeconds;
-  const fleeSucceededOccurred =
-    status.outcome?.monsterContactResolution?.status === "flee-succeeded" &&
-    status.outcome.monsterContact !== null &&
-    status.route.evaluatedAtSeconds + 1e-9 >=
-      status.outcome.monsterContact.expeditionElapsedSeconds;
-  const doctrineResumed =
-    status.doctrine?.status === "resumed-and-continuing" &&
-    !waitingAtStop &&
-    !idleFailure;
-  const stopInterruptedByContact = Boolean(
-    status.outcome?.stopInterruptedByContact,
-  );
-  const doctrineContinues =
-    status.doctrine?.status === "marked-and-continuing" ||
-    status.doctrine?.status === "known-and-continuing";
-  const knownTargetContinues =
-    status.doctrine?.status === "known-and-continuing";
-  const panelState = outcomeFailed
-    ? "depleted"
-    : outcomeCompleted
-      ? "completed"
-    : paused
-      ? "stopped"
-    : waitingAtStop
-      ? "stopped"
-    : status.forecast.canFinish
-      ? "safe"
-      : "risk";
-  caravanPanel.dataset.state = panelState;
-  caravanStateLabel.textContent =
-    outcomeFailed
-      ? monsterDefeat
-        ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ ÑƒĞ½Ğ¸Ñ‡Ñ‚Ğ¾Ğ¶ĞµĞ½"
-        : "Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ¿Ğ¾Ñ‚ĞµÑ€ÑĞ½Ğ°"
-      : outcomeCompleted
-        ? `ĞŸÑ€Ğ¸Ğ±Ñ‹Ğ» Ğ² ${status.outcome?.destinationCity?.name ?? "Ğ³Ğ¾Ñ€Ğ¾Ğ´"}`
-      : paused
-        ? routeEnded
-          ? "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ²Ğ½Ğµ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°"
-          : monsterContactPause
-          ? "ĞšĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚ Ñ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ¾Ğ¼"
-          : "ĞÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½ Ñƒ Ñ†ĞµĞ»Ğ¸"
-        : waitingAtStop
-          ? "Ğ¡Ñ‚Ğ¾ÑĞ½ĞºĞ° Ñƒ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ½Ğ¾Ğ¹ Ñ†ĞµĞ»Ğ¸"
-        : doctrineResumed
-          ? stopInterruptedByContact
-            ? "FLEE Ğ¿Ñ€ĞµÑ€Ğ²Ğ°Ğ» ÑÑ‚Ğ¾ÑĞ½ĞºÑƒ Â· Ğ² Ğ¿ÑƒÑ‚Ğ¸"
-            : "Ğ¦ĞµĞ»ÑŒ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ° Â· Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½"
-        : doctrineContinues
-          ? knownTargetContinues
-            ? "Ğ˜Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ°Ñ Ñ†ĞµĞ»ÑŒ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ° Â· Ğ² Ğ¿ÑƒÑ‚Ğ¸"
-            : "Ğ¦ĞµĞ»ÑŒ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ° Â· Ğ² Ğ¿ÑƒÑ‚Ğ¸"
-        : monsterVictoryOccurred
-          ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ¿Ğ¾Ğ±ĞµĞ¶Ğ´Ñ‘Ğ½ Â· Ğ² Ğ¿ÑƒÑ‚Ğ¸"
-        : fleeSucceededOccurred
-          ? "ĞÑ‚Ñ…Ğ¾Ğ´ ÑƒÑĞ¿ĞµÑˆĞµĞ½ Â· Ğ² Ğ¿ÑƒÑ‚Ğ¸"
-      : panelState === "risk"
-        ? "Ğ Ğ¸ÑĞº Ğ¸ÑÑ‚Ğ¾Ñ‰ĞµĞ½Ğ¸Ñ"
-        : "Ğ“Ğ¾Ñ‚Ğ¾Ğ² Ğº Ğ¿ÑƒÑ‚Ğ¸";
-
-  caravanRouteStatus.textContent =
-    outcomeFailed
-      ? `${monsterDefeat ? "Ğ Ğ°Ğ·Ğ±Ğ¸Ñ‚" : "ĞŸĞ¾Ğ³Ğ¸Ğ±"} Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${(status.route.segmentIndex ?? 0) + 1}/4`
-      : outcomeCompleted
-        ? `ĞŸÑ€Ğ¸Ğ±Ñ‹Ğ» Â· ${status.outcome?.destinationCity?.name ?? "Ğ³Ğ¾Ñ€Ğ¾Ğ´"}`
-      : paused
-      ? `${routeEnded ? "ĞšĞ¾Ğ½ĞµÑ† Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ°" : monsterContactPause ? "ĞšĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚" : "Ğ¡Ñ‚Ğ¾ÑĞ½ĞºĞ°"} Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${(status.route.segmentIndex ?? 0) + 1}/4`
-      : waitingAtStop
-        ? `Idle-ÑÑ‚Ğ¾ÑĞ½ĞºĞ° Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${(status.route.segmentIndex ?? 0) + 1}/4`
-      : status.route.status === "arrived"
-      ? "ĞŸÑ€Ğ¸Ğ±Ñ‹Ğ» Â· Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ·Ğ°Ğ²ĞµÑ€ÑˆÑ‘Ğ½"
-      : `Ğ’ Ğ¿ÑƒÑ‚Ğ¸ Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${(status.route.segmentIndex ?? 0) + 1}/4`;
-  caravanDistance.textContent = `${formatNumber(status.route.traveledDistanceKilometers, 1)} / ${formatNumber(status.route.traveledDistanceKilometers + status.route.remainingDistanceKilometers, 1)} ĞºĞ¼`;
-  routeProgress.value = status.route.progress;
-  routeProgress.textContent = `${Math.round(status.route.progress * 100)}%`;
-  routeProgressLabel.textContent = outcomeFailed
-    ? `${Math.round(status.route.progress * 100)}% Â· Ğ“Ğ˜Ğ‘Ğ•Ğ›Ğ¬ ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
-    : outcomeCompleted
-      ? `100% Â· Ğ“ĞĞ ĞĞ” ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
-      : paused
-        ? `${Math.round(status.route.progress * 100)}% Â· ${routeEnded ? "Ğ’ĞĞ• Ğ“ĞĞ ĞĞ”Ğ" : monsterContactPause ? "ĞšĞĞĞ¢ĞĞšĞ¢" : "STOP"} ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
-        : waitingAtStop
-          ? `${Math.round(status.route.progress * 100)}% Â· IDLE ${formatDuration(status.route.idleElapsedSeconds)} / ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)}`
-        : `${Math.round(status.route.progress * 100)}% Â· ETA ${formatDuration(status.route.totalDurationSeconds)}`;
-
-  renderSupply(
-    foodCard,
-    foodRemaining,
-    foodProgress,
-    foodMeta,
-    status.supplies.foodRemaining,
-    status.supplies.initialFoodUnits,
-    status.supplies.foodFraction,
-    status.supplies.activity === "idle"
-      ? supplySettings.profile.idle.foodUnitsPerHour
-      : supplySettings.profile.moving.foodUnitsPerHour,
-  );
-  renderSupply(
-    waterCard,
-    waterRemaining,
-    waterProgress,
-    waterMeta,
-    status.supplies.waterRemaining,
-    status.supplies.initialWaterUnits,
-    status.supplies.waterFraction,
-    status.supplies.activity === "idle"
-      ? supplySettings.profile.idle.waterUnitsPerHour
-      : supplySettings.profile.moving.waterUnitsPerHour,
-  );
-
-  if (outcomeFailed) {
-    forecastTitle.textContent = monsterDefeat
-      ? fleeFailed
-        ? "ĞŸĞ¾Ğ±ĞµĞ³ Ğ½Ğµ ÑƒĞ´Ğ°Ğ»ÑÑ"
-        : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ ÑƒĞ½Ğ¸Ñ‡Ñ‚Ğ¾Ğ¶ĞµĞ½"
-      : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ğ¾Ğ³Ğ¸Ğ±";
-    forecastDetail.textContent = monsterDefeat
-      ? fleeFailed
-        ? `Ğ¡ĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ Ğ¾Ñ‚Ñ…Ğ¾Ğ´Ğ° ${formatNumber((status.outcome?.monsterContactResolution?.fleeResolution?.caravanSpeedMetersPerSecond ?? 0) * 3.6, 1)} ĞºĞ¼/Ñ‡ Ğ½Ğµ Ğ²Ñ‹ÑˆĞµ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚Ğ¸ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ ${formatNumber((status.outcome?.monsterContactResolution?.fleeResolution?.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} ĞºĞ¼/Ñ‡.`
-        : `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "â€”"} < Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "â€”"}; ACCEPT_FIGHT Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞ¸Ğ» ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ.`
-      : `${formatDepletionCause(status.outcome?.failureCause ?? null)} Ğ¸ÑÑ‡ĞµÑ€Ğ¿Ğ°Ğ½Ñ‹ ${idleFailure ? "Ğ²Ğ¾ Ğ²Ñ€ĞµĞ¼Ñ ÑÑ‚Ğ¾ÑĞ½ĞºĞ¸" : "Ğ² Ğ¿ÑƒÑ‚Ğ¸"} Ğ½Ğ° ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}.`;
-  } else if (outcomeCompleted) {
-    forecastTitle.textContent = `ĞŸÑ€Ğ¸Ğ±Ñ‹Ñ‚Ğ¸Ğµ Ğ² ${status.outcome?.destinationCity?.name ?? "Ğ³Ğ¾Ñ€Ğ¾Ğ´"}`;
-    forecastDetail.textContent = `Ğ’ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğµ: ĞµĞ´Ğ° ${formatNumber(status.supplies.foodRemaining, 1)} Â· Ğ²Ğ¾Ğ´Ğ° ${formatNumber(status.supplies.waterRemaining, 1)}`;
-  } else if (paused) {
-    forecastTitle.textContent = routeEnded
-      ? "Ğ“Ğ¾Ñ€Ğ¾Ğ´ Ğ½Ğµ Ğ´Ğ¾ÑÑ‚Ğ¸Ğ³Ğ½ÑƒÑ‚"
-      : monsterContactPause
-        ? "Ğ’Ñ‹Ğ±Ñ€Ğ°Ğ½ FLEE"
-        : "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¿Ğ¾ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½ Ğ½Ğ° Ğ¿Ğ°ÑƒĞ·Ñƒ";
-    forecastDetail.textContent = routeEnded
-      ? `Ğ›Ğ¸Ğ½Ğ¸Ñ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ° Ğ·Ğ°ĞºĞ¾Ğ½Ñ‡Ğ¸Ğ»Ğ°ÑÑŒ Ğ²Ğ½Ğµ Ñ€Ğ°Ğ´Ğ¸ÑƒÑĞ° ${formatNumber(status.outcome?.cityArrivalRadiusMeters ?? 0, 0)} Ğ¼ Ğ¾Ñ‚ ${status.outcome?.destinationCity?.name ?? "Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°"}.`
-      : monsterContactPause
-        ? "Ğ¡Ğ¸Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ğ» Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚: Ğ´Ğ»Ñ FLEE Ğ½Ğµ Ğ¿ĞµÑ€ĞµĞ´Ğ°Ğ½Ñ‹ ÑĞ²Ğ½Ñ‹Ğµ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚Ğ¸."
-        : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¶Ğ´Ñ‘Ñ‚ Ñƒ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ½Ğ¾Ğ¹ Ñ†ĞµĞ»Ğ¸; ÑÑ‚Ğ¾ Ğ½Ğµ Ñ„Ğ¸Ğ½Ğ°Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¸ÑÑ…Ğ¾Ğ´.";
-  } else if (waitingAtStop) {
-    const monsterWillDefeat =
-      status.outcome?.failureReason === "monster";
-    const fatalSupplyBeforeResume =
-      !monsterWillDefeat &&
-      status.outcome?.planned.status === "failed" &&
-      status.outcome.resumeAtSeconds !== null &&
-      status.outcome.planned.atSeconds <=
-        status.outcome.resumeAtSeconds + 1e-9;
-    forecastTitle.textContent = monsterWillDefeat
-      ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ¾Ğ¿Ğ°ÑĞ½ĞµĞµ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½Ğ°"
-      : fatalSupplyBeforeResume
-      ? "Ğ—Ğ°Ğ¿Ğ°ÑĞ¾Ğ² Ğ½Ğµ Ñ…Ğ²Ğ°Ñ‚Ğ¸Ñ‚ Ğ½Ğ° ÑÑ‚Ğ¾ÑĞ½ĞºÑƒ"
-      : stopInterruptedByContact
-        ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ¿Ñ€ĞµÑ€Ğ²Ñ‘Ñ‚ ÑÑ‚Ğ¾ÑĞ½ĞºÑƒ"
-      : "Ğ˜Ğ´Ñ‘Ñ‚ ÑÑ‚Ğ¾ÑĞ½ĞºĞ° Ñƒ Ñ†ĞµĞ»Ğ¸";
-    forecastDetail.textContent = monsterWillDefeat
-      ? `ĞšĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚ Ğ½Ğ° ${formatElapsed(status.outcome?.planned.atSeconds ?? 0)} Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞ¸Ñ‚ ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ğ¾Ğ¹ Ğ´Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ¾Ğ¹.`
-      : fatalSupplyBeforeResume
-      ? `${formatDepletionCause(status.outcome?.planned.failureCause ?? null)} Ğ·Ğ°ĞºĞ¾Ğ½Ñ‡Ğ°Ñ‚ÑÑ Ğ½Ğ° ${formatElapsed(status.outcome?.planned.atSeconds ?? 0)} Ğ´Ğ¾ Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ.`
-      : stopInterruptedByContact
-        ? `Ğ£ÑĞ¿ĞµÑˆĞ½Ñ‹Ğ¹ FLEE Ğ½Ğ°Ñ‡Ğ½Ñ‘Ñ‚ÑÑ Ğ½Ğ° ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)} Ğ¸ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ Ğ¾ÑÑ‚Ğ°Ñ‚Ğ¾Ğº Ğ¾Ğ¶Ğ¸Ğ´Ğ°Ğ½Ğ¸Ñ.`
-      : `ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ½Ğ¾Ğµ Ğ²Ñ€ĞµĞ¼Ñ Ğ·Ğ°Ğ¼Ğ¾Ñ€Ğ¾Ğ¶ĞµĞ½Ğ¾; idle-Ñ€Ğ°ÑÑ…Ğ¾Ğ´ Ğ´ĞµĞ¹ÑÑ‚Ğ²ÑƒĞµÑ‚ Ğ´Ğ¾ ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}.`;
-  } else if (doctrineResumed) {
-    forecastTitle.textContent = stopInterruptedByContact
-      ? "Ğ¡Ñ‚Ğ¾ÑĞ½ĞºĞ° Ğ¿Ñ€ĞµÑ€Ğ²Ğ°Ğ½Ğ° Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ‘Ğ¼"
-      : "ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½";
-    forecastDetail.textContent = stopInterruptedByContact
-      ? `Ğ£ÑĞ¿ĞµÑˆĞ½Ñ‹Ğ¹ FLEE Ğ½Ğ°Ñ‡Ğ°Ğ»ÑÑ Ğ½Ğ° ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}; ÑƒÑ‡Ñ‚ĞµĞ½Ğ¾ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)} Ñ„Ğ°ĞºÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğ¹ ÑÑ‚Ğ¾ÑĞ½ĞºĞ¸.`
-      : "ĞĞ°Ğ¹Ğ´ĞµĞ½Ğ½Ğ°Ñ Ñ†ĞµĞ»ÑŒ ÑƒĞ¶Ğµ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ° Ğ¸ Ğ½Ğµ ÑĞ¾Ğ·Ğ´Ğ°ÑÑ‚ Ğ¿Ğ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ñ‹Ğ¹ STOP; ÑĞ»ĞµĞ´ÑƒÑÑ‰Ğ¸Ğµ Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ñ‹ Ñ€Ğ°ÑÑÑ‡Ğ¸Ñ‚Ñ‹Ğ²Ğ°ÑÑ‚ÑÑ Ğ¿Ğ¾ Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ğ¾Ğ¼Ñƒ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ñƒ.";
-  } else if (monsterVictoryOccurred) {
-    forecastTitle.textContent = "Ğ¡Ğ»Ğ°Ğ±Ñ‹Ğ¹ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»ÑŒ ÑƒĞ½Ğ¸Ñ‡Ñ‚Ğ¾Ğ¶ĞµĞ½";
-    forecastDetail.textContent = `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "â€”"} > Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "â€”"}; ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚.`;
-  } else if (fleeSucceededOccurred) {
-    forecastTitle.textContent = "ĞÑ‚Ñ…Ğ¾Ğ´ Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½";
-    forecastDetail.textContent = `ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¾Ñ‚ĞºÑ€Ñ‹Ğ» Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½ÑƒÑ Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ñ Ğ·Ğ° ${formatDuration(status.outcome?.monsterContactResolution?.fleeResolution?.secondsToSafeSeparation ?? 0)} Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚.`;
-  } else if (status.forecast.canFinish) {
-    forecastTitle.textContent = status.outcome?.cityArrival
-      ? "Ğ—Ğ°Ğ¿Ğ°ÑĞ¾Ğ² Ñ…Ğ²Ğ°Ñ‚Ğ¸Ñ‚ Ğ´Ğ¾ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°"
-      : "Ğ—Ğ°Ğ¿Ğ°ÑĞ¾Ğ² Ñ…Ğ²Ğ°Ñ‚Ğ¸Ñ‚ Ğ´Ğ¾ ĞºĞ¾Ğ½Ñ†Ğ° Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ°";
-    forecastDetail.textContent = `${status.outcome?.cityArrival ? "ĞŸÑ€Ğ¸ Ğ²Ñ…Ğ¾Ğ´Ğµ Ğ² Ğ³Ğ¾Ñ€Ğ¾Ğ´" : "Ğ’ ĞºĞ¾Ğ½Ñ†Ğµ Ğ»Ğ¸Ğ½Ğ¸Ğ¸"}: ĞµĞ´Ğ° ${formatNumber(status.forecast.foodAtArrival, 1)} Â· Ğ²Ğ¾Ğ´Ğ° ${formatNumber(status.forecast.waterAtArrival, 1)}`;
-  } else {
-    forecastTitle.textContent = "Ğ—Ğ°Ğ¿Ğ°ÑĞ¾Ğ² Ğ½Ğµ Ñ…Ğ²Ğ°Ñ‚Ğ¸Ñ‚";
-    forecastDetail.textContent = `${formatDepletionCause(status.forecast.depletionCause)} Ğ·Ğ°ĞºĞ¾Ğ½Ñ‡Ğ°Ñ‚ÑÑ Ğ½Ğ° ${formatElapsed(status.forecast.firstDepletionAtSeconds ?? 0)}`;
-  }
-}
-
-/**
- * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
- */
-function renderExpeditionOutcome(outcome) {
-  const destinationName = outcome.destinationCity?.name ?? "Ğ³Ğ¾Ñ€Ğ¾Ğ´";
-  const routeEnded = outcome.interruptionCause === "route-end";
-  outcomePanel.dataset.state = outcome.status;
-  outcomeTime.textContent = formatElapsed(outcome.planned.atSeconds);
-  outcomePosition.textContent =
-    outcome.planned.segmentIndex === null
-      ? `Ğ¤Ğ¸Ğ½Ğ¸Ñˆ Â· ${formatNumber(outcome.planned.routeDistanceKilometers, 1)} ĞºĞ¼`
-      : `Ğ¡ĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${outcome.planned.segmentIndex + 1} Â· ${formatNumber(outcome.planned.routeDistanceKilometers, 1)} ĞºĞ¼`;
-
-  if (outcome.status === "in-progress") {
-    if (outcome.phase === "idle-at-stop") {
-      const patrolWillInterrupt = outcome.stopInterruptedByContact;
-      const monsterWillDefeat = outcome.failureReason === "monster";
-      const fatalSupplyBeforeResume =
-        !monsterWillDefeat &&
-        outcome.resumeAtSeconds !== null &&
-        outcome.planned.status === "failed" &&
-        outcome.planned.atSeconds <= outcome.resumeAtSeconds + 1e-9;
-      outcomePanel.dataset.state = "paused";
-      outcomeState.textContent = "Ğ¡Ñ‚Ğ¾ÑĞ½ĞºĞ°";
-      outcomeTitle.textContent = monsterWillDefeat
-        ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ°Ñ‚Ğ°ĞºÑƒĞµÑ‚ Ğ½Ğ° ÑÑ‚Ğ¾ÑĞ½ĞºĞµ"
-        : fatalSupplyBeforeResume
-        ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ½Ğµ Ğ¿ĞµÑ€ĞµĞ¶Ğ¸Ğ²Ñ‘Ñ‚ ÑÑ‚Ğ¾ÑĞ½ĞºÑƒ"
-        : patrolWillInterrupt
-          ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ¿Ñ€ĞµÑ€Ğ²Ñ‘Ñ‚ ÑÑ‚Ğ¾ÑĞ½ĞºÑƒ"
-        : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¶Ğ´Ñ‘Ñ‚ Ñƒ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ½Ğ¾Ğ¹ Ñ†ĞµĞ»Ğ¸";
-      outcomeAction.textContent = monsterWillDefeat
-        ? "DEV: Ğº ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ñƒ"
-        : fatalSupplyBeforeResume
-        ? "DEV: Ğº Ğ³Ğ¸Ğ±ĞµĞ»Ğ¸"
-        : patrolWillInterrupt
-          ? "DEV: Ğº ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ñƒ"
-        : "DEV: Ğº Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ";
-      outcomeDetail.textContent = monsterWillDefeat
-        ? outcome.monsterContactResolution?.status === "flee-failed"
-          ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ²Ğ¾Ğ¹Ğ´Ñ‘Ñ‚ Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑ Ğ½ĞµĞ¿Ğ¾Ğ´Ğ²Ğ¸Ğ¶Ğ½Ğ¾Ğ³Ğ¾ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½Ğ°; Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ğ¾Ğ¹ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚Ğ¸ FLEE Ğ½Ğµ Ñ…Ğ²Ğ°Ñ‚Ğ¸Ñ‚ Ğ´Ğ»Ñ Ñ€Ğ°Ğ·Ñ€Ñ‹Ğ²Ğ° Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ğ¸."
-          : "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ²Ğ¾Ğ¹Ğ´Ñ‘Ñ‚ Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑ Ğ½ĞµĞ¿Ğ¾Ğ´Ğ²Ğ¸Ğ¶Ğ½Ğ¾Ğ³Ğ¾ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½Ğ°; ACCEPT_FIGHT Ğ¿Ñ€Ğ¾Ñ‚Ğ¸Ğ² Ğ¿Ñ€ĞµĞ²Ğ¾ÑÑ…Ğ¾Ğ´ÑÑ‰ĞµĞ³Ğ¾ Power ÑÑ‚Ğ°Ğ½ĞµÑ‚ Ñ‚ĞµÑ€Ğ¼Ğ¸Ğ½Ğ°Ğ»ÑŒĞ½Ğ¾Ğ¹ Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†ĞµĞ¹."
-        : fatalSupplyBeforeResume
-        ? `SIM-006 Ğ¸ÑÑ‡ĞµÑ€Ğ¿Ğ°ĞµÑ‚ ${formatDepletionCause(outcome.planned.failureCause).toLocaleLowerCase("ru-RU")} Ğ´Ğ¾ Ğ¾ĞºĞ¾Ğ½Ñ‡Ğ°Ğ½Ğ¸Ñ Ğ¾Ğ¶Ğ¸Ğ´Ğ°Ğ½Ğ¸Ñ; Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¾ÑÑ‚Ğ°Ğ½ĞµÑ‚ÑÑ Ğ² Ñ‚Ğ¾Ñ‡ĞºĞµ STOP.`
-        : patrolWillInterrupt
-          ? `ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¾ÑÑ‚Ğ°Ñ‘Ñ‚ÑÑ Ğ½ĞµĞ¿Ğ¾Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½ Ğ´Ğ¾ Ğ²Ñ…Ğ¾Ğ´Ğ° Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑ; ÑƒÑĞ¿ĞµÑˆĞ½Ñ‹Ğ¹ FLEE Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ Ğ¾ÑÑ‚Ğ°Ñ‚Ğ¾Ğº Ğ·Ğ°Ğ¿Ğ»Ğ°Ğ½Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ñ… ${formatDuration(outcome.scheduledIdleDurationSeconds)}.`
-        : `ĞŸÑ€Ğ¾ÑˆĞ»Ğ¾ ${formatDuration(outcome.idleElapsedSeconds)} Ğ¸Ğ· ${formatDuration(outcome.idleDurationSeconds)}; SIM-005 Ğ¾ÑÑ‚Ğ°Ñ‘Ñ‚ÑÑ Ğ² Ñ‚Ğ¾Ñ‡ĞºĞµ STOP, SIM-006 Ñ€Ğ°ÑÑ…Ğ¾Ğ´ÑƒĞµÑ‚ idle-Ğ·Ğ°Ğ¿Ğ°ÑÑ‹.`;
-      outcomeCause.textContent = monsterWillDefeat
-        ? `ĞœĞ¾Ğ½ÑÑ‚Ñ€ Â· ${formatElapsed(outcome.planned.atSeconds)}`
-        : fatalSupplyBeforeResume
-        ? `Ğ“Ğ¸Ğ±ĞµĞ»ÑŒ Â· ${formatElapsed(outcome.planned.atSeconds)}`
-        : patrolWillInterrupt
-          ? `ĞšĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚ Ğ¸ FLEE Â· ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`
-        : `Ğ’Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ğµ Â· ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`;
-      return;
-    }
-    outcomeState.textContent = "Ğ’ Ğ¿ÑƒÑ‚Ğ¸";
-    outcomeTitle.textContent = "Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ÑÑ";
-    outcomeAction.textContent = "DEV: Ğº Ğ¸ÑÑ…Ğ¾Ğ´Ñƒ";
-    if (outcome.planned.status === "failed") {
-      const monsterDefeat = outcome.failureReason === "monster";
-      const fleeFailed =
-        outcome.monsterContactResolution?.status === "flee-failed";
-      outcomeDetail.textContent = monsterDefeat
-        ? fleeFailed
-          ? "Ğ¡ĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ Ğ¾Ñ‚Ñ…Ğ¾Ğ´Ğ° Ğ½Ğµ Ğ²Ñ‹ÑˆĞµ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚Ğ¸ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ; FLEE ÑÑ‚Ğ°Ğ½ĞµÑ‚ Ñ‚ĞµÑ€Ğ¼Ğ¸Ğ½Ğ°Ğ»ÑŒĞ½Ğ¾Ğ¹ Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†ĞµĞ¹."
-          : "Ğ’Ñ‹Ğ±Ñ€Ğ°Ğ½ ACCEPT_FIGHT Ğ¿Ñ€Ğ¾Ñ‚Ğ¸Ğ² Ğ±Ğ¾Ğ»ĞµĞµ ÑĞ¸Ğ»ÑŒĞ½Ğ¾Ğ³Ğ¾ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ°; ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚ ÑÑ‚Ğ°Ğ½ĞµÑ‚ Ñ‚ĞµÑ€Ğ¼Ğ¸Ğ½Ğ°Ğ»ÑŒĞ½Ğ¾Ğ¹ Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†ĞµĞ¹."
-        : "Ğ•ÑĞ»Ğ¸ Ğ¿Ğ»Ğ°Ğ½ Ğ½Ğµ Ğ¸Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ, ĞºÑ€Ğ¸Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ Ğ·Ğ°Ğ¿Ğ°ÑÑ‹ Ğ·Ğ°ĞºĞ¾Ğ½Ñ‡Ğ°Ñ‚ÑÑ Ñ€Ğ°Ğ½ÑŒÑˆĞµ Ñ„Ğ¸Ğ½Ğ¸ÑˆĞ°.";
-      outcomeCause.textContent = monsterDefeat
-        ? fleeFailed
-          ? "Ğ¡Ğ¸Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ Â· FLEE Ğ½Ğµ ÑƒĞ´Ğ°Ğ»ÑÑ"
-          : "Ğ¡Ğ¸Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ Â· ACCEPT_FIGHT"
-        : formatDepletionCause(outcome.planned.failureCause);
-    } else if (outcome.planned.status === "paused") {
-      const monsterContact = outcome.interruptionCause === "monster-contact";
-      outcomeDetail.textContent = routeEnded
-        ? `ĞĞ°Ñ€Ğ¸ÑĞ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ·Ğ°ĞºĞ¾Ğ½Ñ‡Ğ¸Ñ‚ÑÑ Ğ²Ğ½Ğµ Ñ€Ğ°Ğ´Ğ¸ÑƒÑĞ° ${formatNumber(outcome.cityArrivalRadiusMeters ?? 0, 0)} Ğ¼ Ğ¾Ñ‚ ${destinationName}; Ğ¿Ğ¾Ğ±ĞµĞ´Ñ‹ Ğ½Ğµ Ğ±ÑƒĞ´ĞµÑ‚.`
-        : monsterContact
-          ? "Ğ¡Ğ»ĞµĞ´ÑƒÑÑ‰Ğ°Ñ Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğ° Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ¸Ñ â€” FLEE Ğ¾Ñ‚ Ğ±Ğ¾Ğ»ĞµĞµ ÑĞ¸Ğ»ÑŒĞ½Ğ¾Ğ³Ğ¾ Ğ´Ğ²Ğ¸Ğ¶ÑƒÑ‰ĞµĞ³Ğ¾ÑÑ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ."
-          : "Ğ¡Ğ»ĞµĞ´ÑƒÑÑ‰Ğ°Ñ Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğ° Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ¸Ñ â€” Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²ĞºĞ° Ñƒ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ½Ğ¾Ğ¹ Ñ†ĞµĞ»Ğ¸.";
-      outcomeCause.textContent = routeEnded
-        ? `Ğ“Ğ¾Ñ€Ğ¾Ğ´ Ğ½Ğµ Ğ´Ğ¾ÑÑ‚Ğ¸Ğ³Ğ½ÑƒÑ‚ Â· ${destinationName}`
-        : monsterContact
-          ? "Ğ¡Ğ¸Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ Â· FLEE"
-          : "Ğ”Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ° STOP";
-    } else {
-      outcomeDetail.textContent =
-        `ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ¸ Ğ·Ğ°Ğ¿Ğ°Ñ Ğ¿Ñ€Ğ¾Ğ²Ğ¸Ğ·Ğ¸Ğ¸ Ğ¿Ğ¾Ğ·Ğ²Ğ¾Ğ»ÑÑÑ‚ Ğ²Ğ¾Ğ¹Ñ‚Ğ¸ Ğ² Ñ€Ğ°Ğ´Ğ¸ÑƒÑ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ° ${destinationName}.`;
-      outcomeCause.textContent = `ĞŸÑ€Ğ¸Ğ±Ñ‹Ñ‚Ğ¸Ğµ Â· ${destinationName}`;
-    }
-    return;
-  }
-
-  const discoveryStop =
-    outcome.status === "paused" &&
-    outcome.interruptionCause === "doctrine-stop";
-  outcomeAction.textContent = discoveryStop
-    ? `Ğ–Ğ´Ğ°Ñ‚ÑŒ ${formatDuration(readStopIdleDurationSeconds())} Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ`
-    : "ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ñ‚ÑŒ ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ";
-  if (outcome.status === "failed") {
-    const monsterDefeat = outcome.failureReason === "monster";
-    const fleeFailed =
-      outcome.monsterContactResolution?.status === "flee-failed";
-    outcomeState.textContent = "ĞŸĞ¾Ñ€Ğ°Ğ¶ĞµĞ½Ğ¸Ğµ";
-    const idleFailure = outcome.failureActivity === "idle";
-    outcomeTitle.textContent = monsterDefeat
-      ? fleeFailed
-        ? "ĞŸĞ°Ñ‚Ñ€ÑƒĞ»ÑŒ Ğ½Ğ°ÑÑ‚Ğ¸Ğ³ ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½"
-        : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ ÑƒĞ½Ğ¸Ñ‡Ñ‚Ğ¾Ğ¶ĞµĞ½ ÑĞ¸Ğ»ÑŒĞ½Ñ‹Ğ¼ Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»Ñ‘Ğ¼"
-      : idleFailure
-        ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ğ¾Ğ³Ğ¸Ğ± Ğ½Ğ° ÑÑ‚Ğ¾ÑĞ½ĞºĞµ"
-        : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ğ¾Ğ³Ğ¸Ğ± Ğ² Ğ¿ÑƒÑ‚Ğ¸";
-    outcomeDetail.textContent = monsterDefeat
-      ? fleeFailed
-        ? "FLEE Ğ½Ğµ Ğ¾Ñ‚ĞºÑ€Ñ‹Ğ» Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ñ: Ñ€Ğ°Ğ²Ğ½Ğ°Ñ Ğ¸Ğ»Ğ¸ Ğ¼ĞµĞ½ÑŒÑˆĞ°Ñ ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞ¸Ğ»Ğ° ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ½Ğ° Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğµ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°."
-        : "ACCEPT_FIGHT Ğ¿Ñ€Ğ¾Ñ‚Ğ¸Ğ² Ğ¿Ñ€ĞµĞ²Ğ¾ÑÑ…Ğ¾Ğ´ÑÑ‰ĞµĞ³Ğ¾ Power Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞ¸Ğ» ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ½Ğ° Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğµ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ°."
-      : idleFailure
-        ? "Idle-Ñ€Ğ°ÑÑ…Ğ¾Ğ´ Ğ¸ÑÑ‡ĞµÑ€Ğ¿Ğ°Ğ» ĞºÑ€Ğ¸Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ Ğ·Ğ°Ğ¿Ğ°ÑÑ‹ Ğ´Ğ¾ Ğ²Ğ¾Ğ·Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ; ĞºĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¾ÑÑ‚Ğ°Ğ»ÑÑ Ğ² Ñ‚Ğ¾Ñ‡ĞºĞµ STOP."
-        : "Ğ¤Ğ°Ñ‚Ğ°Ğ»ÑŒĞ½Ğ¾Ğµ Ğ¸ÑÑ‚Ğ¾Ñ‰ĞµĞ½Ğ¸Ğµ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ğ»Ğ¾ Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸Ğµ; Ğ±ÑƒĞ´ÑƒÑ‰Ğ¸Ğµ ÑÑ‚Ğ°Ğ¿Ñ‹ Ğ¸ Ğ¿Ñ€Ğ¸Ğ±Ñ‹Ñ‚Ğ¸Ğµ Ğ¾Ñ‚Ğ¼ĞµĞ½ĞµĞ½Ñ‹.";
-    outcomeCause.textContent = monsterDefeat
-      ? fleeFailed
-        ? `${formatNumber((outcome.monsterContactResolution?.fleeResolution?.caravanSpeedMetersPerSecond ?? 0) * 3.6, 1)} â‰¤ ${formatNumber((outcome.monsterContactResolution?.fleeResolution?.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} ĞºĞ¼/Ñ‡`
-        : `PWR ${outcome.monsterContactResolution?.playerPower ?? "â€”"} < ${outcome.monsterContactResolution?.monsterPower ?? "â€”"}`
-      : formatDepletionCause(outcome.failureCause);
-  } else if (outcome.status === "completed") {
-    outcomeState.textContent = "Ğ£ÑĞ¿ĞµÑ…";
-    outcomeTitle.textContent =
-      outcome.cityArrival?.kind === "reentry"
-        ? `ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ²ĞµÑ€Ğ½ÑƒĞ»ÑÑ Ğ² ${destinationName}`
-        : `ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¿Ñ€Ğ¸Ğ±Ñ‹Ğ» Ğ² ${destinationName}`;
-    outcomeDetail.textContent =
-      `ĞĞ²Ñ‚Ğ¾Ñ€Ğ¸Ñ‚ĞµÑ‚Ğ½Ğ°Ñ Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ†Ğ° Ğ¿ĞµÑ€ĞµÑĞµÑ‡ĞµĞ½Ğ° Ğ½Ğ° Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ğ¸ ${formatNumber(outcome.cityArrivalRadiusMeters ?? 0, 0)} Ğ¼ Ğ¾Ñ‚ Ñ†ĞµĞ½Ñ‚Ñ€Ğ° Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°.`;
-    outcomeCause.textContent = `Ğ“Ğ¾Ñ€Ğ¾Ğ´ Â· ${destinationName}`;
-  } else {
-    const monsterContact = outcome.interruptionCause === "monster-contact";
-    outcomeState.textContent = "ĞŸĞ°ÑƒĞ·Ğ°";
-    outcomeTitle.textContent = routeEnded
-      ? `ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Ğ½Ğµ Ğ´Ğ¾ÑÑ‚Ğ¸Ğ³ ${destinationName}`
-      : monsterContact
-        ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ²ÑÑ‚Ñ€ĞµÑ‚Ğ¸Ğ» Ğ¿Ğ°Ñ‚Ñ€ÑƒĞ»ÑŒ"
-        : "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½ Ñƒ Ñ†ĞµĞ»Ğ¸";
-    outcomeDetail.textContent = routeEnded
-      ? "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Ğ´Ğ¾ÑˆÑ‘Ğ» Ğ´Ğ¾ ĞºĞ¾Ğ½Ñ†Ğ° Ğ·Ğ°Ğ´Ğ°Ğ½Ğ½Ğ¾Ğ¹ Ğ»Ğ¸Ğ½Ğ¸Ğ¸, Ğ½Ğ¾ Ğ½Ğµ Ğ²Ğ¾ÑˆÑ‘Ğ» Ğ² Ğ³Ğ¾Ñ€Ğ¾Ğ´. Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ¾ÑÑ‚Ğ°Ñ‘Ñ‚ÑÑ Ğ½ĞµĞ·Ğ°Ğ²ĞµÑ€ÑˆÑ‘Ğ½Ğ½Ğ¾Ğ¹."
-      : monsterContact
-        ? "FLEE Ğ¾Ğ¶Ğ¸Ğ´Ğ°ĞµÑ‚ ÑĞ²Ğ½Ñ‹Ñ… Ğ²Ñ…Ğ¾Ğ´Ğ½Ñ‹Ñ… ÑĞºĞ¾Ñ€Ğ¾ÑÑ‚ĞµĞ¹; ÑÑ‚Ğ¾ Ñ€ĞµĞ·ĞµÑ€Ğ²Ğ½Ğ¾Ğµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ API."
-        : "Ğ”Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ° STOP Ğ¿Ñ€ĞµÑ€Ğ²Ğ°Ğ»Ğ° Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸Ğµ, Ğ½Ğ¾ ÑĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ½Ğµ ÑÑ‡Ğ¸Ñ‚Ğ°ĞµÑ‚ÑÑ Ğ·Ğ°Ğ²ĞµÑ€ÑˆÑ‘Ğ½Ğ½Ğ¾Ğ¹. Ğ¯Ğ²Ğ½Ğ°Ñ ĞºĞ¾Ğ¼Ğ°Ğ½Ğ´Ğ° Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ Ğ¾Ñ‚Ğ¼ĞµÑ‚Ğ¸Ñ‚ ÑÑ‚Ñƒ Ñ†ĞµĞ»ÑŒ Ğ¸ ÑĞ½Ğ¾Ğ²Ğ° Ğ¾Ñ‚ĞºÑ€Ğ¾ĞµÑ‚ Ğ¸ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚.";
-    outcomeCause.textContent = routeEnded
-      ? "ĞšĞ¾Ğ½ĞµÑ† Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ° Ğ²Ğ½Ğµ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°"
-      : monsterContact
-        ? "Ğ¡Ğ¸Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ Â· FLEE"
-        : "Ğ”Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ° STOP";
-  }
-}
-
-/**
- * @param {HTMLElement} card
- * @param {HTMLElement} remainingOutput
- * @param {HTMLProgressElement} progress
- * @param {HTMLParagraphElement} meta
- * @param {number} remaining
- * @param {number} initial
- * @param {number} fraction
- * @param {number} rate
- */
-function renderSupply(
-  card,
-  remainingOutput,
-  progress,
-  meta,
-  remaining,
-  initial,
-  fraction,
-  rate,
-) {
-  card.dataset.state = remaining === 0 ? "depleted" : fraction <= 0.25 ? "risk" : "safe";
-  remainingOutput.textContent = formatNumber(remaining, 1);
-  progress.value = fraction;
-  progress.textContent = `${Math.round(fraction * 100)}%`;
-  meta.textContent = `Ğ¸Ğ· ${formatNumber(initial, 1)} Â· Ñ€Ğ°ÑÑ…Ğ¾Ğ´ ${formatNumber(rate, 2)}/Ñ‡`;
-}
-
-function readSupplySettings() {
-  return {
-    initial: {
-      foodUnits: initialFood.valueAsNumber,
-      waterUnits: initialWater.valueAsNumber,
-    },
-    profile: {
-      moving: {
-        foodUnitsPerHour: movingFoodRate.valueAsNumber,
-        waterUnitsPerHour: movingWaterRate.valueAsNumber,
-      },
-      idle: {
-        foodUnitsPerHour: idleFoodRate.valueAsNumber,
-        waterUnitsPerHour: idleWaterRate.valueAsNumber,
-      },
-    },
-  };
-}
-
-/** @returns {number} */
-function readStopIdleDurationSeconds() {
-  const hours = stopIdleHours.valueAsNumber;
-  if (!Number.isFinite(hours) || hours < 0) {
-    throw new RangeError("Ğ”Ğ»Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ¾ÑÑ‚ÑŒ ÑÑ‚Ğ¾ÑĞ½ĞºĞ¸ Ğ´Ğ¾Ğ»Ğ¶Ğ½Ğ° Ğ±Ñ‹Ñ‚ÑŒ Ğ½ĞµĞ¾Ñ‚Ñ€Ğ¸Ñ†Ğ°Ñ‚ĞµĞ»ÑŒĞ½Ğ¾Ğ¹");
-  }
-  return hours * 3_600;
-}
-
-/** @returns {import("../sim-core/dist/src/index.js").StaticObjectDiscoveryDoctrine} */
-function readDiscoveryDoctrine() {
-  return doctrineMarkAndContinue.checked ? "MARK_AND_CONTINUE" : "STOP";
-}
-
-/** @returns {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine} */
-function readStrongMonsterDoctrine() {
-  return contactDoctrineFight.checked ? "ACCEPT_FIGHT" : "FLEE";
-}
-
-/**
- * @param {ReturnType<typeof createDebugMapSnapshot>} snapshot
- * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
- * @param {ReturnType<typeof createRumorSearchSnapshot>} rumorSearch
- * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | NonNullable<ReturnType<typeof createDiscoveryResumeSnapshot>>} doctrine
- * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
- * @param {ReturnType<typeof createMonsterContactSnapshot> | null} monsterContact
- */
-function drawSnapshot(
-  snapshot,
-  route,
-  rumorSearch,
-  doctrine,
-  outcome,
-  monsterContact,
-) {
-  worldMap.replaceChildren();
-  drawGrid();
-
-  for (const monster of snapshot.monsters) {
-    for (const path of monster.patrolPaths) {
-      const polyline = svgElement("polyline", {
-        class: "patrol-path",
-        points: path.map((point) => `${point.x},${point.y}`).join(" "),
-      });
-      worldMap.append(polyline);
-    }
-  }
-
-  for (const path of route.routePaths) {
-    worldMap.append(
-      svgElement("polyline", {
-        class: "caravan-route-path",
-        points: path.map((point) => `${point.x},${point.y}`).join(" "),
-      }),
-    );
-  }
-
-  for (const segment of route.segments) {
-    const group = svgElement("g", {
-      "data-detail-title": `ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚ Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${segment.index + 1}`,
-      "data-detail-rows": JSON.stringify([
-        ["ĞĞ·Ğ¸Ğ¼ÑƒÑ‚", `${segment.bearingDeg.toFixed(1)}Â°`],
-        ["Ğ”Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ñ", `${segment.distanceKilometers.toFixed(1)} ĞºĞ¼`],
-        ["ETA", formatDuration(segment.etaEndSeconds)],
-        ["Ğ¨Ğ¸Ñ€Ğ¾Ñ‚Ğ°", segment.end.latitudeDeg.toFixed(6)],
-        ["Ğ”Ğ¾Ğ»Ğ³Ğ¾Ñ‚Ğ°", segment.end.longitudeDeg.toFixed(6)],
-      ]),
-    });
-    const marker = svgElement("circle", {
-      class: "route-waypoint",
-      cx: segment.endPoint.x,
-      cy: segment.endPoint.y,
-      r: 5,
-    });
-    const label = svgElement("text", {
-      class: "route-waypoint-label",
-      x: segment.endPoint.x,
-      y: segment.endPoint.y + 3,
-      "text-anchor": "middle",
-    });
-    label.textContent = String(segment.index + 1);
-    group.append(marker, label, svgTitle(`ĞšĞ¾Ğ½ĞµÑ† ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚Ğ° ${segment.index + 1}`));
-    worldMap.append(group);
-  }
-
-  for (const city of snapshot.cities) {
-    const isDestination = outcome.destinationCity?.id === city.id;
-    const group = svgElement("g", {
-      "data-detail-title": `${city.name} Â· ${city.id}`,
-      "data-detail-rows": JSON.stringify([
-        ["Ğ¢Ğ¸Ğ¿", isDestination ? "Ğ“Ğ¾Ñ€Ğ¾Ğ´ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ" : "Ğ“Ğ¾Ñ€Ğ¾Ğ´"],
-        ["Ğ Ğ°Ğ´Ğ¸ÑƒÑ Ğ¿Ñ€Ğ¸Ğ±Ñ‹Ñ‚Ğ¸Ñ", isDestination ? `${outcome.cityArrivalRadiusMeters ?? 0} Ğ¼` : "â€”"],
-        ["ĞĞ°ÑĞµĞ»ĞµĞ½Ğ¸Ğµ", `${city.population.inhabitants} NPC`],
-        ["Ğ•Ğ´Ğ° ÑĞµĞ¹Ñ‡Ğ°Ñ", `${formatNumber(city.stocks.foodUnits, 1)} ĞµĞ´.`],
-        ["Ğ’Ğ¾Ğ´Ğ° ÑĞµĞ¹Ñ‡Ğ°Ñ", `${formatNumber(city.stocks.waterUnits, 1)} ĞµĞ´.`],
-        ["Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ Ğ·Ğ°Ğ¿Ğ°ÑĞ¾Ğ²", cityStockStatusLabel(city.stocks.status)],
-        ["Ğ•Ğ´Ğ° Ğ¸Ğ·Ğ½Ğ°Ñ‡Ğ°Ğ»ÑŒĞ½Ğ¾", `${city.initialStocks.foodUnits} ĞµĞ´.`],
-        ["Ğ’Ğ¾Ğ´Ğ° Ğ¸Ğ·Ğ½Ğ°Ñ‡Ğ°Ğ»ÑŒĞ½Ğ¾", `${city.initialStocks.waterUnits} ĞµĞ´.`],
-        ["Ğ¨Ğ¸Ñ€Ğ¾Ñ‚Ğ°", city.position.latitudeDeg.toFixed(6)],
-        ["Ğ”Ğ¾Ğ»Ğ³Ğ¾Ñ‚Ğ°", city.position.longitudeDeg.toFixed(6)],
-      ]),
-    });
-    const marker = svgElement("circle", {
-      class: isDestination
-        ? "city-marker city-marker--destination"
-        : "city-marker",
-      cx: city.point.x,
-      cy: city.point.y,
-      r: isDestination ? 7 : 5,
-    });
-    const label = svgElement("text", {
-      class: "city-label",
-      x: city.point.x + 8,
-      y: city.point.y - 7,
-    });
-    label.textContent = city.name;
-    group.append(
-      marker,
-      label,
-      svgTitle(
-        `${city.name} (${city.id})${isDestination ? " Â· Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ" : ""}`,
-      ),
-    );
-    worldMap.append(group);
-  }
-
-  for (const object of snapshot.staticObjects) {
-    const label = STATIC_KIND_LABELS[object.kind];
-    const marker = svgElement("rect", {
-      class: `object-marker object-marker--${object.kind}`,
-      x: object.point.x - 4,
-      y: object.point.y - 4,
-      width: 8,
-      height: 8,
-      rx: object.kind === "oasis" ? 4 : 1,
-      transform:
-        object.kind === "mine"
-          ? `rotate(45 ${object.point.x} ${object.point.y})`
-          : "",
-      "data-detail-title": `${label} Â· ${object.id}`,
-      "data-detail-rows": JSON.stringify([
-        ["Ğ¢Ğ¸Ğ¿", label],
-        ["Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ", "Ğ¡ĞºÑ€Ñ‹Ñ‚Ñ‹Ğ¹ Ğ¾Ğ±ÑŠĞµĞºÑ‚"],
-        ["Ğ¨Ğ¸Ñ€Ğ¾Ñ‚Ğ°", object.position.latitudeDeg.toFixed(6)],
-        ["Ğ”Ğ¾Ğ»Ğ³Ğ¾Ñ‚Ğ°", object.position.longitudeDeg.toFixed(6)],
-      ]),
-    });
-    marker.append(svgTitle(`${label} (${object.id})`));
-    worldMap.append(marker);
-  }
-
-  const rumorTarget = rumorSearch.serverTruth.target;
-  const rumorTargetPoint = projectCoordinate(rumorTarget.position);
-  const rumorTargetMarker = svgElement("circle", {
-    class: "rumor-world-target",
-    cx: rumorTargetPoint.x,
-    cy: rumorTargetPoint.y,
-    r: 8,
-    "data-detail-title": `Ğ¦ĞµĞ»ÑŒ ÑĞ»ÑƒÑ…Ğ° Â· ${rumorTarget.id}`,
-    "data-detail-rows": JSON.stringify([
-      ["Ğ¢Ğ¸Ğ¿", staticKindLabel(rumorTarget.kind)],
-      ["Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ", "Ğ¢Ğ¾Ñ‡Ğ½Ğ°Ñ server truth Â· DEV"],
-      ["ĞĞ·Ğ¸Ğ¼ÑƒÑ‚", `${rumorSearch.serverTruth.exactBearingDeg.toFixed(6)}Â°`],
-      ["Ğ”Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ñ", `${rumorSearch.serverTruth.exactDistanceKilometers.toFixed(6)} ĞºĞ¼`],
-      ["Ğ¨Ğ¸Ñ€Ğ¾Ñ‚Ğ°", rumorTarget.position.latitudeDeg.toFixed(6)],
-      ["Ğ”Ğ¾Ğ»Ğ³Ğ¾Ñ‚Ğ°", rumorTarget.position.longitudeDeg.toFixed(6)],
-    ]),
-  });
-  rumorTargetMarker.append(svgTitle("Ğ¢Ğ¾Ñ‡Ğ½Ğ°Ñ Ñ†ĞµĞ»ÑŒ ÑĞ»ÑƒÑ…Ğ° â€” Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ DEV"));
-  const rumorTargetLabel = svgElement("text", {
-    class: "rumor-world-target-label",
-    x: rumorTargetPoint.x + 11,
-    y: rumorTargetPoint.y - 9,
-  });
-  rumorTargetLabel.textContent = "RUMOR TARGET";
-  worldMap.append(rumorTargetMarker, rumorTargetLabel);
-
-  if (monsterContact?.contact) {
-    const contact = monsterContact.contact;
-    const contactResolution =
-      outcome.monsterContact?.monsterId === contact.monsterId
-        ? outcome.monsterContactResolution
-        : null;
-    const contactResultLabel =
-      contactResolution?.status === "monster-defeated"
-        ? "VICTORY"
-        : contactResolution?.status === "flee-succeeded"
-          ? "FLEE OK"
-          : contactResolution?.status === "flee-failed"
-            ? "FLEE FAIL"
-        : contactResolution?.status === "flee-required"
-          ? "FLEE"
-          : contactResolution?.status === "expedition-defeated"
-            ? "DEFEAT"
-            : "CONTACT";
-    const marker = svgElement("circle", {
-      class: "contact-world-marker",
-      cx: contact.caravanPoint.x,
-      cy: contact.caravanPoint.y,
-      r: 12,
-      "data-detail-title": `ĞšĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚ Â· ${contact.monsterId}`,
-      "data-detail-rows": JSON.stringify([
-        ["Ğ’Ñ€ĞµĞ¼Ñ", formatElapsed(contact.atSeconds)],
-        ["ĞœĞ¾Ğ½ÑÑ‚Ñ€", contact.monsterId],
-        ["Player Power", String(contactResolution?.playerPower ?? 100)],
-        ["Monster Power", String(contact.monsterPower)],
-        ["Ğ Ğ°Ğ·Ñ€ĞµÑˆĞµĞ½Ğ¸Ğµ", contactResolution?.status ?? "ĞĞµ Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚ÑÑ"],
-        ["Ğ”Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ°", contactResolution?.doctrine ?? "AUTO"],
-        ["Ğ¡ĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€Ğ°", `${(contact.monsterSpeedMetersPerSecond * 3.6).toFixed(1)} ĞºĞ¼/Ñ‡`],
-        [
-          "Ğ¡ĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ Ğ¾Ñ‚Ñ…Ğ¾Ğ´Ğ°",
-          contactResolution?.fleeResolution
-            ? `${(contactResolution.fleeResolution.caravanSpeedMetersPerSecond * 3.6).toFixed(1)} ĞºĞ¼/Ñ‡`
-            : "â€”",
-        ],
-        [
-          "Ğ”Ğ¾ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾Ğ¹ Ğ´Ğ¸ÑÑ‚Ğ°Ğ½Ñ†Ğ¸Ğ¸",
-          contactResolution?.fleeResolution?.secondsToSafeSeparation === null ||
-          contactResolution?.fleeResolution === null ||
-          contactResolution?.fleeResolution === undefined
-            ? "â€”"
-            : formatDuration(
-                contactResolution.fleeResolution.secondsToSafeSeparation,
-              ),
-        ],
-        ["Ğ Ğ°Ğ´Ğ¸ÑƒÑ", `${contact.interactionRadiusMeters} Ğ¼`],
-        ["Ğ Ğ°Ğ·Ğ´ĞµĞ»ĞµĞ½Ğ¸Ğµ", `${contact.separationMeters.toFixed(3)} Ğ¼`],
-        ["ĞŸÑƒÑ‚ÑŒ", `${contact.routeDistanceKilometers.toFixed(1)} ĞºĞ¼`],
-      ]),
-    });
-    const label = svgElement("text", {
-      class: "contact-world-label",
-      x: contact.caravanPoint.x + 15,
-      y: contact.caravanPoint.y - 11,
-    });
-    label.textContent = contactResultLabel;
-    marker.append(
-      svgTitle(`${contactResultLabel}: ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚ Ñ ${contact.monsterId}`),
-    );
-    worldMap.append(marker, label);
-  }
-
-  for (const monster of snapshot.monsters) {
-    const marker = svgElement("polygon", {
-      class: "monster-marker",
-      points: `${monster.point.x},${monster.point.y - 7} ${monster.point.x + 7},${monster.point.y + 6} ${monster.point.x - 7},${monster.point.y + 6}`,
-      "data-detail-title": `Ğ‘Ğ»ÑƒĞ¶Ğ´Ğ°ÑÑ‰Ğ¸Ğ¹ Ğ¼Ğ¾Ğ½ÑÑ‚Ñ€ Â· ${monster.id}`,
-      "data-detail-rows": JSON.stringify([
-        ["Power", String(monster.power)],
-        ["Ğ¦Ğ¸ĞºĞ»", String(monster.cycleIndex)],
-        ["Ğ¡ĞµĞ³Ğ¼ĞµĞ½Ñ‚", String(monster.segmentIndex + 1)],
-        ["ĞĞ±Ğ·Ğ¾Ñ€", `${monster.visionRadiusMeters} Ğ¼`],
-        ["ĞšĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚", `${monster.interactionRadiusMeters} Ğ¼`],
-        ["Ğ¨Ğ¸Ñ€Ğ¾Ñ‚Ğ°", monster.position.latitudeDeg.toFixed(6)],
-        ["Ğ”Ğ¾Ğ»Ğ³Ğ¾Ñ‚Ğ°", monster.position.longitudeDeg.toFixed(6)],
-      ]),
-    });
-    marker.append(svgTitle(`ĞœĞ¾Ğ½ÑÑ‚Ñ€ ${monster.id}`));
-    const label = svgElement("text", {
-      class: "monster-label",
-      x: monster.point.x + 10,
-      y: monster.point.y + 4,
-    });
-    label.textContent = `PWR ${monster.power}`;
-    worldMap.append(marker, label);
-  }
-
-  const caravanSegment =
-    outcome.status === "failed"
-      ? `ĞŸĞ¾Ğ³Ğ¸Ğ± Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${(route.position.segmentIndex ?? 0) + 1}`
-      : outcome.status === "paused"
-      ? outcome.interruptionCause === "route-end"
-        ? "ĞšĞ¾Ğ½ĞµÑ† Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ° Ğ²Ğ½Ğµ Ğ³Ğ¾Ñ€Ğ¾Ğ´Ğ°"
-        : `ĞÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½ Â· ÑĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${(route.position.segmentIndex ?? 0) + 1}`
-      : outcome.status === "completed"
-        ? "Ğ­ĞºÑĞ¿ĞµĞ´Ğ¸Ñ†Ğ¸Ñ Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞµĞ½Ğ°"
-      : route.position.segmentIndex === null
-      ? "ĞŸÑ€Ğ¸Ğ±Ñ‹Ğ»"
-      : `Ğ¡ĞµĞ³Ğ¼ĞµĞ½Ñ‚ ${route.position.segmentIndex + 1}`;
-  const caravan = svgElement("g", {
-    "data-detail-title": "ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½ Â· Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ñ€ÑˆÑ€ÑƒÑ‚",
-    "data-detail-rows": JSON.stringify([
-      ["Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ", caravanSegment],
-      ["Ğ˜ÑÑ…Ğ¾Ğ´", outcome.status],
-      [
-        "Ğ”Ğ¾ĞºÑ‚Ñ€Ğ¸Ğ½Ğ°",
-        doctrine.status === "resumed-and-continuing"
-          ? "STOP Â· RESUMED"
-          : doctrine.status === "known-and-continuing"
-            ? `${doctrine.doctrine} Â· KNOWN`
-          : doctrine.doctrine,
-      ],
-      ["Ğ¡ĞºĞ¾Ñ€Ğ¾ÑÑ‚ÑŒ", `${route.speedKilometersPerHour.toFixed(1)} ĞºĞ¼/Ñ‡`],
-      ["ĞŸÑ€Ğ¾Ğ¹Ğ´ĞµĞ½Ğ¾", `${(route.position.traveledDistanceMeters / 1_000).toFixed(1)} ĞºĞ¼`],
-      ["ĞÑÑ‚Ğ°Ğ»Ğ¾ÑÑŒ", `${(route.position.remainingDistanceMeters / 1_000).toFixed(1)} ĞºĞ¼`],
-      ["Ğ’Ñ€ĞµĞ¼Ñ", formatElapsed(route.position.elapsedSeconds)],
-      ["Ğ¨Ğ¸Ñ€Ğ¾Ñ‚Ğ°", route.position.coordinate.latitudeDeg.toFixed(6)],
-      ["Ğ”Ğ¾Ğ»Ğ³Ğ¾Ñ‚Ğ°", route.position.coordinate.longitudeDeg.toFixed(6)],
-    ]),
-  });
-  caravan.append(
-    svgElement("circle", {
-      class: `caravan-marker caravan-marker--${outcome.status}`,
-      cx: route.position.point.x,
-      cy: route.position.point.y,
-      r: 8,
-    }),
-    svgTitle("ĞšĞ°Ñ€Ğ°Ğ²Ğ°Ğ½"),
-  );
-  worldMap.append(caravan);
-}
-
-/** @param {import("../sim-core/dist/src/index.js").CityStockStatus} status */
-function cityStockStatusLabel(status) {
-  if (status === "food-depleted") return "ĞĞµÑ‚ ĞµĞ´Ñ‹";
-  if (status === "water-depleted") return "ĞĞµÑ‚ Ğ²Ğ¾Ğ´Ñ‹";
-  if (status === "food-and-water-depleted") return "ĞĞµÑ‚ ĞµĞ´Ñ‹ Ğ¸ Ğ²Ğ¾Ğ´Ñ‹";
-  return "Ğ—Ğ°Ğ¿Ğ°ÑÑ‹ ĞµÑÑ‚ÑŒ";
-}
-
-/**
- * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
- */
-function syncCityOptions(cities) {
-  const nextIds = cities.map((city) => city.id);
-  syncCitySelect(routeStartCity, cities, nextIds);
-  syncCitySelect(routeDestinationCity, cities, nextIds);
-}
-
-/**
- * @param {HTMLSelectElement} select
- * @param {ReturnType<typeof createDebugMapSnapshot>["cities"]} cities
- * @param {readonly string[]} nextIds
- */
-function syncCitySelect(select, cities, nextIds) {
-  const currentIds = Array.from(select.options, (option) => option.value);
-  if (
-    currentIds.length === nextIds.length &&
-    currentIds.every((id, index) => id === nextIds[index])
-  ) {
-    return;
-  }
-
-  const selectedId = select.value;
-  select.replaceChildren(
-    ...cities.map((city) => {
-      const option = document.createElement("option");
-      option.value = city.id;
-      option.textContent = `${city.name} Â· ${city.id}`;
-      return option;
-    }),
-  );
-  select.value = nextIds.includes(selectedId)
-    ? selectedId
-    : (nextIds[0] ?? "");
-}
-
-/**
- * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"]} monsters
- */
-function syncContactMonsterOptions(monsters) {
-  const currentIds = Array.from(contactMonsterSelect.options, (option) => option.value);
-  const nextIds = monsters.map((monster) => monster.id);
-  if (
-    currentIds.length === nextIds.length &&
-    currentIds.every((id, index) => id === nextIds[index])
-  ) {
-    return;
-  }
-
-  const selectedId = contactMonsterSelect.value;
-  contactMonsterSelect.replaceChildren(
-    ...monsters.map((monster) => {
-      const option = document.createElement("option");
-      option.value = monster.id;
-      option.textContent = `${monster.id} Â· PWR ${monster.power}`;
-      return option;
-    }),
-  );
-  contactMonsterSelect.value = nextIds.includes(selectedId)
-    ? selectedId
-    : (nextIds[0] ?? "");
-}
-
-function readRouteCommands() {
-  return routeBearingInputs.map((input, index) => ({
-    bearingDeg: input.valueAsNumber,
-    distanceKilometers: routeDistanceInputs[index]?.valueAsNumber ?? Number.NaN,
-  }));
-}
-
-function drawGrid() {
-  for (let longitude = -180; longitude <= 180; longitude += 60) {
-    const x = ((longitude + 180) / 360) * DEBUG_MAP_WIDTH;
-    worldMap.append(
-      svgElement("line", {
-        class: longitude === 0 ? "map-meridian" : "map-grid",
-        x1: x,
-        x2: x,
-        y1: 0,
-        y2: DEBUG_MAP_HEIGHT,
-      }),
-    );
-    if (longitude > -180 && longitude < 180) {
-      const label = svgElement("text", {
-        class: "map-axis-label",
-        x: x + 5,
-        y: DEBUG_MAP_HEIGHT - 7,
-      });
-      label.textContent = `${longitude}Â°`;
-      worldMap.append(label);
-    }
-  }
-
-  for (let latitude = -60; latitude <= 60; latitude += 30) {
-    const y = ((90 - latitude) / 180) * DEBUG_MAP_HEIGHT;
-    worldMap.append(
-      svgElement("line", {
-        class: latitude === 0 ? "map-equator" : "map-grid",
-        x1: 0,
-        x2: DEBUG_MAP_WIDTH,
-        y1: y,
-        y2: y,
-      }),
-    );
-    const label = svgElement("text", {
-      class: "map-axis-label",
-      x: 7,
-      y: y - 5,
-    });
-    label.textContent = `${latitude}Â°`;
-    worldMap.append(label);
-  }
-}
-
-/** @param {string} title @param {unknown} rowsValue */
-function showDetails(title, rowsValue) {
-  if (!Array.isArray(rowsValue)) return;
-  detailTitle.textContent = title;
-  detailList.replaceChildren();
-
-  for (const row of rowsValue) {
-    if (!Array.isArray(row) || row.length !== 2) continue;
-    const wrapper = document.createElement("div");
-    const term = document.createElement("dt");
-    const value = document.createElement("dd");
-    term.textContent = String(row[0]);
-    value.textContent = String(row[1]);
-    wrapper.append(term, value);
-    detailList.append(wrapper);
-  }
-}
-
-/**
- * @template {Element} T
- * @param {string} id
- * @param {{ new (...args: any[]): T }} constructor
- * @returns {T}
- */
-function requireElement(id, constructor) {
-  const element = document.getElementById(id);
-  if (!(element instanceof constructor)) {
-    throw new Error(`Missing required element #${id}`);
-  }
-  return element;
-}
-
-/**
- * @param {keyof SVGElementTagNameMap} tagName
- * @param {Record<string, string | number>} [attributes]
- */
-function svgElement(tagName, attributes = {}) {
-  const element = document.createElementNS(SVG_NAMESPACE, tagName);
-  for (const [name, value] of Object.entries(attributes)) {
-    if (value !== "") element.setAttribute(name, String(value));
-  }
-  return element;
-}
-
-/** @param {string} text */
-function svgTitle(text) {
-  const title = svgElement("title");
-  title.textContent = text;
-  return title;
-}
-
-/** @param {number} seconds */
-function formatElapsed(seconds) {
-  const wholeSeconds = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(wholeSeconds / 3_600);
-  const minutes = Math.floor((wholeSeconds % 3_600) / 60);
-  const remainder = wholeSeconds % 60;
-  return `T+${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
-}
-
-/** @param {number} seconds */
-function formatDuration(seconds) {
-  const hours = seconds / 3_600;
-  return hours >= 48 ? `${(hours / 24).toFixed(1)} Ğ´Ğ½` : `${hours.toFixed(1)} Ñ‡`;
-}
-
-/** @param {number} value @param {number} [maximumFractionDigits] */
-function formatNumber(value, maximumFractionDigits = 1) {
-  return value.toLocaleString("ru-RU", { maximumFractionDigits });
-}
-
-/** @param {"food" | "water" | "both" | null} cause */
-function formatDepletionCause(cause) {
-  if (cause === "food") return "Ğ•Ğ´Ğ°";
-  if (cause === "water") return "Ğ’Ğ¾Ğ´Ğ°";
-  if (cause === "both") return "Ğ•Ğ´Ğ° Ğ¸ Ğ²Ğ¾Ğ´Ğ°";
-  return "Ğ—Ğ°Ğ¿Ğ°ÑÑ‹";
-}
-
-/** @param {keyof typeof STATIC_KIND_LABELS | null} kind */
-function staticKindLabel(kind) {
-  return kind ? STATIC_KIND_LABELS[kind] : "Ğ¡ĞºÑ€Ñ‹Ñ‚Ñ‹Ğ¹ Ğ¾Ğ±ÑŠĞµĞºÑ‚";
-}
-
-/** @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route */
-function formatRouteSummary(route) {
-  return `${route.totalDistanceKilometers.toLocaleString("ru-RU", { maximumFractionDigits: 1 })} ĞºĞ¼ Â· ETA ${formatDuration(route.totalDurationSeconds)} Â· ${route.speedKilometersPerHour.toFixed(1)} ĞºĞ¼/Ñ‡`;
-}
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíßŞõé:-jZ.¶›­–)Ş³RòòG2Ö6†V6° ¦–×÷'B°¢4ôåD5Eõ¤ôôÕô„T”t…BÀ¢4ôåD5Eõ¤ôôÕõt”ED‚À¢DT%TuôÔô„T”t…BÀ¢DT%TuôÔõt”ED‚À¢´äõtÄTDtUôÔô„T”t…BÀ¢´äõtÄTDtUôÔõt”ED‚À¢4”ÕTÄD”ôåô4Äô4µõ5TTEôÕTÅD•Ä”U%2À¢Gfæ6U6–×VÆF–öä6Æö6²À¢Ç”W‡VF—F–öä÷WF6öÖUFõ&÷WFRÀ¢7&VFT6&få7FGW56æ6†÷BÀ¢7&VFT6—G”'&—fÅ&÷WFU&W6WBÀ¢7&VFT6—G”'&—fÅ6æ6†÷BÀ¢7&VFT6öçF7E¦ööÕ6æ6†÷BÀ¢7&VFTFV'VtÖ6æ6†÷BÀ¢7&VFTF—66÷fW'”Fö7G&–æU6æ6†÷BÀ¢7&VFTF—66÷fW'•&W7VÖU6æ6†÷BÀ¢7&VFTF—66÷fW'•7F÷Æ–fV7–6ÆU6æ6†÷BÀ¢7&VFTW‡VF—F–öäWfVçDÆöu6æ6†÷BÀ¢7&VFTW‡VF—F–öä÷WF6öÖU6æ6†÷BÀ¢7&VFTf÷W%6VvÖVçE&÷WFU6æ6†÷BÀ¢7&VFTÖöç7FW$6öçF7E6æ6†÷BÀ¢7&VFTÖöç7FW$–çFW&6WE&÷WFU&W6WBÀ¢7&VFT¶æ÷väö&¦V7E&WGW&å&÷WFU&W6WBÀ¢7&VFU'VÖ÷%6V&6…6æ6†÷BÀ¢7&VFU&V6†VD6—G”ÆæFÖ&´–çWBÀ¢7&VFU6W76–öä¶æ÷vÆVFvTÖ6æ6†÷BÀ¢7&VFU7FF–öæ'•7F÷G&öÅ&W6WBÀ¢&ö¦V7D6ö÷&F–æFRÀ§Òg&öÒ"âöÖÖÖöFVÂæ§2#°¦–×÷'B°¢7&VFUÆ–W$F—66÷fW'”ÆVFvW"À¢7&VFUÆ–W%G&fVÄÆVFvW"À¢&V6÷&DF—&V7DF—66÷fW'”ö'6W'fF–öâÀ¢&V6÷&DW‡VF—F–öåG&fVÅ&öw&W72À¢&V6÷&E&V6†VD6—G”ÆæFÖ&²À¢v4ö&¦V7D¶æ÷vä&Vf÷&TW‡VF—F–öâÀ§Òg&öÒ"ââ÷6–ÒÖ6÷&RöF—7B÷7&2ö–æFW‚æ§2#° ¦6öç7B5duôäÔU54RÒ&‡GG¢ò÷wwrçs2æ÷&ró#÷7fr#°¦6öç7B5DD”5ô´”äEôÄ$TÅ2Ò°¢ö6—3¢-	í}"À¢Ö–æS¢-
+=Mİ¢"À¢'V–ç3¢-
+=İ²"À¢6fS¢-	ı]]"À§Ó° ¦6öç7B6VVDf÷&ÒÒ&WV—&TVÆVÖVçB‚'6VVBÖf÷&Ò"Â…DÔÄf÷&ÔVÆVÖVçB“°¦6öç7B6VVD–çWBÒ&WV—&TVÆVÖVçB‚'6VVBÖ–çWB"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7BF–ÖU6Æ–FW"Ò&WV—&TVÆVÖVçB‚'F–ÖR×6Æ–FW""Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7BF–ÖT÷WGWBÒ&WV—&TVÆVÖVçB‚'F–ÖRÖ÷WGWB"Â…DÔÄ÷WGWDVÆVÖVçB“°¦6öç7B6Æö6µFövvÆRÒ&WV—&TVÆVÖVçB‚&6Æö6²×FövvÆR"Â…DÔÄ'WGFöäVÆVÖVçB“°¦6öç7B6Æö6µFövvÆT–6öâÒ&WV—&TVÆVÖVçB‚&6Æö6²×FövvÆRÖ–6öâ"Â…DÔÅ7äVÆVÖVçB“°¦6öç7B6Æö6µFövvÆTÆ&VÂÒ&WV—&TVÆVÖVçB‚&6Æö6²×FövvÆRÖÆ&VÂ"Â…DÔÅ7äVÆVÖVçB“°¦6öç7B6Æö6µ7VVBÒ&WV—&TVÆVÖVçB‚&6Æö6²×7VVB"Â…DÔÅ6VÆV7DVÆVÖVçB“°¦6öç7B6Æö6µ7FGW2Ò&WV—&TVÆVÖVçB‚&6Æö6²×7FGW2"Â…DÔÄ÷WGWDVÆVÖVçB“°¦6öç7Bv÷&ÆDÖÒ&WV—&TVÆVÖVçB‚'v÷&ÆBÖÖ"Â5du5dtVÆVÖVçB“°¦6öç7BW'&÷$ÖW76vRÒ&WV—&TVÆVÖVçB‚&W'&÷"ÖÖW76vR"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7BÖF—FÆRÒ&WV—&TVÆVÖVçB‚&Ö×F—FÆR"Â…DÔÄ†VF–ætVÆVÖVçB“°¦6öç7B6—G”6÷VçBÒ&WV—&TVÆVÖVçB‚&6—G’Ö6÷VçB"Â…DÔÄVÆVÖVçB“°¦6öç7Bö&¦V7D6÷VçBÒ&WV—&TVÆVÖVçB‚&ö&¦V7BÖ6÷VçB"Â…DÔÄVÆVÖVçB“°¦6öç7BÖöç7FW$6÷VçBÒ&WV—&TVÆVÖVçB‚&Ööç7FW"Ö6÷VçB"Â…DÔÄVÆVÖVçB“°¦6öç7BFWF–ÅF—FÆRÒ&WV—&TVÆVÖVçB‚&FWF–Â×F—FÆR"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7BFWF–ÄÆ—7BÒ&WV—&TVÆVÖVçB‚&FWF–ÂÖÆ—7B"Â…DÔÄDÆ—7DVÆVÖVçB“°¦6öç7B&÷WFTf÷&ÒÒ&WV—&TVÆVÖVçB‚'&÷WFRÖf÷&Ò"Â…DÔÄf÷&ÔVÆVÖVçB“°¦6öç7B&÷WFU7F'D6—G’Ò&WV—&TVÆVÖVçB‚'&÷WFR×7F'BÖ6—G’"Â…DÔÅ6VÆV7DVÆVÖVçB“°¦6öç7B&÷WFTFW7F–æF–öä6—G’Ò&WV—&TVÆVÖVçB€¢'&÷WFRÖFW7F–æF–öâÖ6—G’"À¢…DÔÅ6VÆV7DVÆVÖVçBÀ¢“°¦6öç7B&÷WFU7VVBÒ&WV—&TVÆVÖVçB‚'&÷WFR×7VVB"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7B6—G”FWe&÷WFRÒ&WV—&TVÆVÖVçB‚&6—G’ÖFWb×&÷WFR"Â…DÔÄ'WGFöäVÆVÖVçB“°¦6öç7B&÷WFU7VÖÖ'’Ò&WV—&TVÆVÖVçB‚'&÷WFR×7VÖÖ'’"Â…DÔÄ÷WGWDVÆVÖVçB“°¦6öç7B&÷WFT&V&–æt–çWG2Ò³Â"Â2ÂEÒæÖ‚†–æFW‚’Óà¢&WV—&TVÆVÖVçB†&÷WFRÖ&V&–ærÒG¶–æFW‡ÖÂ…DÔÄ–çWDVÆVÖVçB’À¢“°¦6öç7B&÷WFTF—7Fæ6T–çWG2Ò³Â"Â2ÂEÒæÖ‚†–æFW‚’Óà¢&WV—&TVÆVÖVçB†&÷WFRÖF—7Fæ6RÒG¶–æFW‡ÖÂ…DÔÄ–çWDVÆVÖVçB’À¢“°¦6öç7B6&fåæVÂÒ&WV—&TVÆVÖVçB‚&6&fâ×æVÂ"Â…DÔÄVÆVÖVçB“°¦6öç7B6&få7FFTÆ&VÂÒ&WV—&TVÆVÖVçB‚&6&fâ×7FFRÖÆ&VÂ"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7B6&få&÷WFU7FGW2Ò&WV—&TVÆVÖVçB‚&6&fâ×&÷WFR×7FGW2"Â…DÔÄVÆVÖVçB“°¦6öç7B6&fäF—7Fæ6RÒ&WV—&TVÆVÖVçB‚&6&fâÖF—7Fæ6R"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7B&÷WFU&öw&W72Ò&WV—&TVÆVÖVçB‚'&÷WFR×&öw&W72"Â…DÔÅ&öw&W74VÆVÖVçB“°¦6öç7B&÷WFU&öw&W74Æ&VÂÒ&WV—&TVÆVÖVçB‚'&÷WFR×&öw&W72ÖÆ&VÂ"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7BfööD6&BÒ&WV—&TVÆVÖVçB‚&fööBÖ6&B"Â…DÔÄVÆVÖVçB“°¦6öç7BfööE&VÖ–æ–ærÒ&WV—&TVÆVÖVçB‚&fööB×&VÖ–æ–ær"Â…DÔÄVÆVÖVçB“°¦6öç7BfööE&öw&W72Ò&WV—&TVÆVÖVçB‚&fööB×&öw&W72"Â…DÔÅ&öw&W74VÆVÖVçB“°¦6öç7BfööDÖWFÒ&WV—&TVÆVÖVçB‚&fööBÖÖWF"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7BvFW$6&BÒ&WV—&TVÆVÖVçB‚'vFW"Ö6&B"Â…DÔÄVÆVÖVçB“°¦6öç7BvFW%&VÖ–æ–ærÒ&WV—&TVÆVÖVçB‚'vFW"×&VÖ–æ–ær"Â…DÔÄVÆVÖVçB“°¦6öç7BvFW%&öw&W72Ò&WV—&TVÆVÖVçB‚'vFW"×&öw&W72"Â…DÔÅ&öw&W74VÆVÖVçB“°¦6öç7BvFW$ÖWFÒ&WV—&TVÆVÖVçB‚'vFW"ÖÖWF"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7Bf÷&V67EF—FÆRÒ&WV—&TVÆVÖVçB‚&f÷&V67B×F—FÆR"Â…DÔÄVÆVÖVçB“°¦6öç7Bf÷&V67DFWF–ÂÒ&WV—&TVÆVÖVçB‚&f÷&V67BÖFWF–Â"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7B÷WF6öÖUæVÂÒ&WV—&TVÆVÖVçB‚&÷WF6öÖR×æVÂ"Â…DÔÄVÆVÖVçB“°¦6öç7B÷WF6öÖUF—FÆRÒ&WV—&TVÆVÖVçB‚&÷WF6öÖR×F—FÆR"Â…DÔÄ†VF–ætVÆVÖVçB“°¦6öç7B÷WF6öÖTFWF–ÂÒ&WV—&TVÆVÖVçB‚&÷WF6öÖRÖFWF–Â"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7B÷WF6öÖU7FFRÒ&WV—&TVÆVÖVçB‚&÷WF6öÖR×7FFR"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7B÷WF6öÖUF–ÖRÒ&WV—&TVÆVÖVçB‚&÷WF6öÖR×F–ÖR"Â…DÔÄVÆVÖVçB“°¦6öç7B÷WF6öÖT6W6RÒ&WV—&TVÆVÖVçB‚&÷WF6öÖRÖ6W6R"Â…DÔÄVÆVÖVçB“°¦6öç7B÷WF6öÖU÷6—F–öâÒ&WV—&TVÆVÖVçB‚&÷WF6öÖR×÷6—F–öâ"Â…DÔÄVÆVÖVçB“°¦6öç7B÷WF6öÖT7F–öâÒ&WV—&TVÆVÖVçB‚&÷WF6öÖRÖ7F–öâ"Â…DÔÄ'WGFöäVÆVÖVçB“°¦6öç7B7F÷–FÆT†÷W'2Ò&WV—&TVÆVÖVçB‚'7F÷Ö–FÆRÖ†÷W'2"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7B7WÇ”f÷&ÒÒ&WV—&TVÆVÖVçB‚'7WÇ’Öf÷&Ò"Â…DÔÄf÷&ÔVÆVÖVçB“°¦6öç7B–æ—F–ÄfööBÒ&WV—&TVÆVÖVçB‚&–æ—F–ÂÖfööB"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7B–æ—F–ÅvFW"Ò&WV—&TVÆVÖVçB‚&–æ—F–Â×vFW""Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7BÖ÷f–ætfööE&FRÒ&WV—&TVÆVÖVçB‚&Ö÷f–ærÖfööB×&FR"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7BÖ÷f–æuvFW%&FRÒ&WV—&TVÆVÖVçB‚&Ö÷f–ær×vFW"×&FR"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7B–FÆTfööE&FRÒ&WV—&TVÆVÖVçB‚&–FÆRÖfööB×&FR"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7B–FÆUvFW%&FRÒ&WV—&TVÆVÖVçB‚&–FÆR×vFW"×&FR"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7BWfVçDÆöt6÷VçBÒ&WV—&TVÆVÖVçB‚&WfVçBÖÆörÖ6÷VçB"Â…DÔÄ÷WGWDVÆVÖVçB“°¦6öç7BWfVçDÆötæW‡BÒ&WV—&TVÆVÖVçB‚&WfVçBÖÆörÖæW‡B"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7BWfVçDÆötÆ—7BÒ&WV—&TVÆVÖVçB‚&WfVçBÖÆörÖÆ—7B"Â…DÔÄôÆ—7DVÆVÖVçB“°¦6öç7B'VÖ÷%æVÂÒ&WV—&TVÆVÖVçB‚''VÖ÷"×æVÂ"Â…DÔÄVÆVÖVçB“°¦6öç7B'VÖ÷%7FFRÒ&WV—&TVÆVÖVçB‚''VÖ÷"×7FFR"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7B'VÖ÷%FW‡BÒ&WV—&TVÆVÖVçB‚''VÖ÷"×FW‡B"Â…DÔÄVÆVÖVçB“°¦6öç7B'VÖ÷$÷&–v–âÒ&WV—&TVÆVÖVçB‚''VÖ÷"Ö÷&–v–â"Â…DÔÄVÆVÖVçB“°¦6öç7B'VÖ÷%6V7F÷"Ò&WV—&TVÆVÖVçB‚''VÖ÷"×6V7F÷""Â…DÔÄVÆVÖVçB“°¦6öç7B'VÖ÷%&ævRÒ&WV—&TVÆVÖVçB‚''VÖ÷"×&ævR"Â…DÔÄVÆVÖVçB“°¦6öç7B'VÖ÷%&W7VÇBÒ&WV—&TVÆVÖVçB‚''VÖ÷"×&W7VÇB"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7BFö7G&–æU&W7VÇBÒ&WV—&TVÆVÖVçB‚&Fö7G&–æR×&W7VÇB"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7BFö7G&–æU7F÷Ò&WV—&TVÆVÖVçB‚&Fö7G&–æR×7F÷"Â…DÔÄ–çWDVÆVÖVçB“°¦6öç7BFö7G&–æTÖ&´æD6öçF–çVRÒ&WV—&TVÆVÖVçB€¢&Fö7G&–æRÖÖ&²ÖæBÖ6öçF–çVR"À¢…DÔÄ–çWDVÆVÖVçBÀ¢“°¦6öç7B'VÖ÷$FWe&÷WFRÒ&WV—&TVÆVÖVçB‚''VÖ÷"ÖFWb×&÷WFR"Â…DÔÄ'WGFöäVÆVÖVçB“°¦6öç7B'VÖ÷$ÖÒ&WV—&TVÆVÖVçB‚''VÖ÷"ÖÖ"Â5du5dtVÆVÖVçB“°¦6öç7B¶æ÷vÆVFvT6÷VçBÒ&WV—&TVÆVÖVçB‚&¶æ÷vÆVFvRÖ6÷VçB"Â…DÔÄ÷WGWDVÆVÖVçB“°¦6öç7B¶æ÷vÆVFvUG&6´6÷VçBÒ&WV—&TVÆVÖVçB€¢&¶æ÷vÆVFvR×G&6²Ö6÷VçB"À¢…DÔÄ÷WGWDVÆVÖVçBÀ¢“°¦6öç7B¶æ÷vÆVFvTW‡VF—F–öâÒ&WV—&TVÆVÖVçB€¢&¶æ÷vÆVFvRÖW‡VF—F–öâ"À¢…DÔÄ÷WGWDVÆVÖVçBÀ¢“°¦6öç7B¶æ÷vÆVFvTV×G’Ò&WV—&TVÆVÖVçB€¢&¶æ÷vÆVFvRÖV×G’"À¢…DÔÅ&w&„VÆVÖVçBÀ¢“°¦6öç7B¶æ÷vÆVFvTÆ—7BÒ&WV—&TVÆVÖVçB‚&¶æ÷vÆVFvRÖÆ—7B"Â…DÔÄôÆ—7DVÆVÖVçB“°¦6öç7B¶æ÷vÆVFvTÖÒ&WV—&TVÆVÖVçB‚&¶æ÷vÆVFvRÖÖ"Â5du5dtVÆVÖVçB“°¦6öç7B¶æ÷vÆVFvTÖ÷&–v–âÒ&WV—&TVÆVÖVçB€¢&¶æ÷vÆVFvRÖÖÖ÷&–v–â"À¢…DÔÅ6VÆV7DVÆVÖVçBÀ¢“°¦6öç7B¶æ÷vÆVFvTÖ66ÆRÒ&WV—&TVÆVÖVçB€¢&¶æ÷vÆVFvRÖÖ×66ÆR"À¢…DÔÄ÷WGWDVÆVÖVçBÀ¢“°¦6öç7B¶æ÷vÆVFvTÖf—6–&–Æ—G’Ò&WV—&TVÆVÖVçB€¢&¶æ÷vÆVFvRÖÖ×f—6–&–Æ—G’"À¢…DÔÄ÷WGWDVÆVÖVçBÀ¢“°¦6öç7B¶æ÷vÆVFvU&÷WFU7FGW2Ò&WV—&TVÆVÖVçB€¢&¶æ÷vÆVFvR×&÷WFR×7FGW2"À¢…DÔÄ÷WGWDVÆVÖVçBÀ¢“°¦6öç7B¶æ÷vÆVFvU&W6WBÒ&WV—&TVÆVÖVçB‚&¶æ÷vÆVFvR×&W6WB"Â…DÔÄ'WGFöäVÆVÖVçB“°¦6öç7B6öçF7EæVÂÒ&WV—&TVÆVÖVçB‚&6öçF7B×æVÂ"Â…DÔÄVÆVÖVçB“°¦6öç7B6öçF7E7FFRÒ&WV—&TVÆVÖVçB‚&6öçF7B×7FFR"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7B6öçF7EF—FÆRÒ&WV—&TVÆVÖVçB‚&6öçF7B×F—FÆR"Â…DÔÄ†VF–ætVÆVÖVçB“°¦6öç7B6öçF7DFWF–ÂÒ&WV—&TVÆVÖVçB‚&6öçF7BÖFWF–Â"Â…DÔÅ&w&„VÆVÖVçB“°¦6öç7B6öçF7EF–ÖRÒ&WV—&TVÆVÖVçB‚&6öçF7B×F–ÖR"Â…DÔÄVÆVÖVçB“°¦6öç7B6öçF7DÖöç7FW"Ò&WV—&TVÆVÖVçB‚&6öçF7BÖÖöç7FW""Â…DÔÄVÆVÖVçB“°¦6öç7B6öçF7E÷6—F–öâÒ&WV—&TVÆVÖVçB‚&6öçF7B×÷6—F–öâ"Â…DÔÄVÆVÖVçB“°¦6öç7B6öçF7DF—7Fæ6RÒ&WV—&TVÆVÖVçB‚&6öçF7BÖF—7Fæ6R"Â…DÔÄVÆVÖVçB“°¦6öç7B6öçF7EÆ–W%÷vW"Ò&WV—&TVÆVÖVçB‚&6öçF7B×Æ–W"×÷vW""Â…DÔÄVÆVÖVçB“°¦6öç7B6öçF7E÷vW$6ö×&—6öâÒ&WV—&TVÆVÖVçB€¢&6öçF7B×÷vW"Ö6ö×&—6öâ"À¢…DÔÄVÆVÖVçBÀ¢“°¦6öç7B6öçF7DÖöç7FW%7VVBÒ&WV—&TVÆVÖVçB‚&6öçF7BÖÖöç7FW"×7VVB"Â…DÔÄVÆVÖVçB“°¦6öç7B6öçF7DfÆVU&W7VÇBÒ&WV—&TVÆVÖVçB‚&6öçF7BÖfÆVR×&W7VÇB"Â…DÔÄVÆVÖVçB“°¦6öç7B6öçF7DÖöç7FW%6VÆV7BÒ&WV—&TVÆVÖVçB€¢&6öçF7BÖÖöç7FW"×6VÆV7B"À¢…DÔÅ6VÆV7DVÆVÖVçBÀ¢“°¦6öç7B6öçF7DfÆVU7VVBÒ&WV—&TVÆVÖVçB€¢&6öçF7BÖfÆVR×7VVB"À¢…DÔÄ–çWDVÆVÖVçBÀ¢“°¦6öç7B6öçF7DFö7G&–æTfÆVRÒ&WV—&TVÆVÖVçB€¢&6öçF7BÖFö7G&–æRÖfÆVR"À¢…DÔÄ–çWDVÆVÖVçBÀ¢“°¦6öç7B6öçF7DFö7G&–æTf–v‡BÒ&WV—&TVÆVÖVçB€¢&6öçF7BÖFö7G&–æRÖf–v‡B"À¢…DÔÄ–çWDVÆVÖVçBÀ¢“°¦6öç7B6öçF7DFWe&÷WFRÒ&WV—&TVÆVÖVçB‚&6öçF7BÖFWb×&÷WFR"Â…DÔÄ'WGFöäVÆVÖVçB“°¦6öç7B6öçF7E7F÷FWe&÷WFRÒ&WV—&TVÆVÖVçB€¢&6öçF7B×7F÷ÖFWb×&÷WFR"À¢…DÔÄ'WGFöäVÆVÖVçBÀ¢“°¦6öç7B6öçF7E7F–Å¦ööÒÒ&WV—&TVÆVÖVçB€¢&6öçF7B×7F–Â×¦ööÒ"À¢…DÔÅ6VÆV7DVÆVÖVçBÀ¢“°¦6öç7B6öçF7EF–ÖU¦ööÒÒ&WV—&TVÆVÖVçB‚&6öçF7B×F–ÖR×¦ööÒ"Â…DÔÅ6VÆV7DVÆVÖVçB“°¦6öç7B6öçF7E¦ööÔÖÒ&WV—&TVÆVÖVçB‚&6öçF7B×¦ööÒÖÖ"Â5du5dtVÆVÖVçB“°¦6öç7B6öçF7E¦ööÔ6F–öâÒ&WV—&TVÆVÖVçB€¢&6öçF7B×¦ööÒÖ6F–öâ"À¢…DÔÅ&w&„VÆVÖVçBÀ¢“° ¦ÆWBVÆ6VE6V6öæG2Ò°¦ÆWB6Æö6µ'Vææ–ærÒfÇ6S°¦ÆWB6Æö6µ7VVD×VÇF—Æ–W"Ò&VD6Æö6µ7VVD×VÇF—Æ–W"‚“°¢ò¢¢G—R¶çVÖ&W"ÂçVÆÇÒ¢ğ¦ÆWB6Æö6´g&ÖT–BÒçVÆÃ°¢ò¢¢G—R¶çVÖ&W"ÂçVÆÇÒ¢ğ¦ÆWB6Æö6´æ6†÷%F–ÖW7F×Ö–ÆÆ—6V6öæG2ÒçVÆÃ°¦ÆWB6Æö6´æ6†÷$VÆ6VE6V6öæG2Ò°¦ÆWB7WÇ•6WGF–æw2Ò&VE7WÇ•6WGF–æw2‚“°¦ÆWBW‡VF—F–öäçVÖ&W"Ò°¦ÆWBF—66÷fW'”ÆVFvW"Ò7&VFUÆ–W$F—66÷fW'”ÆVFvW"‡6VVD–çWBçfÇVRçG&–Ò‚’“°¦ÆWBG&fVÄÆVFvW"Ò7&VFUÆ–W%G&fVÄÆVFvW"‡6VVD–çWBçfÇVRçG&–Ò‚’“°¢ò¢¢G—R·7G&–ærÂçVÆÇÒ¢ğ¦ÆWB&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢ò¢¢G—R·7G&–ærÂçVÆÇÒ¢ğ¦ÆWB6VÆV7FVD¶æ÷vÆVFvTÖ÷&–v–ä6—G”–BÒçVÆÃ°¢ò¢¢G—R·7G&–ærÂçVÆÇÒ¢ğ¦ÆWB&W7VÖVDF—66÷fW'”ö&¦V7D–BÒçVÆÃ°¦ÆWB7FF–öæ'•7F÷Væ&ÆVBÒfÇ6S°¢ò¢¢G—Rµ&WGW&åG—SÇG—Vöb7&VFU'VÖ÷%6V&6…6æ6†÷CâÂçVÆÇÒ¢ğ¦ÆWB7F—fU'VÖ÷%6V&6‚ÒçVÆÃ°¢ò¢¢G—Rµ&WGW&åG—SÇG—Vöb7&VFTF—66÷fW'”Fö7G&–æU6æ6†÷CâÂçVÆÇÒ¢ğ¦ÆWB7F—fTFö7G&–æRÒçVÆÃ°¢ò¢¢G—Rµ&WGW&åG—SÇG—Vöb7&VFTW‡VF—F–öä÷WF6öÖU6æ6†÷CâÂçVÆÇÒ¢ğ¦ÆWB7F—fT÷WF6öÖRÒçVÆÃ°¢ò¢¢G—Rµ&WGW&åG—SÇG—Vöb7&VFTFV'VtÖ6æ6†÷CâÂçVÆÇÒ¢ğ¦ÆWB7F—fU6æ6†÷BÒçVÆÃ° §6VVDf÷&ÒæFDWfVçDÆ—7FVæW"‚'7V&Ö—B"Â†WfVçB’Óâ°¢WfVçBç&WfVçDFVfVÇB‚“°¢6öç7BæW‡E6VVBÒ6VVD–çWBçfÇVRçG&–Ò‚“°¢–b†æW‡E6VVBæÆVæwF‚âbbæW‡E6VVBÓÒF—66÷fW'”ÆVFvW"çv÷&ÆE6VVB’°¢F—66÷fW'”ÆVFvW"Ò7&VFUÆ–W$F—66÷fW'”ÆVFvW"†æW‡E6VVB“°¢G&fVÄÆVFvW"Ò7&VFUÆ–W%G&fVÄÆVFvW"†æW‡E6VVB“°¢W‡VF—F–öäçVÖ&W"Ò°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢6VÆV7FVD¶æ÷vÆVFvTÖ÷&–v–ä6—G”–BÒçVÆÃ°¢Ğ¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° §F–ÖU6Æ–FW"æFDWfVçDÆ—7FVæW"‚&–çWB"Â‚’Óâ°¢W6U6–×VÆF–öä6Æö6²‚“°¢VÆ6VE6V6öæG2ÒçVÖ&W"‡F–ÖU6Æ–FW"çfÇVR“°¢&VæFW"‚“°§Ò“° ¦6Æö6µFövvÆRæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢–b†6Æö6µ'Vææ–ær’°¢7–æ6‡&öæ—¦U6–×VÆF–öä6Æö6²‡W&f÷&Öæ6Rææ÷r‚’“°¢W6U6–×VÆF–öä6Æö6²‚“°¢&WGW&ã°¢Ğ ¢7F'E6–×VÆF–öä6Æö6²‚“°§Ò“° ¦6Æö6µ7VVBæFDWfVçDÆ—7FVæW"‚&6†ævR"Â‚’Óâ°¢6öç7BæW‡D×VÇF—Æ–W"Ò&VD6Æö6µ7VVD×VÇF—Æ–W"‚“°¢–b†6Æö6µ'Vææ–ær’°¢6öç7BF–ÖW7F×Ö–ÆÆ—6V6öæG2ÒW&f÷&Öæ6Rææ÷r‚“°¢6öç7B&V6†VD&÷VæF'’Ò7–æ6‡&öæ—¦U6–×VÆF–öä6Æö6²‡F–ÖW7F×Ö–ÆÆ—6V6öæG2“°¢6Æö6µ7VVD×VÇF—Æ–W"ÒæW‡D×VÇF—Æ–W#°¢–b‡&V6†VD&÷VæF'’’°¢W6U6–×VÆF–öä6Æö6²‚“°¢&WGW&ã°¢Ğ¢6Æö6´æ6†÷$VÆ6VE6V6öæG2ÒVÆ6VE6V6öæG3°¢6Æö6´æ6†÷%F–ÖW7F×Ö–ÆÆ—6V6öæG2ÒF–ÖW7F×Ö–ÆÆ—6V6öæG3°¢ÒVÇ6R°¢6Æö6µ7VVD×VÇF—Æ–W"ÒæW‡D×VÇF—Æ–W#°¢Ğ¢WFFT6Æö6´6öçG&öÇ2‚“°§Ò“° §&÷WFTf÷&ÒæFDWfVçDÆ—7FVæW"‚'7V&Ö—B"Â†WfVçB’Óâ°¢WfVçBç&WfVçDFVfVÇB‚“°¢&Vv–äæWtW‡VF—F–öä–eG&fVÆÆVB‚“°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° §7WÇ”f÷&ÒæFDWfVçDÆ—7FVæW"‚'7V&Ö—B"Â†WfVçB’Óâ°¢WfVçBç&WfVçDFVfVÇB‚“°¢7WÇ•6WGF–æw2Ò&VE7WÇ•6WGF–æw2‚“°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° ¦Fö7G&–æU7F÷æFDWfVçDÆ—7FVæW"‚&6†ævR"Â6ÆV$F—66÷fW'•&W7VÖTæE&VæFW"“°¦Fö7G&–æTÖ&´æD6öçF–çVRæFDWfVçDÆ—7FVæW"€¢&6†ævR"À¢6ÆV$F—66÷fW'•&W7VÖTæE&VæFW"À¢“°§7F÷–FÆT†÷W'2æFDWfVçDÆ—7FVæW"‚&6†ævR"Â6ÆV$F—66÷fW'•&W7VÖTæE&VæFW"“°¦6öçF7DÖöç7FW%6VÆV7BæFDWfVçDÆ—7FVæW"‚&6†ævR"Â‚’Óâ°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“°¦6öçF7DFö7G&–æTfÆVRæFDWfVçDÆ—7FVæW"‚&6†ævR"ÂW6T6Æö6´æE&VæFW"“°¦6öçF7DFö7G&–æTf–v‡BæFDWfVçDÆ—7FVæW"‚&6†ævR"ÂW6T6Æö6´æE&VæFW"“°¦6öçF7DfÆVU7VVBæFDWfVçDÆ—7FVæW"‚&6†ævR"ÂW6T6Æö6´æE&VæFW"“°¦6öçF7E7F–Å¦ööÒæFDWfVçDÆ—7FVæW"‚&6†ævR"Â&VæFW"“°¦6öçF7EF–ÖU¦ööÒæFDWfVçDÆ—7FVæW"‚&6†ævR"Â&VæFW"“°¦¶æ÷vÆVFvTÖ÷&–v–âæFDWfVçDÆ—7FVæW"‚&6†ævR"Â‚’Óâ°¢6VÆV7FVD¶æ÷vÆVFvTÖ÷&–v–ä6—G”–BÒ¶æ÷vÆVFvTÖ÷&–v–âçfÇVRÇÂçVÆÃ°¢&VæFW"‚“°§Ò“°¦¶æ÷vÆVFvU&W6WBæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢6öç7B6VVBÒ6VVD–çWBçfÇVRçG&–Ò‚“°¢–b‡6VVBæÆVæwF‚ÓÓÒ’&WGW&ã°¢F—66÷fW'”ÆVFvW"Ò7&VFUÆ–W$F—66÷fW'”ÆVFvW"‡6VVB“°¢G&fVÄÆVFvW"Ò7&VFUÆ–W%G&fVÄÆVFvW"‡6VVB“°¢W‡VF—F–öäçVÖ&W"Ò°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢6VÆV7FVD¶æ÷vÆVFvTÖ÷&–v–ä6—G”–BÒçVÆÃ°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° ¦¶æ÷vÆVFvTÆ—7BæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â†WfVçB’Óâ°¢–b‚†WfVçBçF&vWB–ç7Fæ6VöbVÆVÖVçB’’&WGW&ã°¢6öç7B'WGFöâÒWfVçBçF&vWBæ6Æ÷6W7B‚&'WGFöå¶FFÖ¶æ÷vÆVFvRÖö&¦V7BÖ–EÒ"“°¢–b‚†'WGFöâ–ç7Fæ6Vöb…DÔÄ'WGFöäVÆVÖVçB’’&WGW&ã°¢6öç7Bö&¦V7D–BÒ'WGFöâæFF6WBæ¶æ÷vÆVFvTö&¦V7D–C°¢–b‚ö&¦V7D–B’&WGW&ã° ¢6öç7B&W6WBÒ7&VFT¶æ÷väö&¦V7E&WGW&å&÷WFU&W6WB€¢F—66÷fW'”ÆVFvW"À¢ö&¦V7D–BÀ¢“°¢7FF–öæ'•7F÷Væ&ÆVBÒfÇ6S°¢W‡VF—F–öäçVÖ&W"³Ò°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒ&W6WBæö&¦V7D–C°¢6VÆV7FVD¶æ÷vÆVFvTÖ÷&–v–ä6—G”–BÒ&W6WBæ÷&–v–ä6—G”–C°¢&÷WFU7F'D6—G’çfÇVRÒ&W6WBæ÷&–v–ä6—G”–C°¢&÷WFT&V&–æt–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRÒ&W6WBæ6öÖÖæG5¶–æFW…Óòæ&V&–ætFVrçFôf—†VBƒb’óò##°¢Ò“°¢&÷WFTF—7Fæ6T–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRĞ¢&W6WBæ6öÖÖæG5¶–æFW…ÓòæF—7Fæ6T¶–ÆöÖWFW'2çFôf—†VBƒb’óò##°¢Ò“°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° ¦÷WF6öÖT7F–öâæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢–b‚7F—fT÷WF6öÖR’&WGW&ã°¢W6U6–×VÆF–öä6Æö6²‚“°¢–b€¢7F—fT÷WF6öÖRç7FGW2ÓÓÒ'W6VB"b`¢7F—fT÷WF6öÖRæ–çFW''WF–öä6W6RÓÓÒ&Fö7G&–æR×7F÷"b`¢7F—fTFö7G&–æSòæFV6—6–öà¢’°¢&W7VÖVDF—66÷fW'”ö&¦V7D–BÒ7F—fTFö7G&–æRæFV6—6–öâæö&¦V7D–C°¢&VæFW"‚“°¢&WGW&ã°¢Ğ¢–b†7F—fT÷WF6öÖRç7FGW2ÓÓÒ&–â×&öw&W72"’°¢VÆ6VE6V6öæG2Ğ¢7F—fT÷WF6öÖRç†6RÓÓÒ&–FÆRÖB×7F÷"b`¢7F—fT÷WF6öÖRç&W7VÖTE6V6öæG2ÓÒçVÆÂb`¢€¢7F—fT÷WF6öÖRçÆææVBç7FGW2ÓÓÒ&f–ÆVB"b`¢7F—fT÷WF6öÖRçÆææVBæE6V6öæG2ÃĞ¢7F—fT÷WF6öÖRç&W7VÖTE6V6öæG2²RÓ¢¢ò7F—fT÷WF6öÖRç&W7VÖTE6V6öæG0¢¢7F—fT÷WF6öÖRçÆææVBæE6V6öæG3°¢ÒVÇ6R°¢W‡VF—F–öäçVÖ&W"³Ò°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢Ğ¢F–ÖU6Æ–FW"çfÇVRÒ7G&–ær†VÆ6VE6V6öæG2“°¢&VæFW"‚“°§Ò“° §'VÖ÷$FWe&÷WFRæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢–b‚7F—fU'VÖ÷%6V&6‚’&WGW&ã° ¢&Vv–äæWtW‡VF—F–öä–eG&fVÆÆVB‚“°¢7FF–öæ'•7F÷Væ&ÆVBÒfÇ6S°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢6öç7B²W†7D&V&–ætFVrÂW†7DF—7Fæ6T¶–ÆöÖWFW'2ÒĞ¢7F—fU'VÖ÷%6V&6‚ç6W'fW%G'WFƒ°¢&÷WFT&V&–æt–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRÒ–æFW‚ÓÓÒòW†7D&V&–ætFVrçFôf—†VBƒb’¢##°¢Ò“°¢&÷WFTF—7Fæ6T–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRÒ–æFW‚ÓÓÒòW†7DF—7Fæ6T¶–ÆöÖWFW'2çFôf—†VBƒb’¢##°¢Ò“°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° ¦6öçF7DFWe&÷WFRæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢6öç7BÖöç7FW"Ò7F—fU6æ6†÷CòæÖöç7FW'2æf–æB€¢†6æF–FFR’Óâ6æF–FFRæ–BÓÓÒ6öçF7DÖöç7FW%6VÆV7BçfÇVRÀ¢“°¢–b‚7F—fU6æ6†÷BÇÂÖöç7FW"’&WGW&ã° ¢&Vv–äæWtW‡VF—F–öä–eG&fVÆÆVB‚“° ¢6öç7B6æF–FFW2Ò7F—fU6æ6†÷Bæ6—F–W2æÖ‚†6—G’’Óâ‡°¢6—G’À¢&W6WC¢7&VFTÖöç7FW$–çFW&6WE&÷WFU&W6WB†6—G’ç÷6—F–öâÂÖöç7FW"’À¢Ò’“°¢6æF–FFW2ç6÷'B€¢†ÆVgBÂ&–v‡B’Óà¢ÆVgBç&W6WBæ6öÖÖæG5³ÒæF—7Fæ6T¶–ÆöÖWFW'2Ğ¢&–v‡Bç&W6WBæ6öÖÖæG5³ÒæF—7Fæ6T¶–ÆöÖWFW'2ÇÀ¢ÆVgBæ6—G’æ–BæÆö6ÆT6ö×&R‡&–v‡Bæ6—G’æ–B’À¢“°¢6öç7B6VÆV7FVBÒ6æF–FFW5³Ó°¢–b‚6VÆV7FVB’&WGW&ã° ¢7FF–öæ'•7F÷Væ&ÆVBÒfÇ6S°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢&÷WFU7F'D6—G’çfÇVRÒ6VÆV7FVBæ6—G’æ–C°¢&÷WFU7VVBçfÇVRÒ6VÆV7FVBç&W6WBç7VVD¶–ÆöÖWFW'5W$†÷W"çFôf—†VBƒb“°¢&÷WFT&V&–æt–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRÒ6VÆV7FVBç&W6WBæ6öÖÖæG5¶–æFW…Óòæ&V&–ætFVrçFôf—†VBƒb’óò##°¢Ò“°¢&÷WFTF—7Fæ6T–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRĞ¢6VÆV7FVBç&W6WBæ6öÖÖæG5¶–æFW…ÓòæF—7Fæ6T¶–ÆöÖWFW'2çFôf—†VBƒb’óò##°¢Ò“°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° ¦6öçF7E7F÷FWe&÷WFRæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢–b‚7F—fU'VÖ÷%6V&6‚’&WGW&ã° ¢&Vv–äæWtW‡VF—F–öä–eG&fVÆÆVB‚“°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢6öç7B²W†7D&V&–ætFVrÂW†7DF—7Fæ6T¶–ÆöÖWFW'2ÒĞ¢7F—fU'VÖ÷%6V&6‚ç6W'fW%G'WFƒ°¢&÷WFT&V&–æt–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRÒ–æFW‚ÓÓÒòW†7D&V&–ætFVrçFôf—†VBƒb’¢##°¢Ò“°¢&÷WFTF—7Fæ6T–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRÒ–æFW‚ÓÓÒòW†7DF—7Fæ6T¶–ÆöÖWFW'2çFôf—†VBƒb’¢##°¢Ò“°¢Fö7G&–æU7F÷æ6†V6¶VBÒG'VS°¢7F÷–FÆT†÷W'2çfÇVRÒ#b#°¢7FF–öæ'•7F÷Væ&ÆVBÒG'VS°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° ¦6—G”FWe&÷WFRæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â‚’Óâ°¢6öç7B7F'D6—G’Ò7F—fU6æ6†÷Còæ6—F–W2æf–æB€¢†6—G’’Óâ6—G’æ–BÓÓÒ&÷WFU7F'D6—G’çfÇVRÀ¢“°¢6öç7BFW7F–æF–öä6—G’Ò7F—fU6æ6†÷Còæ6—F–W2æf–æB€¢†6—G’’Óâ6—G’æ–BÓÓÒ&÷WFTFW7F–æF–öä6—G’çfÇVRÀ¢“°¢–b‚7F'D6—G’ÇÂFW7F–æF–öä6—G’’&WGW&ã° ¢&Vv–äæWtW‡VF—F–öä–eG&fVÆÆVB‚“°¢7FF–öæ'•7F÷Væ&ÆVBÒfÇ6S°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢6öç7B&W6WBÒ7&VFT6—G”'&—fÅ&÷WFU&W6WB€¢7F'D6—G’ç÷6—F–öâÀ¢FW7F–æF–öä6—G’À¢“°¢&÷WFT&V&–æt–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRÒ&W6WBæ6öÖÖæG5¶–æFW…Óòæ&V&–ætFVrçFôf—†VBƒb’óò##°¢Ò“°¢&÷WFTF—7Fæ6T–çWG2æf÷$V6‚‚†–çWBÂ–æFW‚’Óâ°¢–çWBçfÇVRĞ¢&W6WBæ6öÖÖæG5¶–æFW…ÓòæF—7Fæ6T¶–ÆöÖWFW'2çFôf—†VBƒb’óò##°¢Ò“°¢Fö7G&–æTÖ&´æD6öçF–çVRæ6†V6¶VBÒG'VS°¢6öç7BvV´Ööç7FW"Ò7F—fU6æ6†÷CòæÖöç7FW'2æf–æB€¢†Ööç7FW"’ÓâÖöç7FW"ç÷vW"ÂÀ¢“°¢–b‡vV´Ööç7FW"’6öçF7DÖöç7FW%6VÆV7BçfÇVRÒvV´Ööç7FW"æ–C°¢&W6WE6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ò“° §v÷&ÆDÖæFDWfVçDÆ—7FVæW"‚&6Æ–6²"Â†WfVçB’Óâ°¢–b‚†WfVçBçF&vWB–ç7Fæ6VöbVÆVÖVçB’’&WGW&ã°¢6öç7BÖ&¶W"ÒWfVçBçF&vWBæ6Æ÷6W7B‚%¶FFÖFWF–Â×F—FÆUÒ"“°¢–b‚Ö&¶W"’&WGW&ã° ¢6öç7BF—FÆRÒÖ&¶W"ævWDGG&–'WFR‚&FFÖFWF–Â×F—FÆR"“°¢6öç7B&÷w2ÒÖ&¶W"ævWDGG&–'WFR‚&FFÖFWF–Â×&÷w2"“°¢–b‚F—FÆRÇÂ&÷w2’&WGW&ã° ¢6†÷tFWF–Ç2‡F—FÆRÂ¥4ôâç'6R‡&÷w2’“°§Ò“° §&VæFW"‚“° ¢ò¢¢&WGW&ç2·fö–GÒ¢ğ¦gVæ7F–öâ&VæFW"‚’°¢G'’°¢6öç7B6æ6†÷BÒ7&VFTFV'VtÖ6æ6†÷B€¢6VVD–çWBçfÇVRçG&–Ò‚’À¢VÆ6VE6V6öæG2À¢"À¢“°¢–b†F—66÷fW'”ÆVFvW"çv÷&ÆE6VVBÓÒ6æ6†÷Bç6VVB’°¢F—66÷fW'”ÆVFvW"Ò7&VFUÆ–W$F—66÷fW'”ÆVFvW"‡6æ6†÷Bç6VVB“°¢G&fVÄÆVFvW"Ò7&VFUÆ–W%G&fVÄÆVFvW"‡6æ6†÷Bç6VVB“°¢W‡VF—F–öäçVÖ&W"Ò°¢&W&VD¶æ÷vÆVFvTö&¦V7D–BÒçVÆÃ°¢6VÆV7FVD¶æ÷vÆVFvTÖ÷&–v–ä6—G”–BÒçVÆÃ°¢Ğ¢6öç7B¶æ÷väö&¦V7D–G2ÒF—66÷fW'”ÆVFvW"æVçG&–W0¢æf–ÇFW"€¢†VçG'’’Óà¢v4ö&¦V7D¶æ÷vä&Vf÷&TW‡VF—F–öâ€¢F—66÷fW'”ÆVFvW"À¢VçG'’æö&¦V7D–BÀ¢W‡VF—F–öäçVÖ&W"À¢’À¢¢æÖ‚†VçG'’’ÓâVçG'’æö&¦V7D–B“°¢7–æ46—G”÷F–öç2‡6æ6†÷Bæ6—F–W2“°¢7–æ46öçF7DÖöç7FW$÷F–öç2‡6æ6†÷BæÖöç7FW'2“°¢6öç7B7F'D6—G’Ò6æ6†÷Bæ6—F–W2æf–æB€¢†6—G’’Óâ6—G’æ–BÓÓÒ&÷WFU7F'D6—G’çfÇVRÀ¢“°¢–b‚7F'D6—G’’F‡&÷ræWrW'&÷"‚-	-½]-R=]--=í’--í-½’=ííB"“°¢6öç7BFW7F–æF–öä6—G’Ò6æ6†÷Bæ6—F–W2æf–æB€¢†6—G’’Óâ6—G’æ–BÓÓÒ&÷WFTFW7F–æF–öä6—G’çfÇVRÀ¢“°¢–b‚FW7F–æF–öä6—G’’°¢F‡&÷ræWrW'&÷"‚-	-½]-R=]--=í’=ííBİ}İ}]İò"“°¢Ğ ¢6öç7BF–ÖVÆ–æU&÷WFRÒ7&VFTf÷W%6VvÖVçE&÷WFU6æ6†÷B€¢7F'D6—G’ç÷6—F–öâÀ¢&VE&÷WFT6öÖÖæG2‚’À¢&÷WFU7VVBçfÇVT4çVÖ&W"À¢VÆ6VE6V6öæG2À¢“°¢6öç7BF–ÖVÆ–æU'VÖ÷%6V&6‚Ò7&VFU'VÖ÷%6V&6…6æ6†÷B€¢6æ6†÷Bç6VVBÀ¢7F'D6—G’À¢F–ÖVÆ–æU&÷WFRÀ¢¶æ÷väö&¦V7D–G2À¢“°¢6öç7BF–ÖVÆ–æTFö7G&–æRÒ7&VFTF—66÷fW'”Fö7G&–æU6æ6†÷B€¢F–ÖVÆ–æU&÷WFRÀ¢F–ÖVÆ–æU'VÖ÷%6V&6‚À¢&VDF—66÷fW'”Fö7G&–æR‚’À¢“°¢6öç7BF–ÖVÆ–æU&W7VÖRÒ7&VFTF—66÷fW'•&W7VÖU6æ6†÷B€¢F–ÖVÆ–æTFö7G&–æRÀ¢&W7VÖVDF—66÷fW'”ö&¦V7D–BÀ¢“°¢6öç7B6—G•F–ÖVÆ–æTFW7F–æF–öâÒ7&VFT6—G”'&—fÅ6æ6†÷B€¢F–ÖVÆ–æU&÷WFRÀ¢FW7F–æF–öä6—G’À¢“°¢ÆWBÆ–fV7–6ÆU&W7VÖRÒF–ÖVÆ–æU&W7VÖS°¢–b€¢Æ–fV7–6ÆU&W7VÖRÓÓÒçVÆÂb`¢&W7VÖVDF—66÷fW'”ö&¦V7D–BÓÒçVÆÂb`¢F–ÖVÆ–æU'VÖ÷%6V&6‚ç6W'fW%G'WF‚çÆææVDF—66÷fW'”E6V6öæG2ÓÒçVÆÀ¢’°¢6öç7B7F÷&÷WFRÒ7&VFTf÷W%6VvÖVçE&÷WFU6æ6†÷B€¢7F'D6—G’ç÷6—F–öâÀ¢&VE&÷WFT6öÖÖæG2‚’À¢&÷WFU7VVBçfÇVT4çVÖ&W"À¢F–ÖVÆ–æU'VÖ÷%6V&6‚ç6W'fW%G'WF‚çÆææVDF—66÷fW'”E6V6öæG2À¢“°¢6öç7B7F÷6V&6‚Ò7&VFU'VÖ÷%6V&6…6æ6†÷B€¢6æ6†÷Bç6VVBÀ¢7F'D6—G’À¢7F÷&÷WFRÀ¢¶æ÷väö&¦V7D–G2À¢“°¢6öç7B7F÷VDFö7G&–æRÒ7&VFTF—66÷fW'”Fö7G&–æU6æ6†÷B€¢7F÷&÷WFRÀ¢7F÷6V&6‚À¢&VDF—66÷fW'”Fö7G&–æR‚’À¢“°¢Æ–fV7–6ÆU&W7VÖRÒ7&VFTF—66÷fW'•&W7VÖU6æ6†÷B€¢7F÷VDFö7G&–æRÀ¢&W7VÖVDF—66÷fW'”ö&¦V7D–BÀ¢“°¢Ğ¢6öç7B66†VGVÆVD–FÆTGW&F–öå6V6öæG2Ò&VE7F÷–FÆTGW&F–öå6V6öæG2‚“°¢6öç7B7F÷Æ–fV7–6ÆRÒ7&VFTF—66÷fW'•7F÷Æ–fV7–6ÆU6æ6†÷B€¢F–ÖVÆ–æU&÷WFRÀ¢7WÇ•6WGF–æw2æ–æ—F–ÂÀ¢7WÇ•6WGF–æw2ç&öf–ÆRÀ¢Æ–fV7–6ÆU&W7VÖRÀ¢66†VGVÆVD–FÆTGW&F–öå6V6öæG2À¢VÆ6VE6V6öæG2À¢6—G•F–ÖVÆ–æTFW7F–æF–öâÀ¢“°¢6öç7BÆææVE&÷WFRÒ7F÷Æ–fV7–6ÆP¢ò7&VFTf÷W%6VvÖVçE&÷WFU6æ6†÷B€¢7F'D6—G’ç÷6—F–öâÀ¢&VE&÷WFT6öÖÖæG2‚’À¢&÷WFU7VVBçfÇVT4çVÖ&W"À¢7F÷Æ–fV7–6ÆRæÖ÷fVÖVçDVÆ6VE6V6öæG2À¢¢¢F–ÖVÆ–æU&÷WFS°¢6öç7BÆææVE'VÖ÷%6V&6‚Ò7&VFU'VÖ÷%6V&6…6æ6†÷B€¢6æ6†÷Bç6VVBÀ¢7F'D6—G’À¢ÆææVE&÷WFRÀ¢¶æ÷väö&¦V7D–G2À¢“°¢6öç7B&÷÷6VDFö7G&–æRÒ7&VFTF—66÷fW'”Fö7G&–æU6æ6†÷B€¢ÆææVE&÷WFRÀ¢ÆææVE'VÖ÷%6V&6‚À¢&VDF—66÷fW'”Fö7G&–æR‚’À¢“°¢6öç7B&÷÷6VE&W7VÖRÒ7&VFTF—66÷fW'•&W7VÖU6æ6†÷B€¢&÷÷6VDFö7G&–æRÀ¢&W7VÖVDF—66÷fW'”ö&¦V7D–BÀ¢“°¢ÆWB6VÆV7FVDÖöç7FW"Ò6æ6†÷BæÖöç7FW'2æf–æB€¢†Ööç7FW"’ÓâÖöç7FW"æ–BÓÓÒ6öçF7DÖöç7FW%6VÆV7BçfÇVRÀ¢“°¢6öç7BÆææVE7F÷Ğ¢F–ÖVÆ–æU'VÖ÷%6V&6‚ç6W'fW%G'WF‚çÆææVDF—66÷fW'’óòçVÆÃ°¢–b€¢7FF–öæ'•7F÷Væ&ÆVBb`¢6VÆV7FVDÖöç7FW"b`¢ÆææVE7F÷b`¢66†VGVÆVD–FÆTGW&F–öå6V6öæG2â ¢’°¢6öç7B6öçF7DE6V6öæG2Ğ¢ÆææVE7F÷æVÆ6VE6V6öæG2²66†VGVÆVD–FÆTGW&F–öå6V6öæG2ò#°¢6öç7BÖöç7FW"Ò7&VFU7FF–öæ'•7F÷G&öÅ&W6WB€¢ÆææVE7F÷æ6&få÷6—F–öâÀ¢6öçF7DE6V6öæG2À¢6VÆV7FVDÖöç7FW"À¢VÆ6VE6V6öæG2À¢“°¢6öç7B6VÆV7FVDÖöç7FW$–æFW‚Ò6æ6†÷BæÖöç7FW'2æf–æD–æFW‚€¢†Ööç7FW"’ÓâÖöç7FW"æ–BÓÓÒ6VÆV7FVDÖöç7FW#òæ–BÀ¢“°¢–b‡6VÆV7FVDÖöç7FW$–æFW‚ãÒ’°¢6æ6†÷BæÖöç7FW'5·6VÆV7FVDÖöç7FW$–æFW…ÒÒÖöç7FW#°¢Ğ¢6VÆV7FVDÖöç7FW"ÒÖöç7FW#°¢Ğ¢6öç7BÖöç7FW$6öçF7BÒ6VÆV7FVDÖöç7FW ¢ò7&VFTÖöç7FW$6öçF7E6æ6†÷B€¢ÆææVE&÷WFRÀ¢6VÆV7FVDÖöç7FW"À¢7F÷Æ–fV7–6ÆRÀ¢¢¢çVÆÃ°¢6öç7B6—G”FW7F–æF–öâÒ7&VFT6—G”'&—fÅ6æ6†÷B€¢ÆææVE&÷WFRÀ¢FW7F–æF–öä6—G’À¢“°¢6öç7B÷WF6öÖRÒ7&VFTW‡VF—F–öä÷WF6öÖU6æ6†÷B€¢ÆææVE&÷WFRÀ¢7WÇ•6WGF–æw2æ–æ—F–ÂÀ¢7WÇ•6WGF–æw2ç&öf–ÆRÀ¢&÷÷6VE&W7VÖRóò&÷÷6VDFö7G&–æRÀ¢Ööç7FW$6öçF7BÀ¢&VE7G&öætÖöç7FW$Fö7G&–æR‚’À¢6öçF7DfÆVU7VVBçfÇVT4çVÖ&W"ò2ãbÀ¢6—G”FW7F–æF–öâÀ¢7F÷Æ–fV7–6ÆRÀ¢“°¢6öç7BVffV7F—fU7F÷Æ–fV7–6ÆRÒ÷WF6öÖRç7F÷Æ–fV7–6ÆRóò7F÷Æ–fV7–6ÆS°¢6öç7B&÷WFRÒÇ”W‡VF—F–öä÷WF6öÖUFõ&÷WFR‡ÆææVE&÷WFRÂ÷WF6öÖR“°¢6öç7B&V6÷&FVEG&fVÂÒ&V6÷&DW‡VF—F–öåG&fVÅ&öw&W72‡G&fVÄÆVFvW"Â°¢W‡VF—F–öäçVÖ&W"À¢÷&–v–ä6—G”–C¢7F'D6—G’æ–BÀ¢&÷WFT6öÖÖæG3¢&÷WFRæWF†÷&—FF—fU&÷WFRç6VvÖVçG2æÖ‚‡6VvÖVçB’Óâ‡°¢&V&–ætFVs¢6VvÖVçBæ&V&–ætFVrÀ¢F—7Fæ6TÖWFW'3¢6VvÖVçBæF—7Fæ6TÖWFW'2À¢Ò’’À¢G&fVÆVDF—7Fæ6TÖWFW'3¢&÷WFRç÷6—F–öâçG&fVÆVDF—7Fæ6TÖWFW'2À¢Ò“°¢G&fVÄÆVFvW"Ò&V6÷&FVEG&fVÂæÆVFvW#°¢6öç7B&V6†VD6—G’Ò7&VFU&V6†VD6—G”ÆæFÖ&´–çWB€¢÷WF6öÖRÀ¢7F'D6—G’À¢W‡VF—F–öäçVÖ&W"À¢“°¢–b‡&V6†VD6—G’’°¢G&fVÄÆVFvW"Ò&V6÷&E&V6†VD6—G”ÆæFÖ&²‡G&fVÄÆVFvW"Â&V6†VD6—G’“°¢Ğ¢6öç7B'VÖ÷%6V&6‚Ò7&VFU'VÖ÷%6V&6…6æ6†÷B€¢6æ6†÷Bç6VVBÀ¢7F'D6—G’À¢&÷WFRÀ¢¶æ÷väö&¦V7D–G2À¢“°¢6öç7BFö7G&–æRÒ7&VFTF—66÷fW'”Fö7G&–æU6æ6†÷B€¢&÷WFRÀ¢'VÖ÷%6V&6‚À¢&VDF—66÷fW'”Fö7G&–æR‚’À¢“°¢6öç7B&W7VÖRÒ7&VFTF—66÷fW'•&W7VÖU6æ6†÷B€¢Fö7G&–æRÀ¢&W7VÖVDF—66÷fW'”ö&¦V7D–BÀ¢“°¢6öç7BVffV7F—fTFö7G&–æRÒ&W7VÖRóòFö7G&–æS°¢–b‡'VÖ÷%6V&6‚ç7FGW2ÓÓÒ&f÷VæB"bb'VÖ÷%6V&6‚æF—66÷fW'’’°¢6öç7B&V6÷&FVBÒ&V6÷&DF—&V7DF—66÷fW'”ö'6W'fF–öâ†F—66÷fW'”ÆVFvW"Â°¢W‡VF—F–öäçVÖ&W"À¢ö&¦V7D–C¢'VÖ÷%6V&6‚ç6W'fW%G'WF‚çF&vWBæ–BÀ¢ö&¦V7D¶–æC¢'VÖ÷%6V&6‚ç'VÖ÷"çF&vWD¶–æBÀ¢÷&–v–ä6—G”–C¢'VÖ÷%6V&6‚æ÷&–v–ä6—G’æ–BÀ¢'VÖ÷$–C¢'VÖ÷%6V&6‚ç'VÖ÷"æ–BÀ¢ö'6W'fVDE6V6öæG3¢'VÖ÷%6V&6‚æF—66÷fW'’æE6V6öæG2À¢6VvÖVçD–æFWƒ¢'VÖ÷%6V&6‚æF—66÷fW'’ç6VvÖVçD–æFW‚À¢&÷WFTF—7Fæ6TÖWFW'3 ¢'VÖ÷%6V&6‚æF—66÷fW'’ç&÷WFTF—7Fæ6T¶–ÆöÖWFW'2¢óÀ¢÷&–v–ä&V&–ætFVs¢'VÖ÷%6V&6‚ç6W'fW%G'WF‚æW†7D&V&–ætFVrÀ¢÷&–v–äF—7Fæ6TÖWFW'3 ¢'VÖ÷%6V&6‚ç6W'fW%G'WF‚æW†7DF—7Fæ6T¶–ÆöÖWFW'2¢óÀ¢Ò“°¢F—66÷fW'”ÆVFvW"Ò&V6÷&FVBæÆVFvW#°¢Ğ¢6öç7B6&få7FGW2Ò7&VFT6&få7FGW56æ6†÷B€¢&÷WFRÀ¢7WÇ•6WGF–æw2æ–æ—F–ÂÀ¢7WÇ•6WGF–æw2ç&öf–ÆRÀ¢VffV7F—fTFö7G&–æRÀ¢÷WF6öÖRÀ¢“°¢7F—fU'VÖ÷%6V&6‚Ò'VÖ÷%6V&6ƒ°¢7F—fTFö7G&–æRÒFö7G&–æS°¢7F—fT÷WF6öÖRÒ÷WF6öÖS°¢7F—fU6æ6†÷BÒ6æ6†÷C°¢6öç7BWfVçDÆörÒ7&VFTW‡VF—F–öäWfVçDÆöu6æ6†÷B€¢&÷WFRÀ¢7WÇ•6WGF–æw2æ–æ—F–ÂÀ¢7WÇ•6WGF–æw2ç&öf–ÆRÀ¢'VÖ÷%6V&6‚À¢Fö7G&–æRÀ¢÷WF6öÖRÀ¢&W7VÖRóòÆ–fV7–6ÆU&W7VÖRÀ¢VffV7F—fU7F÷Æ–fV7–6ÆRÀ¢“°¢6öç7BÖ†–×VÔVÆ6VE6V6öæG2Ò÷WF6öÖRçÆææVBæE6V6öæG3° ¢–b†VÆ6VE6V6öæG2âÖ†–×VÔVÆ6VE6V6öæG2’°¢VÆ6VE6V6öæG2ÒÖ†–×VÔVÆ6VE6V6öæG3°¢F–ÖU6Æ–FW"çfÇVRÒ7G&–ær†VÆ6VE6V6öæG2“°¢&VæFW"‚“°¢&WGW&ã°¢Ğ ¢W'&÷$ÖW76vRæ†–FFVâÒG'VS°¢ÖF—FÆRçFW‡D6öçFVçBÒ6VVC¢G·6æ6†÷Bç6VVGÖ°¢6—G”6÷VçBçFW‡D6öçFVçBÒ7G&–ær‡6æ6†÷Bæ6—F–W2æÆVæwF‚“°¢ö&¦V7D6÷VçBçFW‡D6öçFVçBÒ7G&–ær‡6æ6†÷Bç7FF–4ö&¦V7G2æÆVæwF‚²“°¢Ööç7FW$6÷VçBçFW‡D6öçFVçBÒ7G&–ær‡6æ6†÷BæÖöç7FW'2æÆVæwF‚“°¢F–ÖT÷WGWBçFW‡D6öçFVçBÒf÷&ÖDVÆ6VB†VÆ6VE6V6öæG2“°¢&÷WFU7VÖÖ'’çFW‡D6öçFVçBÒf÷&ÖE&÷WFU7VÖÖ'’‡&÷WFR“°¢&VæFW%'VÖ÷%6V&6‚‡'VÖ÷%6V&6‚ÂVffV7F—fTFö7G&–æRÂ÷WF6öÖR“°¢&VæFW$F—66÷fW'”ÆVFvW"†F—66÷fW'”ÆVFvW"ÂG&fVÄÆVFvW"Â6æ6†÷B“°¢&VæFW$6&få7FGW2†6&få7FGW2“°¢&VæFW$W‡VF—F–öä÷WF6öÖR†÷WF6öÖR“°¢&VæFW$Ööç7FW$6öçF7B†Ööç7FW$6öçF7BÂ÷WF6öÖR“°¢&VæFW$6öçF7E¦ööÒ€¢&÷WFRÀ¢6VÆV7FVDÖöç7FW"óòçVÆÂÀ¢Ööç7FW$6öçF7BÀ¢VffV7F—fU7F÷Æ–fV7–6ÆRÀ¢“°¢&VæFW$WfVçDÆör†WfVçDÆörÂ&÷WFR“° ¢F–ÖU6Æ–FW"æÖ‚Ò7G&–ær„ÖF‚æÖ‚ƒÂÖF‚æ6V–Â†Ö†–×VÔVÆ6VE6V6öæG2’’“°¢F–ÖU6Æ–FW"çfÇVRÒ7G&–ær†VÆ6VE6V6öæG2“°¢WFFT6Æö6´6öçG&öÇ2‚“° ¢G&u6æ6†÷B€¢6æ6†÷BÀ¢&÷WFRÀ¢'VÖ÷%6V&6‚À¢VffV7F—fTFö7G&–æRÀ¢÷WF6öÖRÀ¢Ööç7FW$6öçF7BÀ¢“°¢Ò6F6‚†W'&÷"’°¢7F—fU'VÖ÷%6V&6‚ÒçVÆÃ°¢7F—fTFö7G&–æRÒçVÆÃ°¢7F—fT÷WF6öÖRÒçVÆÃ°¢7F—fU6æ6†÷BÒçVÆÃ°¢6öçF7E¦ööÔÖç&WÆ6T6†–ÆG&Vâ‚“°¢6öçF7E¦ööÔ6F–öâçFW‡D6öçFVçBÒ-	½í­½ÍİíRí­İâİ]Mí-=ıİââ#°¢W6U6–×VÆF–öä6Æö6²‚“°¢W'&÷$ÖW76vRçFW‡D6öçFVçBÒW'&÷"–ç7Fæ6VöbW'&÷"òW'&÷"æÖW76vR¢7G&–ær†W'&÷"“°¢W'&÷$ÖW76vRæ†–FFVâÒfÇ6S°¢Ğ§Ğ ¢ò¢¢&WGW&ç2·fö–GÒ¢ğ¦gVæ7F–öâ7F'E6–×VÆF–öä6Æö6²‚’°¢–b‚7F—fT÷WF6öÖRÇÂ7F—fT÷WF6öÖRç7FGW2ÓÒ&–â×&öw&W72"’°¢WFFT6Æö6´6öçG&öÇ2‚“°¢&WGW&ã°¢Ğ ¢6Æö6µ'Vææ–ærÒG'VS°¢6Æö6´æ6†÷$VÆ6VE6V6öæG2ÒVÆ6VE6V6öæG3°¢6Æö6´æ6†÷%F–ÖW7F×Ö–ÆÆ—6V6öæG2ÒW&f÷&Öæ6Rææ÷r‚“°¢6Æö6´g&ÖT–BÒ&WVW7Dæ–ÖF–öäg&ÖR‡'Vå6–×VÆF–öä6Æö6´g&ÖR“°¢WFFT6Æö6´6öçG&öÇ2‚“°§Ğ ¢ò¢¢&Ò¶çVÖ&W'ÒF–ÖW7F×Ö–ÆÆ—6V6öæG2&WGW&ç2·fö–GÒ¢ğ¦gVæ7F–öâ'Vå6–×VÆF–öä6Æö6´g&ÖR‡F–ÖW7F×Ö–ÆÆ—6V6öæG2’°¢6Æö6´g&ÖT–BÒçVÆÃ°¢–b‚6Æö6µ'Vææ–ær’&WGW&ã° ¢6öç7B&V6†VD&÷VæF'’Ò7–æ6‡&öæ—¦U6–×VÆF–öä6Æö6²‡F–ÖW7F×Ö–ÆÆ—6V6öæG2“°¢–b€¢&V6†VD&÷VæF'’ÇÀ¢7F—fT÷WF6öÖRÇÀ¢7F—fT÷WF6öÖRç7FGW2ÓÒ&–â×&öw&W72 ¢’°¢W6U6–×VÆF–öä6Æö6²‚“°¢&WGW&ã°¢Ğ ¢6Æö6´g&ÖT–BÒ&WVW7Dæ–ÖF–öäg&ÖR‡'Vå6–×VÆF–öä6Æö6´g&ÖR“°§Ğ ¢ò¢ ¢¢&RÖWfÇVFW2VÆ6VB6–×VÆF–öâF–ÖRg&öÒöæR7F&ÆRÆ’æ6†÷"ÂÖ¶–ærF†P¢¢&W7VÇB–æFWVæFVçBg&öÒæ–ÖF–öâÖg&ÖR'F—F–öæ–ærà¢¢&Ò¶çVÖ&W'ÒF–ÖW7F×Ö–ÆÆ—6V6öæG0¢¢&WGW&ç2¶&ööÆVçĞ¢¢ğ¦gVæ7F–öâ7–æ6‡&öæ—¦U6–×VÆF–öä6Æö6²‡F–ÖW7F×Ö–ÆÆ—6V6öæG2’°¢–b€¢6Æö6µ'Vææ–ærÇÀ¢7F—fT÷WF6öÖRÇÀ¢6Æö6´æ6†÷%F–ÖW7F×Ö–ÆÆ—6V6öæG2ÓÓÒçVÆÀ¢’°¢&WGW&âfÇ6S°¢Ğ ¢6öç7B&VÄVÆ6VE6V6öæG2ÒÖF‚æÖ‚€¢À¢‡F–ÖW7F×Ö–ÆÆ—6V6öæG2Ò6Æö6´æ6†÷%F–ÖW7F×Ö–ÆÆ—6V6öæG2’òóÀ¢“°¢6öç7BGfæ6VBÒGfæ6U6–×VÆF–öä6Æö6²€¢6Æö6´æ6†÷$VÆ6VE6V6öæG2À¢&VÄVÆ6VE6V6öæG2À¢6Æö6µ7VVD×VÇF—Æ–W"À¢7F—fT÷WF6öÖRçÆææVBæE6V6öæG2À¢“°¢VÆ6VE6V6öæG2ÒGfæ6VBæVÆ6VE6V6öæG3°¢F–ÖU6Æ–FW"çfÇVRÒ7G&–ær†VÆ6VE6V6öæG2“°¢&VæFW"‚“°¢&WGW&â€¢Gfæ6VBç&V6†VD&÷VæF'’ÇÀ¢7F—fT÷WF6öÖRÇÀ¢7F—fT÷WF6öÖRç7FGW2ÓÒ&–â×&öw&W72 ¢“°§Ğ ¢ò¢¢&WGW&ç2·fö–GÒ¢ğ¦gVæ7F–öâW6U6–×VÆF–öä6Æö6²‚’°¢6Æö6µ'Vææ–ærÒfÇ6S°¢6Æö6´æ6†÷%F–ÖW7F×Ö–ÆÆ—6V6öæG2ÒçVÆÃ°¢6Æö6´æ6†÷$VÆ6VE6V6öæG2ÒVÆ6VE6V6öæG3°¢–b†6Æö6´g&ÖT–BÓÒçVÆÂ’°¢6æ6VÄæ–ÖF–öäg&ÖR†6Æö6´g&ÖT–B“°¢6Æö6´g&ÖT–BÒçVÆÃ°¢Ğ¢WFFT6Æö6´6öçG&öÇ2‚“°§Ğ ¢ò¢¢&WGW&ç2·fö–GÒ¢ğ¦gVæ7F–öâ&W6WE6–×VÆF–öä6Æö6²‚’°¢W6U6–×VÆF–öä6Æö6²‚“°¢VÆ6VE6V6öæG2Ò°¢&W7VÖVDF—66÷fW'”ö&¦V7D–BÒçVÆÃ°¢F–ÖU6Æ–FW"çfÇVRÒ##°§Ğ ¢ò¢¢7F'G2F—7F–æ7BW‡VF—F–öâ&Vf÷&R&WÆ6–ær&÷WFRF†BÇ&VG’Ö÷fVBâ¢ğ¦gVæ7F–öâ&Vv–äæWtW‡VF—F–öä–eG&fVÆÆVB‚’°¢–b€¢G&fVÄÆVFvW"çG&6·2ç6öÖR€¢‡G&6²’ÓâG&6²æW‡VF—F–öäçVÖ&W"ÓÓÒW‡VF—F–öäçVÖ&W"À¢¢’°¢W‡VF—F–öäçVÖ&W"³Ò°¢Ğ§Ğ ¢ò¢¢&WGW&ç2·fö–GÒ¢ğ¦gVæ7F–öâW6T6Æö6´æE&VæFW"‚’°¢W6U6–×VÆF–öä6Æö6²‚“°¢&VæFW"‚“°§Ğ ¢ò¢¢&WGW&ç2·fö–GÒ¢ğ¦gVæ7F–öâ6ÆV$F—66÷fW'•&W7VÖTæE&VæFW"‚’°¢&W7VÖVDF—66÷fW'”ö&¦V7D–BÒçVÆÃ°¢W6T6Æö6´æE&VæFW"‚“°§Ğ ¢ò¢¢&WGW&ç2¶çVÖ&W'Ò¢ğ¦gVæ7F–öâ&VD6Æö6µ7VVD×VÇF—Æ–W"‚’°¢6öç7B7VVD×VÇF—Æ–W"ÒçVÖ&W"†6Æö6µ7VVBçfÇVR“°¢–b‚4”ÕTÄD”ôåô4Äô4µõ5TTEôÕTÅD•Ä”U%2æ–æ6ÇVFW2‡7VVD×VÇF—Æ–W"’’°¢F‡&÷ræWr&ævTW'&÷"‚-	-½]-R­íí-ÂƒÂƒÂƒ½‚ƒ"“°¢Ğ¢&WGW&â7VVD×VÇF—Æ–W#°§Ğ ¢ò¢¢&WGW&ç2·fö–GÒ¢ğ¦gVæ7F–öâWFFT6Æö6´6öçG&öÇ2‚’°¢6öç7B6å'VâÒ7F—fT÷WF6öÖSòç7FGW2ÓÓÒ&–â×&öw&W72#°¢6Æö6µFövvÆRæF—6&ÆVBÒ6å'Vã°¢6Æö6µFövvÆRç6WDGG&–'WFR‚&&–×&W76VB"Â7G&–ær†6Æö6µ'Vææ–ær’“°¢6Æö6µFövvÆT–6öâçFW‡D6öçFVçBÒ6Æö6µ'Vææ–ærò.)Ù®)Ù¢"¢.)kb#°¢6Æö6µFövvÆTÆ&VÂçFW‡D6öçFVçBÒ6Æö6µ'Vææ–ærò-	ı=}"¢-	}ı=--Â#° ¢6öç7B7FFRÒ6Æö6µ'Vææ–æp¢ò''Vææ–ær ¢¢7F—fT÷WF6öÖRbb7F—fT÷WF6öÖRç7FGW2ÓÒ&–â×&öw&W72 ¢ò&&÷VæF'’ ¢¢'W6VB#°¢6Æö6µ7FGW2æFF6WBç7FFRÒ7FFS°¢6Æö6µ7FGW2çFW‡D6öçFVçBÒG°¢7FFRÓÓÒ''Vææ–ær ¢ò-	M" ¢¢7FFRÓÓÒ&&÷VæF'’ ¢ò-	=İmMí-=İ=- ¢¢-	í-İí-½]İâ ¢Ò+r‚G¶6Æö6µ7VVD×VÇF—Æ–W'Ö°§Ğ ¢ò¢ ¢¢&Òµ&WGW&åG—SÇG—Vöb7&VFTf÷W%6VvÖVçE&÷WFU6æ6†÷CçÒ&÷WFP¢¢&Òµ&WGW&åG—SÇG—Vöb7&VFTFV'VtÖ6æ6†÷Cå²&Ööç7FW'2%Õ¶çVÖ&W%ÒÂçVÆÇÒÖöç7FW ¢¢&Òµ&WGW&åG—SÇG—Vöb7&VFTÖöç7FW$6öçF7E6æ6†÷CâÂçVÆÇÒ6öçF7@¢¢&Òµ&WGW&åG—SÇG—Vöb7&VFTF—66÷fW'•7F÷Æ–fV7–6ÆU6æ6†÷CâÂçVÆÇÒ7F÷Æ–fV7–6ÆP¢¢ğ¦gVæ7F–öâ&VæFW$6öçF7E¦ööÒ‡&÷WFRÂÖöç7FW"Â6öçF7BÂ7F÷Æ–fV7–6ÆR’°¢6öçF7E¦ööÔÖç&WÆ6T6†–ÆG&Vâ‚“°¢–b‚Ööç7FW"’°¢6öçF7E¦ööÔ6F–öâçFW‡D6öçFVçBÒ-	-½]-Rı-=½ÂM½ò½í­½Íİí=âí­İâ#°¢&WGW&ã°¢Ğ ¢6öç7B6æ6†÷BÒ7&VFT6öçF7E¦ööÕ6æ6†÷B€¢&÷WFRÀ¢Ööç7FW"À¢6öçF7BÀ¢çVÖ&W"†6öçF7E7F–Å¦ööÒçfÇVR’À¢çVÖ&W"†6öçF7EF–ÖU¦ööÒçfÇVR’À¢7F÷Æ–fV7–6ÆRÀ¢“°¢6öç7B6VçFW%‚Ò4ôåD5Eõ¤ôôÕõt”ED‚ò#°¢6öç7B6VçFW%’Ò4ôåD5Eõ¤ôôÕô„T”t…Bò#°¢6öç7BÖ†–×VÕ&–æu—†VÇ2Ò6æ6†÷Bç7F–Å&F—W4ÖWFW'2ò6æ6†÷BæÖWFW'5W%—†VÃ° ¢6öçF7E¦ööÔÖæVæB€¢7ftVÆVÖVçB‚&Æ–æR"Â°¢6Æ73¢&6öçF7B×¦ööÒÖ7&÷76†—""À¢ƒ¢À¢ƒ#¢4ôåD5Eõ¤ôôÕõt”ED‚À¢“¢6VçFW%’À¢“#¢6VçFW%’À¢Ò’À¢7ftVÆVÖVçB‚&Æ–æR"Â°¢6Æ73¢&6öçF7B×¦ööÒÖ7&÷76†—""À¢ƒ¢6VçFW%‚À¢ƒ#¢6VçFW%‚À¢“¢À¢“#¢4ôåD5Eõ¤ôôÕô„T”t…BÀ¢Ò’À¢“° ¢f÷"†6öç7B&F–òöb³ãRÂÒ’°¢6öçF7E¦ööÔÖæVæB€¢7ftVÆVÖVçB‚&6—&6ÆR"Â°¢6Æ73¢&6öçF7B×¦ööÒÖw&–B"À¢7ƒ¢6VçFW%‚À¢7“¢6VçFW%’À¢#¢Ö†–×VÕ&–æu—†VÇ2¢&F–òÀ¢Ò’À¢“°¢6öç7BÆ&VÂÒ7ftVÆVÖVçB‚'FW‡B"Â°¢6Æ73¢&6öçF7B×¦ööÒÖÆ&VÂ"À¢ƒ¢6VçFW%‚²bÀ¢“¢6VçFW%’ÒÖ†–×VÕ&–æu—†VÇ2¢&F–ò²"À¢Ò“°¢Æ&VÂçFW‡D6öçFVçBÒG¶f÷&ÖDçVÖ&W"€¢‡6æ6†÷Bç7F–Å&F—W4ÖWFW'2¢&F–ò’òóÀ¢À¢—Ò­Æ°¢6öçF7E¦ööÔÖæVæB†Æ&VÂ“°¢Ğ ¢6öç7B6&fåF‚Ò7ftVÆVÖVçB‚'öÇ–Æ–æR"Â°¢6Æ73¢&6öçF7B×¦ööÒÖ6&fâ×F‚"À¢ö–çG3¢6æ6†÷Bæ6&fåF€¢æÖ‚‡²ö–çBÒ’ÓâG·ö–çBç‡ÒÂG·ö–çBç—Ö¢æ¦ö–â‚""’À¢Ò“°¢6&fåF‚æVæB‡7fuF—FÆR‚-
+-]­-íò­-İ-â-]Í]İİíÂí­İR"’“°¢6öç7BÖöç7FW%F‚Ò7ftVÆVÖVçB‚'öÇ–Æ–æR"Â°¢6Æ73¢&6öçF7B×¦ööÒÖÖöç7FW"×F‚"À¢ö–çG3¢6æ6†÷BæÖöç7FW%F€¢æÖ‚‡²ö–çBÒ’ÓâG·ö–çBç‡ÒÂG·ö–çBç—Ö¢æ¦ö–â‚""’À¢Ò“°¢Ööç7FW%F‚æVæB‡7fuF—FÆR‚-
+-]­-íòm­½}]­í=âı-=½ò-â-]Í]İİíÂí­İR"’“°¢6öç7B–çFW&7F–öå&F—W2Ò7ftVÆVÖVçB‚&6—&6ÆR"Â°¢6Æ73¢&6öçF7B×¦ööÒÖ–çFW&7F–öâ×&F—W2"À¢7ƒ¢6æ6†÷Bæfö7W4Ööç7FW"çö–çBç‚À¢7“¢6æ6†÷Bæfö7W4Ööç7FW"çö–çBç’À¢#¢6æ6†÷Bæ–çFW&7F–öå&F—W5—†VÇ2À¢Ò“°¢–çFW&7F–öå&F—W2æVæB€¢7fuF—FÆR†–çFW&7F–öâ&F—W2G·6æ6†÷Bæ–çFW&7F–öå&F—W4ÖWFW'7ÒÆ’À¢“°¢6öçF7E¦ööÔÖæVæB†6&fåF‚ÂÖöç7FW%F‚Â–çFW&7F–öå&F—W2“° ¢6öç7B6&fäÖ&¶W"Ò7ftVÆVÖVçB‚&6—&6ÆR"Â°¢6Æ73¢&6öçF7B×¦ööÒÖ6&fâÖÖ&¶W""À¢7ƒ¢6æ6†÷Bæfö7W46&fâçö–çBç‚À¢7“¢6æ6†÷Bæfö7W46&fâçö–çBç’À¢#¢bÀ¢Ò“°¢6&fäÖ&¶W"æVæB‡7fuF—FÆR†	­-Ò+rG¶f÷&ÖDVÆ6VB‡6æ6†÷Bæfö7W4E6V6öæG2—Ö’“°¢6öç7BÖöç7FW$Ö&¶W"Ò7ftVÆVÖVçB‚'öÇ–vöâ"Â°¢6Æ73¢&6öçF7B×¦ööÒÖÖöç7FW"ÖÖ&¶W""À¢ö–çG3¢G·6æ6†÷Bæfö7W4Ööç7FW"çö–çBç‡ÒÂG·6æ6†÷Bæfö7W4Ööç7FW"çö–çBç’ÒwÒG·6æ6†÷Bæfö7W4Ööç7FW"çö–çBç‚²wÒÂG·6æ6†÷Bæfö7W4Ööç7FW"çö–çBç’²gÒG·6æ6†÷Bæfö7W4Ööç7FW"çö–çBç‚ÒwÒÂG·6æ6†÷Bæfö7W4Ööç7FW"çö–çBç’²gÖÀ¢Ò“°¢Ööç7FW$Ö&¶W"æVæB€¢7fuF—FÆR†G¶Ööç7FW"æ–GÒ+ru"G¶Ööç7FW"ç÷vW'Ò+rG¶f÷&ÖDVÆ6VB‡6æ6†÷Bæfö7W4E6V6öæG2—Ö’À¢“°¢6öçF7E¦ööÔÖæVæB†6&fäÖ&¶W"ÂÖöç7FW$Ö&¶W"“° ¢6öç7Bæ÷'F„Æ&VÂÒ7ftVÆVÖVçB‚'FW‡B"Â°¢6Æ73¢&6öçF7B×¦ööÒÖÆ&VÂ"À¢ƒ¢"À¢“¢’À¢Ò“°¢æ÷'F„Æ&VÂçFW‡D6öçFVçBÒ.(iâ#°¢6öç7Bfö7W4Æ&VÂÒ7ftVÆVÖVçB‚'FW‡B"Â°¢6Æ73¢&6öçF7B×¦ööÒÖÆ&VÂ"À¢ƒ¢"À¢“¢4ôåD5Eõ¤ôôÕô„T”t…BÒ"À¢Ò“°¢fö7W4Æ&VÂçFW‡D6öçFVçBĞ¢6æ6†÷Bæfö7W4¶–æBÓÓÒ&6öçF7B"ò$dô5U3¢4ôåD5B"¢$dô5U3¢E$ôÂ#°¢6öçF7E¦ööÔÖæVæB†æ÷'F„Æ&VÂÂfö7W4Æ&VÂ“° ¢6öç7B7F–ÄÆ&VÂÒf÷&ÖDçVÖ&W"‡6æ6†÷Bç7F–Å&F—W4ÖWFW'2òóÂ“°¢6öç7BF–ÖTÆ&VÂĞ¢6æ6†÷BçF–ÖU&F—W56V6öæG2ãÒ5óc ¢òG¶f÷&ÖDçVÖ&W"‡6æ6†÷BçF–ÖU&F—W56V6öæG2ò5ócÂ—Òv ¢¢G¶f÷&ÖDçVÖ&W"‡6æ6†÷BçF–ÖU&F—W56V6öæG2òcÂ—ÒÍÖ°¢6öçF7E¦ööÔ6F–öâçFW‡D6öçFVçBÒG°¢6æ6†÷Bæfö7W4¶–æBÓÓÒ&6öçF7B"ò-	ı½İí-½’­íİ-­""¢-
+-]­=’ı-=½Â ¢Ò+rG¶f÷&ÖDVÆ6VB‡6æ6†÷Bæfö7W4E6V6öæG2—Ò+rıí-İ--â+G·7F–ÄÆ&VÇÒ­Â+r-]Íò+G·F–ÖTÆ&VÇÒ‚G¶f÷&ÖDVÆ6VB‡6æ6†÷Bçv–æF÷u7F'E6V6öæG2—Ò(	BG¶f÷&ÖDVÆ6VB‡6æ6†÷Bçv–æF÷tVæE6V6öæG2—Ò’æ°¢6öçF7E¦ööÔÖç6WDGG&–'WFR€¢&&–ÖÆ&VÂ"À¢	½í­½Íİò­-G·6æ6†÷Bæfö7W4¶–æBÓÓÒ&6öçF7B"ò-ı½İí-í=â­íİ-­-"¢--]­=]=âı-=½ò'Ò"G¶f÷&ÖDVÆ6VB‡6æ6†÷Bæfö7W4E6V6öæG2—ÖÀ¢“°§Ğ ¢ò¢ ¢¢&Òµ&WGW&åG—SÇG—Vöb7&VFTÖöç7FW$6öçF7E6æ6†÷CâÂçVÆÇÒ6æ6†÷@¢¢&Òµ&WGW&åG—SÇG—Vöb7&VFTW‡VF—F–öä÷WF6öÖU6æ6†÷CçÒ÷WF6öÖP¢¢ğ¦gVæ7F–öâ&VæFW$Ööç7FW$6öçF7B‡6æ6†÷BÂ÷WF6öÖR’°¢6öç7B6öçF7BÒ6æ6†÷Còæ6öçF7BóòçVÆÃ°¢–b‚6öçF7B’°¢6öçF7EæVÂæFF6WBç7FFRÒ&6ÆV"#°¢6öçF7E7FFRçFW‡D6öçFVçBÒ-
+}-½’Í="#°¢6öçF7EF—FÆRçFW‡D6öçFVçBÒ-	­íİ-­-İÍ=-Rİ]"#°¢6öçF7DFWF–ÂçFW‡D6öçFVçBĞ¢%4”ÒÓ‚İRİ²½m]İòı-=½Â-İ=-‚M=-}ÍíM]--òâ#°¢6öçF7EF–ÖRçFW‡D6öçFVçBÒ.(	B#°¢6öçF7DÖöç7FW"çFW‡D6öçFVçBÒ.(	B#°¢6öçF7E÷6—F–öâçFW‡D6öçFVçBÒ.(	B#°¢6öçF7DF—7Fæ6RçFW‡D6öçFVçBÒ.(	B#°¢6öçF7EÆ–W%÷vW"çFW‡D6öçFVçBÒ##°¢6öçF7E÷vW$6ö×&—6öâçFW‡D6öçFVçBÒ.(	B#°¢6öçF7DÖöç7FW%7VVBçFW‡D6öçFVçBÒ.(	B#°¢6öçF7DfÆVU&W7VÇBçFW‡D6öçFVçBÒ.(	B#°¢&WGW&ã°¢Ğ ¢6öç7B&W6öÇWF–öâÒ÷WF6öÖRæÖöç7FW$6öçF7E&W6öÇWF–öã°¢6öç7B–FÆT6öçF7BÒ6öçF7Bæ6&fä7F—f—G’ÓÓÒ&–FÆR#°¢6öçF7EF–ÖRçFW‡D6öçFVçBÒf÷&ÖDVÆ6VB†6öçF7BæE6V6öæG2“°¢6öçF7DÖöç7FW"çFW‡D6öçFVçBÒG¶6öçF7BæÖöç7FW$–GÒ+ru"G¶6öçF7BæÖöç7FW%÷vW'Ö°¢6öçF7E÷6—F–öâçFW‡D6öçFVçBĞ¢6öçF7Bç6VvÖVçD–æFW‚ÓÓÒçVÆÀ¢ò
+Mİ‚+rG¶f÷&ÖDçVÖ&W"†6öçF7Bç&÷WFTF—7Fæ6T¶–ÆöÖWFW'2Â—Ò­ÂG¶–FÆT6öçF7Bò"+r5Dõ"¢"'Ö ¢¢
+]=Í]İ"G¶6öçF7Bç6VvÖVçD–æFW‚²Ò+rG¶f÷&ÖDçVÖ&W"†6öçF7Bç&÷WFTF—7Fæ6T¶–ÆöÖWFW'2Â—Ò­ÂG¶–FÆT6öçF7Bò"+r5Dõ"¢"'Ö°¢6öçF7DF—7Fæ6RçFW‡D6öçFVçBÒG¶f÷&ÖDçVÖ&W"†6öçF7Bç6W&F–öäÖWFW'2Â—ÒÂòG¶f÷&ÖDçVÖ&W"†6öçF7Bæ–çFW&7F–öå&F—W4ÖWFW'2Â—ÒÆ°¢6öçF7EÆ–W%÷vW"çFW‡D6öçFVçBÒ7G&–ær‡&W6öÇWF–öãòçÆ–W%÷vW"óò“°¢6öç7BÆ–W%÷vW"Ò&W6öÇWF–öãòçÆ–W%÷vW"óò°¢6öç7B6ö×&—6öâÒÆ–W%÷vW"â6öçF7BæÖöç7FW%÷vW ¢ò#â ¢¢Æ–W%÷vW"Â6öçF7BæÖöç7FW%÷vW ¢ò#Â ¢¢#Ò#°¢6öçF7E÷vW$6ö×&—6öâçFW‡D6öçFVçBÒG·Æ–W%÷vW'ÒG¶6ö×&—6öçÒG¶6öçF7BæÖöç7FW%÷vW'Ö°¢6öçF7DÖöç7FW%7VVBçFW‡D6öçFVçBÒG¶f÷&ÖDçVÖ&W"†6öçF7BæÖöç7FW%7VVDÖWFW'5W%6V6öæB¢2ãbÂ—Ò­Âıv°¢6öçF7DfÆVU&W7VÇBçFW‡D6öçFVçBÒ&W6öÇWF–öà¢ò-	İRıí½İ-ò ¢¢&W6öÇWF–öâç7FGW2ÓÓÒ&Ööç7FW"ÖFVfVFVB ¢ò-	İR-]=]-ò ¢¢&W6öÇWF–öâç7FGW2ÓÓÒ&fÆVR×7V66VVFVB ¢ò-
+=ı]R ¢¢&W6öÇWF–öâç7FGW2ÓÓÒ&fÆVRÖf–ÆVB ¢ò-	ıí-² ¢¢&W6öÇWF–öâç7FGW2ÓÓÒ&fÆVR×&WV—&VB ¢ò-	ímM]"Mİİ½R ¢¢-	İR-½Ò#° ¢–b‚÷WF6öÖRæÖöç7FW$6öçF7BÇÂ&W6öÇWF–öâ’°¢6öçF7EæVÂæFF6WBç7FFRÒ&'—76VB#°¢6öçF7E7FFRçFW‡D6öçFVçBÒ-	İRıí½İ-ò#°¢6öçF7EF—FÆRçFW‡D6öçFVçBÒ-	ı]]]-"]-Â"ı½İRÂİâİR"ıí½İ]İ‚#°¢6öçF7DFWF–ÂçFW‡D6öçFVçBĞ¢÷WF6öÖRçÆææVBç7FGW2ÓÓÒ&f–ÆVB ¢ò-	­-Òıí=İ]"í"-í]İòİÍR}-İİí=â­íİ-­-â ¢¢÷WF6öÖRçÆææVBç7FGW2ÓÓÒ'W6VB ¢ò÷WF6öÖRæ–çFW''WF–öä6W6RÓÓÒ'&÷WFRÖVæB ¢ò-	Í="}­íİ}-ò-İR=ííMİÍR}-İİí=â­íİ-­-â ¢¢-	Mí­-İ5Dõí-İí-"­-ÒİÍR}-İİí=â­íİ-­-â ¢¢-
+½m]İRı]íM-òİ=İm2ı½-ò‚İRı]½-]"Í="â#°¢&WGW&ã°¢Ğ ¢6öç7Bö67W'&VBÒ6æ6†÷Còç7FGW2ÓÓÒ&6öçF7B#°¢–b‡&W6öÇWF–öâç7FGW2ÓÓÒ&Ööç7FW"ÖFVfVFVB"’°¢6öçF7EæVÂæFF6WBç7FFRÒö67W'&VBò'f–7F÷'’"¢&f÷&V67B#°¢6öçF7E7FFRçFW‡D6öçFVçBÒö67W'&VBò-	ıí]M"¢-	ıí]M}-İ#°¢6öçF7EF—FÆRçFW‡D6öçFVçBÒö67W'&V@¢ò-
+½½’ı-=½Â=İ}-ím]Ò ¢¢-	­-Ò½Íİ]Rı-=½ò#°¢6öçF7DFWF–ÂçFW‡D6öçFVçBĞ¢ö67W'&V@¢ò–FÆT6öçF7@¢ò%Æ–W"÷vW"-½S¢Ííİ-ıí=Â­-ÒıíMí½m]"}ı½İí-İİ=â-íıİ­2â ¢¢%Æ–W"÷vW"-½S¢Ííİ-ıí=Â­-ÒıíMí½m²]íMİ½’Í="â ¢¢–FÆT6öçF7@¢ò-	ı-=½Â-íM""M=İ]ıíM-mİí=â­-İ²ıí]MİRı]-"í--=íò-íıİ­2â ¢¢-	İ=İmRSÂ÷vW"-İı-ò--íÍ-}]­ƒ²í-İí-­‚Í=-İR=M]"â#°¢&WGW&ã°¢Ğ ¢–b‡&W6öÇWF–öâç7FGW2ÓÓÒ&fÆVR×&WV—&VB"’°¢6öçF7EæVÂæFF6WBç7FFRÒö67W'&VBò&fÆVR"¢&FævW"#°¢6öçF7E7FFRçFW‡D6öçFVçBÒö67W'&VBò-	í-]íB"¢-	íıİ½’­íİ-­"#°¢6öçF7EF—FÆRçFW‡D6öçFVçBÒö67W'&V@¢ò-	­-Ò-½²dÄTR ¢¢-	ı-=½Â½Íİ]R­-İ#°¢6öçF7DFWF–ÂçFW‡D6öçFVçBÒö67W'&V@¢ò-	Í="ıí--½]Òİı=}3¢M½ò}]]İòdÄTRİRı]]Mİ²ı-İ½R­íí-‚â ¢¢-	İ=İmR­íİ-­-dÄTRıí-]=]"ı-İ½R­íí-]’­-İ‚ı-=½òâ#°¢&WGW&ã°¢Ğ ¢–b‡&W6öÇWF–öâç7FGW2ÓÓÒ&fÆVR×7V66VVFVB"’°¢6öç7BfÆVRÒ&W6öÇWF–öâæfÆVU&W6öÇWF–öã°¢6öçF7EæVÂæFF6WBç7FFRÒö67W'&VBò'f–7F÷'’"¢&f÷&V67B#°¢6öçF7E7FFRçFW‡D6öçFVçBÒö67W'&VBò-	í-]íB=ı]]Ò"¢-	í-]íB}-Ò#°¢6öçF7EF—FÆRçFW‡D6öçFVçBÒö67W'&V@¢ò-	­-Ò}í-²M-İmâ ¢¢-	­-Ò½-]Rı-=½ò#°¢6öçF7DFWF–ÂçFW‡D6öçFVçBÒfÆVP¢òG¶f÷&ÖDçVÖ&W"†fÆVRæ6&få7VVDÖWFW'5W%6V6öæB¢2ãbÂ—Ò­Âırıí-"G¶f÷&ÖDçVÖ&W"†fÆVRæÖöç7FW%7VVDÖWFW'5W%6V6öæB¢2ãbÂ—Ò­Âıs¢]}íıİòM-İmòG¶f÷&ÖDçVÖ&W"†fÆVRç6fU6W&F–öäÖWFW'2Â—ÒÂ=M]"Mí-=İ=-}G¶f÷&ÖDGW&F–öâ†fÆVRç6V6öæG5Fõ6fU6W&F–öâóò—Ó²G¶–FÆT6öçF7Bò-í--í¢-íıİ­‚í-Í]İı]-ò‚]íMİ½’Í="-í}íİí-½ı]-ò"¢-]íMİ½’Í="ıíMí½m]-ò'Òæ ¢¢$dÄTR}]Ò=ı]İã²]íMİ½’Í="ıíMí½m]-òâ#°¢&WGW&ã°¢Ğ ¢–b‡&W6öÇWF–öâç7FGW2ÓÓÒ&fÆVRÖf–ÆVB"’°¢6öç7BfÆVRÒ&W6öÇWF–öâæfÆVU&W6öÇWF–öã°¢6öçF7EæVÂæFF6WBç7FFRÒö67W'&VBò&FVfVB"¢&FævW"#°¢6öçF7E7FFRçFW‡D6öçFVçBÒö67W'&VBò-	ıím]İR"¢-	ıí]2İ]-í}Íím]Ò#°¢6öçF7EF—FÆRçFW‡D6öçFVçBÒö67W'&V@¢ò-	ı-=½Âİ-2­-Ò ¢¢-	­-ÒİR½-]Rı-=½ò#°¢6öçF7DFWF–ÂçFW‡D6öçFVçBÒfÆVP¢òG¶f÷&ÖDçVÖ&W"†fÆVRæ6&få7VVDÖWFW'5W%6V6öæB¢2ãbÂ—Ò­Âırıí-"G¶f÷&ÖDçVÖ&W"†fÆVRæÖöç7FW%7VVDÖWFW'5W%6V6öæB¢2ãbÂ—Ò­Âıs¢M-İmòİR-"Âıíİ-íÍ2dÄTR}-]"İ­ı]Mmâİ=İmR­íİ-­-æ ¢¢$dÄTR}-]-òıím]İ]Âİ=İmR­íİ-­-â#°¢&WGW&ã°¢Ğ ¢6öçF7EæVÂæFF6WBç7FFRÒö67W'&VBò&FVfVB"¢&FævW"#°¢6öçF7E7FFRçFW‡D6öçFVçBÒö67W'&VBò-	ıím]İR"¢-
+Í]-]½Íİ½’¢#°¢6öçF7EF—FÆRçFW‡D6öçFVçBÒö67W'&V@¢ò-	­-Òıİı²ıí=½İ½’í’ ¢¢$44UEôd”{×«h‘éì¶»§q«^t ˆ€ˆ¤°(€€€ô¤°(€€€ÍÙ±•µ•¹Ğ ‰Á½±å±¥¹”ˆ°ì(€€€€€±…ÍÌè€‰ÉÕµ½Èµ±½…°µÉ½ÕÑ”ˆ°(€€€€€Á½¥¹ÑÌèµ…À¹É½ÕÑ•A½¥¹ÑÌ¹µ…À ¡Á½¥¹Ğ¤€ôø€‘íÁ½¥¹Ğ¹áô°‘íÁ½¥¹Ğ¹åõ€¤¹©½¥¸ ˆ€ˆ¤°(€€€ô¤°(€€¤ì((€½¹ÍĞµ¥¹¥µÕµ1…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€±…ÍÌè€‰ÉÕµ½ÈµÉ…¹”µ±…‰•°ˆ°(€€€àèµ…À¹½É¥¥¹A½¥¹Ğ¹à€¬µ…À¹µ¥¹¥µÕµI…¹•A¥á•±Ì€¬€Ì°(€€€äèµ…À¹½É¥¥¹A½¥¹Ğ¹ä€´€Ì°(€ô¤ì(€µ¥¹¥µÕµ1…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í™½Éµ…Ñ9Õµ‰•È¡Í•…É ¹ÉÕµ½È¹‘¥ÍÑ…¹•I…¹”¹µ¥¹¥µÕµ5•Ñ•ÉÌ€¼€Å|ÀÀÀ°€À¥ôƒBëBñ€ì(€½¹ÍĞµ…á¥µÕµ1…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€±…ÍÌè€‰ÉÕµ½ÈµÉ…¹”µ±…‰•°ˆ°(€€€àèµ…À¹½É¥¥¹A½¥¹Ğ¹à€¬µ…À¹µ…á¥µÕµI…¹•A¥á•±Ì€¬€Ì°(€€€äèµ…À¹½É¥¥¹A½¥¹Ğ¹ä€´€Ì°(€ô¤ì(€µ…á¥µÕµ1…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í™½Éµ…Ñ9Õµ‰•È¡Í•…É ¹ÉÕµ½È¹‘¥ÍÑ…¹•I…¹”¹µ…á¥µÕµ5•Ñ•ÉÌ€¼€Å|ÀÀÀ°€À¥ôƒBëBñ€ì((€½¹ÍĞ±Õ”€ôÍÙ±•µ•¹Ğ ‰¥É±”ˆ°ì(€€€±…ÍÌè€‰ÉÕµ½Èµ±Õ”µµ…É­•Èˆ°(€€€àèµ…À¹±Õ•A½¥¹Ğ¹à°(€€€äèµ…À¹±Õ•A½¥¹Ğ¹ä°(€€€Èè€ÄÀ°(€ô¤ì(€½¹ÍĞ±Õ•1…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€±…ÍÌè€‰ÉÕµ½Èµµ…Àµ±…‰•°ˆ°(€€€àèµ…À¹±Õ•A½¥¹Ğ¹à°(€€€äèµ…À¹±Õ•A½¥¹Ğ¹ä€¬€Ì°(€€€€‰Ñ•áĞµ…¹¡½Èˆè€‰µ¥‘‘±”ˆ°(€ô¤ì(€±Õ•1…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô€ˆüˆì((€½¹ÍĞÑ…É•Ğ€ôÍÙ±•µ•¹Ğ ‰Á½±å½¸ˆ°ì(€€€±…ÍÌè€‰ÉÕµ½ÈµÑ…É•Ğµµ…É­•Èˆ°(€€€Á½¥¹ÑÌè€‘íµ…À¹Ñ…É•ÑA½¥¹Ğ¹áô°‘íµ…À¹Ñ…É•ÑA½¥¹Ğ¹ä€´€İô€‘íµ…À¹Ñ…É•ÑA½¥¹Ğ¹à€¬€İô°‘íµ…À¹Ñ…É•ÑA½¥¹Ğ¹åô€‘íµ…À¹Ñ…É•ÑA½¥¹Ğ¹áô°‘íµ…À¹Ñ…É•ÑA½¥¹Ğ¹ä€¬€İô€‘íµ…À¹Ñ…É•ÑA½¥¹Ğ¹à€´€İô°‘íµ…À¹Ñ…É•ÑA½¥¹Ğ¹åõ€°(€ô¤ì(€Ñ…É•Ğ¹…ÁÁ•¹ (€€€ÍÙQ¥Ñ±” (€€€€€Í•…É ¹Ñ…É•Ñ-¹½İ±•‘”€ôôô€‰­¹½İ¸ˆ(€€€€€€€€ü€‹BcBßBËB×FFB÷BÃF<ƒFB×BïF0ƒBãBÜƒFB×FFBãBûB÷B÷BûBÏBøƒBÛFFB÷BÃBïBÀˆ(€€€€€€€€è€‹B‹BûFB÷BÃF<ƒFB×BïF0ƒŠPƒFBûBïF3BëBøXˆ°(€€€€¤°(€€¤ì((€½¹ÍĞ½É¥¥¸€ôÍÙ±•µ•¹Ğ ‰¥É±”ˆ°ì(€€€±…ÍÌè€‰ÉÕµ½Èµ½É¥¥¸µµ…É­•Èˆ°(€€€àèµ…À¹½É¥¥¹A½¥¹Ğ¹à°(€€€äèµ…À¹½É¥¥¹A½¥¹Ğ¹ä°(€€€Èè€Ø°(€ô¤ì(€½¹ÍĞ½É¥¥¹1…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€±…ÍÌè€‰ÉÕµ½Èµµ…Àµ±…‰•°ˆ°(€€€àèµ…À¹½É¥¥¹A½¥¹Ğ¹à€¬€ä°(€€€äèµ…À¹½É¥¥¹A½¥¹Ğ¹ä€¬€Ì°(€ô¤ì(€½É¥¥¹1…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ôÍ•…É ¹½É¥¥¹¥Ñä¹¹…µ”ì((€½¹ÍĞ…É…Ù…¸€ôÍÙ±•µ•¹Ğ ‰¥É±”ˆ°ì(€€€±…ÍÌè€‰ÉÕµ½Èµ…É…Ù…¸µµ…É­•Èˆ°(€€€àèµ…À¹…É…Ù…¹A½¥¹Ğ¹à°(€€€äèµ…À¹…É…Ù…¹A½¥¹Ğ¹ä°(€€€Èè€Ü°(€ô¤ì(€…É…Ù…¸¹…ÁÁ•¹¡ÍÙQ¥Ñ±” ‹BkBÃFBÃBËBÃBôˆ¤¤ì((€ÉÕµ½É5…À¹…ÁÁ•¹ (€€€µ¥¹¥µÕµ1…‰•°°(€€€µ…á¥µÕµ1…‰•°°(€€€±Õ”°(€€€±Õ•1…‰•°°(€€€Ñ…É•Ğ°(€€€½É¥¥¸°(€€€½É¥¥¹1…‰•°°(€€€…É…Ù…¸°(€€¤ì)ô((¼¨¨(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•…É…Ù…¹MÑ…ÑÕÍM¹…ÁÍ¡½ĞùôÍÑ…ÑÕÌ(€¨¼)™Õ¹Ñ¥½¸É•¹‘•É…É…Ù…¹MÑ…ÑÕÌ¡ÍÑ…ÑÕÌ¤ì(€½¹ÍĞ½ÕÑ½µ•…¥±•€ôÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹ÍÑ…ÑÕÌ€ôôô€‰™…¥±•ˆì(€½¹ÍĞ½ÕÑ½µ•½µÁ±•Ñ•€ôÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹ÍÑ…ÑÕÌ€ôôô€‰½µÁ±•Ñ•ˆì(€½¹ÍĞÁ…ÕÍ•€ôÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹ÍÑ…ÑÕÌ€ôôô€‰Á…ÕÍ•ˆì(€½¹ÍĞİ…¥Ñ¥¹ÑMÑ½À€ôÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹Á¡…Í”€ôôô€‰¥‘±”µ…ĞµÍÑ½Àˆì(€½¹ÍĞ¥‘±•…¥±ÕÉ”€ô(€€€½ÕÑ½µ•…¥±•€˜˜ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹™…¥±ÕÉ•Ñ¥Ù¥Ñä€ôôô€‰¥‘±”ˆì(€½¹ÍĞµ½¹ÍÑ•É•™•…Ğ€ô(€€€½ÕÑ½µ•…¥±•€˜˜ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹™…¥±ÕÉ•I•…Í½¸€ôôô€‰µ½¹ÍÑ•Èˆì(€½¹ÍĞ™±••…¥±•€ô(€€€µ½¹ÍÑ•É•™•…Ğ€˜˜(€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰™±•”µ™…¥±•ˆì(€½¹ÍĞµ½¹ÍÑ•É½¹Ñ…ÑA…ÕÍ”€ô(€€€Á…ÕÍ•€˜˜ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹¥¹Ñ•ÉÉÕÁÑ¥½¹…ÕÍ”€ôôô€‰µ½¹ÍÑ•Èµ½¹Ñ…Ğˆì(€½¹ÍĞÉ½ÕÑ•¹‘•€ô(€€€Á…ÕÍ•€˜˜ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹¥¹Ñ•ÉÉÕÁÑ¥½¹…ÕÍ”€ôôô€‰É½ÕÑ”µ•¹ˆì(€½¹ÍĞµ½¹ÍÑ•ÉY¥Ñ½Éå=ÕÉÉ•€ô(€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰µ½¹ÍÑ•Èµ‘•™•…Ñ•ˆ€˜˜(€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…Ğ€„ôô¹Õ±°€˜˜(€€€ÍÑ…ÑÕÌ¹É½ÕÑ”¹•Ù…±Õ…Ñ•‘ÑM•½¹‘Ì€¬€Å”´ä€øô(€€€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…Ğ¹•áÁ•‘¥Ñ¥½¹±…ÁÍ•‘M•½¹‘Ìì(€½¹ÍĞ™±••MÕ••‘•‘=ÕÉÉ•€ô(€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰™±•”µÍÕ••‘•ˆ€˜˜(€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…Ğ€„ôô¹Õ±°€˜˜(€€€ÍÑ…ÑÕÌ¹É½ÕÑ”¹•Ù…±Õ…Ñ•‘ÑM•½¹‘Ì€¬€Å”´ä€øô(€€€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…Ğ¹•áÁ•‘¥Ñ¥½¹±…ÁÍ•‘M•½¹‘Ìì(€½¹ÍĞ‘½ÑÉ¥¹•I•ÍÕµ•€ô(€€€ÍÑ…ÑÕÌ¹‘½ÑÉ¥¹”ü¹ÍÑ…ÑÕÌ€ôôô€‰É•ÍÕµ•µ…¹µ½¹Ñ¥¹Õ¥¹œˆ€˜˜(€€€€…İ…¥Ñ¥¹ÑMÑ½À€˜˜(€€€€…¥‘±•…¥±ÕÉ”ì(€½¹ÍĞÍÑ½Á%¹Ñ•ÉÉÕÁÑ•‘	å½¹Ñ…Ğ€ô	½½±•…¸ (€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹ÍÑ½Á%¹Ñ•ÉÉÕÁÑ•‘	å½¹Ñ…Ğ°(€€¤ì(€½¹ÍĞ‘½ÑÉ¥¹•½¹Ñ¥¹Õ•Ì€ô(€€€ÍÑ…ÑÕÌ¹‘½ÑÉ¥¹”ü¹ÍÑ…ÑÕÌ€ôôô€‰µ…É­•µ…¹µ½¹Ñ¥¹Õ¥¹œˆñğ(€€€ÍÑ…ÑÕÌ¹‘½ÑÉ¥¹”ü¹ÍÑ…ÑÕÌ€ôôô€‰­¹½İ¸µ…¹µ½¹Ñ¥¹Õ¥¹œˆì(€½¹ÍĞ­¹½İ¹Q…É•Ñ½¹Ñ¥¹Õ•Ì€ô(€€€ÍÑ…ÑÕÌ¹‘½ÑÉ¥¹”ü¹ÍÑ…ÑÕÌ€ôôô€‰­¹½İ¸µ…¹µ½¹Ñ¥¹Õ¥¹œˆì(€½¹ÍĞÁ…¹•±MÑ…Ñ”€ô½ÕÑ½µ•…¥±•(€€€€ü€‰‘•Á±•Ñ•ˆ(€€€€è½ÕÑ½µ•½µÁ±•Ñ•(€€€€€€ü€‰½µÁ±•Ñ•ˆ(€€€€èÁ…ÕÍ•(€€€€€€ü€‰ÍÑ½ÁÁ•ˆ(€€€€èİ…¥Ñ¥¹ÑMÑ½À(€€€€€€ü€‰ÍÑ½ÁÁ•ˆ(€€€€èÍÑ…ÑÕÌ¹™½É•…ÍĞ¹…¹¥¹¥Í (€€€€€€ü€‰Í…™”ˆ(€€€€€€è€‰É¥Í¬ˆì(€…É…Ù…¹A…¹•°¹‘…Ñ…Í•Ğ¹ÍÑ…Ñ”€ôÁ…¹•±MÑ…Ñ”ì(€…É…Ù…¹MÑ…Ñ•1…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô(€€€½ÕÑ½µ•…¥±•(€€€€€€üµ½¹ÍÑ•É•™•…Ğ(€€€€€€€€ü€‹BkBÃFBÃBËBÃBôƒFB÷BãFFBûBÛB×Bôˆ(€€€€€€€€è€‹B·BëFBÿB×BÓBãFBãF<ƒBÿBûFB×FF?B÷BÀˆ(€€€€€€è½ÕÑ½µ•½µÁ±•Ñ•(€€€€€€€€üƒBFBãBÇF/BìƒBÈ€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹‘•ÍÑ¥¹…Ñ¥½¹¥Ñäü¹¹…µ”€üü€‹BÏBûFBûBĞ‰õ€(€€€€€€èÁ…ÕÍ•(€€€€€€€€üÉ½ÕÑ•¹‘•(€€€€€€€€€€ü€‹BsBÃFF#FFFƒBËB÷BÔƒBÏBûFBûBÓBÀˆ(€€€€€€€€€€èµ½¹ÍÑ•É½¹Ñ…ÑA…ÕÍ”(€€€€€€€€€€ü€‹BkBûB÷FBÃBëFƒFƒBóBûB÷FFFBûBğˆ(€€€€€€€€€€è€‹B{FFBÃB÷BûBËBïB×BôƒFƒFB×BïBàˆ(€€€€€€€€èİ…¥Ñ¥¹ÑMÑ½À(€€€€€€€€€€ü€‹B‡FBûF?B÷BëBÀƒFƒB÷BÃBçBÓB×B÷B÷BûBäƒFB×BïBàˆ(€€€€€€€€è‘½ÑÉ¥¹•I•ÍÕµ•(€€€€€€€€€€üÍÑ½Á%¹Ñ•ÉÉÕÁÑ•‘	å½¹Ñ…Ğ(€€€€€€€€€€€€ü€‰1ƒBÿFB×FBËBÃBìƒFFBûF?B÷BëFƒ
+ÜƒBÈƒBÿFFBàˆ(€€€€€€€€€€€€è€‹B›B×BïF0ƒBûFBóB×FB×B÷BÀƒ
+ÜƒBóBÃFF#FFFƒBËBûBßBûBÇB÷BûBËBïFGBôˆ(€€€€€€€€è‘½ÑÉ¥¹•½¹Ñ¥¹Õ•Ì(€€€€€€€€€€ü­¹½İ¹Q…É•Ñ½¹Ñ¥¹Õ•Ì(€€€€€€€€€€€€ü€‹BcBßBËB×FFB÷BÃF<ƒFB×BïF0ƒBÿBûBÓFBËB×FBÛBÓB×B÷BÀƒ
+ÜƒBÈƒBÿFFBàˆ(€€€€€€€€€€€€è€‹B›B×BïF0ƒBûFBóB×FB×B÷BÀƒ
+ÜƒBÈƒBÿFFBàˆ(€€€€€€€€èµ½¹ÍÑ•ÉY¥Ñ½Éå=ÕÉÉ•(€€€€€€€€€€ü€‹BBÃFFFBïF0ƒBÿBûBÇB×BÛBÓFGBôƒ
+ÜƒBÈƒBÿFFBàˆ(€€€€€€€€è™±••MÕ••‘•‘=ÕÉÉ•(€€€€€€€€€€ü€‹B{FFBûBĞƒFFBÿB×F#B×Bôƒ
+ÜƒBÈƒBÿFFBàˆ(€€€€€€èÁ…¹•±MÑ…Ñ”€ôôô€‰É¥Í¬ˆ(€€€€€€€€ü€‹BƒBãFBèƒBãFFBûF'B×B÷BãF<ˆ(€€€€€€€€è€‹BOBûFBûBÈƒBèƒBÿFFBàˆì((€…É…Ù…¹I½ÕÑ•MÑ…ÑÕÌ¹Ñ•áÑ½¹Ñ•¹Ğ€ô(€€€½ÕÑ½µ•…¥±•(€€€€€€ü€‘íµ½¹ÍÑ•É•™•…Ğ€ü€‹BƒBÃBßBÇBãFˆ€è€‹BBûBÏBãBÄ‰ôƒ
+ÜƒFB×BÏBóB×B÷F€‘ì¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹Í•µ•¹Ñ%¹‘•à€üü€À¤€¬€Åô¼Ñ€(€€€€€€è½ÕÑ½µ•½µÁ±•Ñ•(€€€€€€€€üƒBFBãBÇF/Bìƒ
+Ü€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹‘•ÍÑ¥¹…Ñ¥½¹¥Ñäü¹¹…µ”€üü€‹BÏBûFBûBĞ‰õ€(€€€€€€èÁ…ÕÍ•(€€€€€€ü€‘íÉ½ÕÑ•¹‘•€ü€‹BkBûB÷B×FƒBóBÃFF#FFFBÀˆ€èµ½¹ÍÑ•É½¹Ñ…ÑA…ÕÍ”€ü€‹BkBûB÷FBÃBëFˆ€è€‹B‡FBûF?B÷BëBÀ‰ôƒ
+ÜƒFB×BÏBóB×B÷F€‘ì¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹Í•µ•¹Ñ%¹‘•à€üü€À¤€¬€Åô¼Ñ€(€€€€€€èİ…¥Ñ¥¹ÑMÑ½À(€€€€€€€€ü%‘±”·FFBûF?B÷BëBÀƒ
+ÜƒFB×BÏBóB×B÷F€‘ì¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹Í•µ•¹Ñ%¹‘•à€üü€À¤€¬€Åô¼Ñ€(€€€€€€èÍÑ…ÑÕÌ¹É½ÕÑ”¹ÍÑ…ÑÕÌ€ôôô€‰…ÉÉ¥Ù•ˆ(€€€€€€ü€‹BFBãBÇF/Bìƒ
+ÜƒBóBÃFF#FFFƒBßBÃBËB×FF#FGBôˆ(€€€€€€èƒBHƒBÿFFBàƒ
+ÜƒFB×BÏBóB×B÷F€‘ì¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹Í•µ•¹Ñ%¹‘•à€üü€À¤€¬€Åô¼Ñ€ì(€…É…Ù…¹¥ÍÑ…¹”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í™½Éµ…Ñ9Õµ‰•È¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹ÑÉ…Ù•±•‘¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ°€Ä¥ô€¼€‘í™½Éµ…Ñ9Õµ‰•È¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹ÑÉ…Ù•±•‘¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ€¬ÍÑ…ÑÕÌ¹É½ÕÑ”¹É•µ…¥¹¥¹¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ°€Ä¥ôƒBëBñ€ì(€É½ÕÑ•AÉ½É•ÍÌ¹Ù…±Õ”€ôÍÑ…ÑÕÌ¹É½ÕÑ”¹ÁÉ½É•ÍÌì(€É½ÕÑ•AÉ½É•ÍÌ¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í5…Ñ ¹É½Õ¹¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹ÁÉ½É•ÍÌ€¨€ÄÀÀ¥ô•€ì(€É½ÕÑ•AÉ½É•ÍÍ1…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô½ÕÑ½µ•…¥±•(€€€€ü€‘í5…Ñ ¹É½Õ¹¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹ÁÉ½É•ÍÌ€¨€ÄÀÀ¥ô”ƒ
+ÜƒBOBcBGBWBoB°€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹•¹‘•‘ÑM•½¹‘Ì€üü€À¥õ€(€€€€è½ÕÑ½µ•½µÁ±•Ñ•(€€€€€€ü€ÄÀÀ”ƒ
+ÜƒBOB{BƒB{BP€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹•¹‘•‘ÑM•½¹‘Ì€üü€À¥õ€(€€€€€€èÁ…ÕÍ•(€€€€€€€€ü€‘í5…Ñ ¹É½Õ¹¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹ÁÉ½É•ÍÌ€¨€ÄÀÀ¥ô”ƒ
+Ü€‘íÉ½ÕÑ•¹‘•€ü€‹BKBwBTƒBOB{BƒB{BSB@ˆ€èµ½¹ÍÑ•É½¹Ñ…ÑA…ÕÍ”€ü€‹BkB{BwB‹BCBkBˆˆ€è€‰MQ=@‰ô€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹•¹‘•‘ÑM•½¹‘Ì€üü€À¥õ€(€€€€€€€€èİ…¥Ñ¥¹ÑMÑ½À(€€€€€€€€€€ü€‘í5…Ñ ¹É½Õ¹¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹ÁÉ½É•ÍÌ€¨€ÄÀÀ¥ô”ƒ
+Ü%1€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹¥‘±•±…ÁÍ•‘M•½¹‘Ì¥ô€¼€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹¥‘±•ÕÉ…Ñ¥½¹M•½¹‘Ì€üü€À¥õ€(€€€€€€€€è€‘í5…Ñ ¹É½Õ¹¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹ÁÉ½É•ÍÌ€¨€ÄÀÀ¥ô”ƒ
+ÜQ€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡ÍÑ…ÑÕÌ¹É½ÕÑ”¹Ñ½Ñ…±ÕÉ…Ñ¥½¹M•½¹‘Ì¥õ€ì((€É•¹‘•ÉMÕÁÁ±ä (€€€™½½‘…É°(€€€™½½‘I•µ…¥¹¥¹œ°(€€€™½½‘AÉ½É•ÍÌ°(€€€™½½‘5•Ñ„°(€€€ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹™½½‘I•µ…¥¹¥¹œ°(€€€ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹¥¹¥Ñ¥…±½½‘U¹¥ÑÌ°(€€€ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹™½½‘É…Ñ¥½¸°(€€€ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹…Ñ¥Ù¥Ñä€ôôô€‰¥‘±”ˆ(€€€€€€üÍÕÁÁ±åM•ÑÑ¥¹Ì¹ÁÉ½™¥±”¹¥‘±”¹™½½‘U¹¥ÑÍA•É!½ÕÈ(€€€€€€èÍÕÁÁ±åM•ÑÑ¥¹Ì¹ÁÉ½™¥±”¹µ½Ù¥¹œ¹™½½‘U¹¥ÑÍA•É!½ÕÈ°(€€¤ì(€É•¹‘•ÉMÕÁÁ±ä (€€€İ…Ñ•É…É°(€€€İ…Ñ•ÉI•µ…¥¹¥¹œ°(€€€İ…Ñ•ÉAÉ½É•ÍÌ°(€€€İ…Ñ•É5•Ñ„°(€€€ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹İ…Ñ•ÉI•µ…¥¹¥¹œ°(€€€ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹¥¹¥Ñ¥…±]…Ñ•ÉU¹¥ÑÌ°(€€€ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹İ…Ñ•ÉÉ…Ñ¥½¸°(€€€ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹…Ñ¥Ù¥Ñä€ôôô€‰¥‘±”ˆ(€€€€€€üÍÕÁÁ±åM•ÑÑ¥¹Ì¹ÁÉ½™¥±”¹¥‘±”¹İ…Ñ•ÉU¹¥ÑÍA•É!½ÕÈ(€€€€€€èÍÕÁÁ±åM•ÑÑ¥¹Ì¹ÁÉ½™¥±”¹µ½Ù¥¹œ¹İ…Ñ•ÉU¹¥ÑÍA•É!½ÕÈ°(€€¤ì((€¥˜€¡½ÕÑ½µ•…¥±•¤ì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É•™•…Ğ(€€€€€€ü™±••…¥±•(€€€€€€€€ü€‹BBûBÇB×BÌƒB÷BÔƒFBÓBÃBïFF<ˆ(€€€€€€€€è€‹BkBÃFBÃBËBÃBôƒFB÷BãFFBûBÛB×Bôˆ(€€€€€€è€‹BkBÃFBÃBËBÃBôƒBÿBûBÏBãBÄˆì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É•™•…Ğ(€€€€€€ü™±••…¥±•(€€€€€€€€üƒB‡BëBûFBûFFF0ƒBûFFBûBÓBÀ€‘í™½Éµ…Ñ9Õµ‰•È ¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸ü¹…É…Ù…¹MÁ••‘5•Ñ•ÉÍA•ÉM•½¹€üü€À¤€¨€Ì¸Ø°€Ä¥ôƒBëBğ¿FƒB÷BÔƒBËF/F#BÔƒFBëBûFBûFFBàƒBÿBÃFFFBïF<€‘í™½Éµ…Ñ9Õµ‰•È ¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸ü¹µ½¹ÍÑ•ÉMÁ••‘5•Ñ•ÉÍA•ÉM•½¹€üü€À¤€¨€Ì¸Ø°€Ä¥ôƒBëBğ¿F¹€(€€€€€€€€èA±…å•ÈA]H€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹Á±…å•ÉA½İ•È€üü€‹ŠP‰ô€ğ5½¹ÍÑ•ÈA]H€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹µ½¹ÍÑ•ÉA½İ•È€üü€‹ŠP‰ôìAQ}%!PƒBßBÃBËB×FF#BãBìƒF7BëFBÿB×BÓBãFBãF8¹€(€€€€€€è€‘í™½Éµ…Ñ•Á±•Ñ¥½¹…ÕÍ”¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹™…¥±ÕÉ•…ÕÍ”€üü¹Õ±°¥ôƒBãFFB×FBÿBÃB÷F,€‘í¥‘±•…¥±ÕÉ”€ü€‹BËBøƒBËFB×BóF<ƒFFBûF?B÷BëBàˆ€è€‹BÈƒBÿFFBà‰ôƒB÷BÀ€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹•¹‘•‘ÑM•½¹‘Ì€üü€À¥ô¹€ì(€ô•±Í”¥˜€¡½ÕÑ½µ•½µÁ±•Ñ•¤ì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôƒBFBãBÇF/FBãBÔƒBÈ€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹‘•ÍÑ¥¹…Ñ¥½¹¥Ñäü¹¹…µ”€üü€‹BÏBûFBûBĞ‰õ€ì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôƒBHƒBÏBûFBûBÓBÔèƒB×BÓBÀ€‘í™½Éµ…Ñ9Õµ‰•È¡ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹™½½‘I•µ…¥¹¥¹œ°€Ä¥ôƒ
+ÜƒBËBûBÓBÀ€‘í™½Éµ…Ñ9Õµ‰•È¡ÍÑ…ÑÕÌ¹ÍÕÁÁ±¥•Ì¹İ…Ñ•ÉI•µ…¥¹¥¹œ°€Ä¥õ€ì(€ô•±Í”¥˜€¡Á…ÕÍ•¤ì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÉ½ÕÑ•¹‘•(€€€€€€ü€‹BOBûFBûBĞƒB÷BÔƒBÓBûFFBãBÏB÷FFˆ(€€€€€€èµ½¹ÍÑ•É½¹Ñ…ÑA…ÕÍ”(€€€€€€€€ü€‹BKF/BÇFBÃBô1ˆ(€€€€€€€€è€‹BsBÃFF#FFFƒBÿBûFFBÃBËBïB×BôƒB÷BÀƒBÿBÃFBßFˆì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôÉ½ÕÑ•¹‘•(€€€€€€üƒBoBãB÷BãF<ƒBóBÃFF#FFFBÀƒBßBÃBëBûB÷FBãBïBÃFF0ƒBËB÷BÔƒFBÃBÓBãFFBÀ€‘í™½Éµ…Ñ9Õµ‰•È¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹¥ÑåÉÉ¥Ù…±I…‘¥ÕÍ5•Ñ•ÉÌ€üü€À°€À¥ôƒBğƒBûF€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹‘•ÍÑ¥¹…Ñ¥½¹¥Ñäü¹¹…µ”€üü€‹BÏBûFBûBÓBÀ‰ô¹€(€€€€€€èµ½¹ÍÑ•É½¹Ñ…ÑA…ÕÍ”(€€€€€€€€ü€‹B‡BãBïF3B÷F/BäƒBÿBÃFFFBïF0ƒBûFFBÃB÷BûBËBãBìƒBóBÃFF#FFFèƒBÓBïF<1ƒB÷BÔƒBÿB×FB×BÓBÃB÷F,ƒF?BËB÷F/BÔƒFBëBûFBûFFBà¸ˆ(€€€€€€€€è€‹BkBÃFBÃBËBÃBôƒBÛBÓFGFƒFƒB÷BÃBçBÓB×B÷B÷BûBäƒFB×BïBàìƒF7FBøƒB÷BÔƒFBãB÷BÃBïF3B÷F/BäƒBãFFBûBĞ¸ˆì(€ô•±Í”¥˜€¡İ…¥Ñ¥¹ÑMÑ½À¤ì(€€€½¹ÍĞµ½¹ÍÑ•É]¥±±•™•…Ğ€ô(€€€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹™…¥±ÕÉ•I•…Í½¸€ôôô€‰µ½¹ÍÑ•Èˆì(€€€½¹ÍĞ™…Ñ…±MÕÁÁ±å	•™½É•I•ÍÕµ”€ô(€€€€€€…µ½¹ÍÑ•É]¥±±•™•…Ğ€˜˜(€€€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹Á±…¹¹•¹ÍÑ…ÑÕÌ€ôôô€‰™…¥±•ˆ€˜˜(€€€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”¹É•ÍÕµ•ÑM•½¹‘Ì€„ôô¹Õ±°€˜˜(€€€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”¹Á±…¹¹•¹…ÑM•½¹‘Ì€ğô(€€€€€€€ÍÑ…ÑÕÌ¹½ÕÑ½µ”¹É•ÍÕµ•ÑM•½¹‘Ì€¬€Å”´äì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É]¥±±•™•…Ğ(€€€€€€ü€‹BBÃFFFBïF0ƒBûBÿBÃFB÷B×BÔƒBëBÃFBÃBËBÃB÷BÀˆ(€€€€€€è™…Ñ…±MÕÁÁ±å	•™½É•I•ÍÕµ”(€€€€€€ü€‹B_BÃBÿBÃFBûBÈƒB÷BÔƒFBËBÃFBãFƒB÷BÀƒFFBûF?B÷BëFˆ(€€€€€€èÍÑ½Á%¹Ñ•ÉÉÕÁÑ•‘	å½¹Ñ…Ğ(€€€€€€€€ü€‹BBÃFFFBïF0ƒBÿFB×FBËFGFƒFFBûF?B÷BëFˆ(€€€€€€è€‹BcBÓFGFƒFFBûF?B÷BëBÀƒFƒFB×BïBàˆì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É]¥±±•™•…Ğ(€€€€€€üƒBkBûB÷FBÃBëFƒB÷BÀ€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹Á±…¹¹•¹…ÑM•½¹‘Ì€üü€À¥ôƒBßBÃBËB×FF#BãFƒF7BëFBÿB×BÓBãFBãF8ƒBËF/BÇFBÃB÷B÷BûBäƒBÓBûBëFFBãB÷BûBä¹€(€€€€€€è™…Ñ…±MÕÁÁ±å	•™½É•I•ÍÕµ”(€€€€€€ü€‘í™½Éµ…Ñ•Á±•Ñ¥½¹…ÕÍ”¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹Á±…¹¹•¹™…¥±ÕÉ•…ÕÍ”€üü¹Õ±°¥ôƒBßBÃBëBûB÷FBÃFFF<ƒB÷BÀ€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹Á±…¹¹•¹…ÑM•½¹‘Ì€üü€À¥ôƒBÓBøƒBËBûBßBûBÇB÷BûBËBïB×B÷BãF<¹€(€€€€€€èÍÑ½Á%¹Ñ•ÉÉÕÁÑ•‘	å½¹Ñ…Ğ(€€€€€€€€üƒBFBÿB×F#B÷F/Bä1ƒB÷BÃFB÷FGFFF<ƒB÷BÀ€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹É•ÍÕµ•ÑM•½¹‘Ì€üü€À¥ôƒBàƒBûFBóB×B÷BãFƒBûFFBÃFBûBèƒBûBÛBãBÓBÃB÷BãF<¹€(€€€€€€èƒBsBÃFF#FFFB÷BûBÔƒBËFB×BóF<ƒBßBÃBóBûFBûBÛB×B÷Bøì¥‘±”·FBÃFFBûBĞƒBÓB×BçFFBËFB×FƒBÓBø€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹É•ÍÕµ•ÑM•½¹‘Ì€üü€À¥ô¹€ì(€ô•±Í”¥˜€¡‘½ÑÉ¥¹•I•ÍÕµ•¤ì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÍÑ½Á%¹Ñ•ÉÉÕÁÑ•‘	å½¹Ñ…Ğ(€€€€€€ü€‹B‡FBûF?B÷BëBÀƒBÿFB×FBËBÃB÷BÀƒBÿBÃFFFBïFGBğˆ(€€€€€€è€‹BsBÃFF#FFFƒBËBûBßBûBÇB÷BûBËBïFGBôˆì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôÍÑ½Á%¹Ñ•ÉÉÕÁÑ•‘	å½¹Ñ…Ğ(€€€€€€üƒBFBÿB×F#B÷F/Bä1ƒB÷BÃFBÃBïFF<ƒB÷BÀ€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹É•ÍÕµ•ÑM•½¹‘Ì€üü€À¥ôìƒFFFB×B÷BøƒFBûBïF3BëBø€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹¥‘±•ÕÉ…Ñ¥½¹M•½¹‘Ì€üü€À¥ôƒFBÃBëFBãFB×FBëBûBäƒFFBûF?B÷BëBà¹€(€€€€€€è€‹BwBÃBçBÓB×B÷B÷BÃF<ƒFB×BïF0ƒFBÛBÔƒBûFBóB×FB×B÷BÀƒBàƒB÷BÔƒFBûBßBÓBÃFFƒBÿBûBËFBûFB÷F/BäMQ=@ìƒFBïB×BÓFF;F'BãBÔƒBÏFBÃB÷BãFF,ƒFBÃFFFBãFF/BËBÃF;FFF<ƒBÿBøƒBãFFBûBÓB÷BûBóFƒBóBÃFF#FFFF¸ˆì(€ô•±Í”¥˜€¡µ½¹ÍÑ•ÉY¥Ñ½Éå=ÕÉÉ•¤ì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹B‡BïBÃBÇF/BäƒBÿBÃFFFBïF0ƒFB÷BãFFBûBÛB×Bôˆì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôA±…å•ÈA]H€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹Á±…å•ÉA½İ•È€üü€‹ŠP‰ô€ø5½¹ÍÑ•ÈA]H€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹µ½¹ÍÑ•ÉA½İ•È€üü€‹ŠP‰ôìƒBëBÃFBÃBËBÃBôƒBÿFBûBÓBûBïBÛBÃB×FƒBóBÃFF#FFF¹€ì(€ô•±Í”¥˜€¡™±••MÕ••‘•‘=ÕÉÉ•¤ì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹B{FFBûBĞƒBËF/BÿBûBïB÷B×Bôˆì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôƒBkBÃFBÃBËBÃBôƒBûFBëFF/BìƒBÇB×BßBûBÿBÃFB÷FF8ƒBÓBãFFBÃB÷FBãF8ƒBßBÀ€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡ÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸ü¹Í•½¹‘ÍQ½M…™•M•Á…É…Ñ¥½¸€üü€À¥ôƒBàƒBÿFBûBÓBûBïBÛBÃB×FƒBãFFBûBÓB÷F/BäƒBóBÃFF#FFF¹€ì(€ô•±Í”¥˜€¡ÍÑ…ÑÕÌ¹™½É•…ÍĞ¹…¹¥¹¥Í ¤ì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹¥ÑåÉÉ¥Ù…°(€€€€€€ü€‹B_BÃBÿBÃFBûBÈƒFBËBÃFBãFƒBÓBøƒBÏBûFBûBÓBÀˆ(€€€€€€è€‹B_BÃBÿBÃFBûBÈƒFBËBÃFBãFƒBÓBøƒBëBûB÷FBÀƒBóBÃFF#FFFBÀˆì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘íÍÑ…ÑÕÌ¹½ÕÑ½µ”ü¹¥ÑåÉÉ¥Ù…°€ü€‹BFBàƒBËFBûBÓBÔƒBÈƒBÏBûFBûBĞˆ€è€‹BHƒBëBûB÷FBÔƒBïBãB÷BãBà‰ôèƒB×BÓBÀ€‘í™½Éµ…Ñ9Õµ‰•È¡ÍÑ…ÑÕÌ¹™½É•…ÍĞ¹™½½‘ÑÉÉ¥Ù…°°€Ä¥ôƒ
+ÜƒBËBûBÓBÀ€‘í™½Éµ…Ñ9Õµ‰•È¡ÍÑ…ÑÕÌ¹™½É•…ÍĞ¹İ…Ñ•ÉÑÉÉ¥Ù…°°€Ä¥õ€ì(€ô•±Í”ì(€€€™½É•…ÍÑQ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹B_BÃBÿBÃFBûBÈƒB÷BÔƒFBËBÃFBãFˆì(€€€™½É•…ÍÑ•Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í™½Éµ…Ñ•Á±•Ñ¥½¹…ÕÍ”¡ÍÑ…ÑÕÌ¹™½É•…ÍĞ¹‘•Á±•Ñ¥½¹…ÕÍ”¥ôƒBßBÃBëBûB÷FBÃFFF<ƒB÷BÀ€‘í™½Éµ…Ñ±…ÁÍ•¡ÍÑ…ÑÕÌ¹™½É•…ÍĞ¹™¥ÉÍÑ•Á±•Ñ¥½¹ÑM•½¹‘Ì€üü€À¥õ€ì(€ô)ô((¼¨¨(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•áÁ•‘¥Ñ¥½¹=ÕÑ½µ•M¹…ÁÍ¡½Ğùô½ÕÑ½µ”(€¨¼)™Õ¹Ñ¥½¸É•¹‘•ÉáÁ•‘¥Ñ¥½¹=ÕÑ½µ”¡½ÕÑ½µ”¤ì(€½¹ÍĞ‘•ÍÑ¥¹…Ñ¥½¹9…µ”€ô½ÕÑ½µ”¹‘•ÍÑ¥¹…Ñ¥½¹¥Ñäü¹¹…µ”€üü€‹BÏBûFBûBĞˆì(€½¹ÍĞÉ½ÕÑ•¹‘•€ô½ÕÑ½µ”¹¥¹Ñ•ÉÉÕÁÑ¥½¹…ÕÍ”€ôôô€‰É½ÕÑ”µ•¹ˆì(€½ÕÑ½µ•A…¹•°¹‘…Ñ…Í•Ğ¹ÍÑ…Ñ”€ô½ÕÑ½µ”¹ÍÑ…ÑÕÌì(€½ÕÑ½µ•Q¥µ”¹Ñ•áÑ½¹Ñ•¹Ğ€ô™½Éµ…Ñ±…ÁÍ•¡½ÕÑ½µ”¹Á±…¹¹•¹…ÑM•½¹‘Ì¤ì(€½ÕÑ½µ•A½Í¥Ñ¥½¸¹Ñ•áÑ½¹Ñ•¹Ğ€ô(€€€½ÕÑ½µ”¹Á±…¹¹•¹Í•µ•¹Ñ%¹‘•à€ôôô¹Õ±°(€€€€€€üƒB“BãB÷BãF ƒ
+Ü€‘í™½Éµ…Ñ9Õµ‰•È¡½ÕÑ½µ”¹Á±…¹¹•¹É½ÕÑ•¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ°€Ä¥ôƒBëBñ€(€€€€€€èƒB‡B×BÏBóB×B÷F€‘í½ÕÑ½µ”¹Á±…¹¹•¹Í•µ•¹Ñ%¹‘•à€¬€Åôƒ
+Ü€‘í™½Éµ…Ñ9Õµ‰•È¡½ÕÑ½µ”¹Á±…¹¹•¹É½ÕÑ•¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ°€Ä¥ôƒBëBñ€ì((€¥˜€¡½ÕÑ½µ”¹ÍÑ…ÑÕÌ€ôôô€‰¥¸µÁÉ½É•ÍÌˆ¤ì(€€€¥˜€¡½ÕÑ½µ”¹Á¡…Í”€ôôô€‰¥‘±”µ…ĞµÍÑ½Àˆ¤ì(€€€€€½¹ÍĞÁ…ÑÉ½±]¥±±%¹Ñ•ÉÉÕÁĞ€ô½ÕÑ½µ”¹ÍÑ½Á%¹Ñ•ÉÉÕÁÑ•‘	å½¹Ñ…Ğì(€€€€€½¹ÍĞµ½¹ÍÑ•É]¥±±•™•…Ğ€ô½ÕÑ½µ”¹™…¥±ÕÉ•I•…Í½¸€ôôô€‰µ½¹ÍÑ•Èˆì(€€€€€½¹ÍĞ™…Ñ…±MÕÁÁ±å	•™½É•I•ÍÕµ”€ô(€€€€€€€€…µ½¹ÍÑ•É]¥±±•™•…Ğ€˜˜(€€€€€€€½ÕÑ½µ”¹É•ÍÕµ•ÑM•½¹‘Ì€„ôô¹Õ±°€˜˜(€€€€€€€½ÕÑ½µ”¹Á±…¹¹•¹ÍÑ…ÑÕÌ€ôôô€‰™…¥±•ˆ€˜˜(€€€€€€€½ÕÑ½µ”¹Á±…¹¹•¹…ÑM•½¹‘Ì€ğô½ÕÑ½µ”¹É•ÍÕµ•ÑM•½¹‘Ì€¬€Å”´äì(€€€€€½ÕÑ½µ•A…¹•°¹‘…Ñ…Í•Ğ¹ÍÑ…Ñ”€ô€‰Á…ÕÍ•ˆì(€€€€€½ÕÑ½µ•MÑ…Ñ”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹B‡FBûF?B÷BëBÀˆì(€€€€€½ÕÑ½µ•Q¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É]¥±±•™•…Ğ(€€€€€€€€ü€‹BBÃFFFBïF0ƒBÃFBÃBëFB×FƒB÷BÀƒFFBûF?B÷BëBÔˆ(€€€€€€€€è™…Ñ…±MÕÁÁ±å	•™½É•I•ÍÕµ”(€€€€€€€€ü€‹BkBÃFBÃBËBÃBôƒB÷BÔƒBÿB×FB×BÛBãBËFGFƒFFBûF?B÷BëFˆ(€€€€€€€€èÁ…ÑÉ½±]¥±±%¹Ñ•ÉÉÕÁĞ(€€€€€€€€€€ü€‹BBÃFFFBïF0ƒBÿFB×FBËFGFƒFFBûF?B÷BëFˆ(€€€€€€€€è€‹BkBÃFBÃBËBÃBôƒBÛBÓFGFƒFƒB÷BÃBçBÓB×B÷B÷BûBäƒFB×BïBàˆì(€€€€€½ÕÑ½µ•Ñ¥½¸¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É]¥±±•™•…Ğ(€€€€€€€€ü€‰XèƒBèƒBëBûB÷FBÃBëFFˆ(€€€€€€€€è™…Ñ…±MÕÁÁ±å	•™½É•I•ÍÕµ”(€€€€€€€€ü€‰XèƒBèƒBÏBãBÇB×BïBàˆ(€€€€€€€€èÁ…ÑÉ½±]¥±±%¹Ñ•ÉÉÕÁĞ(€€€€€€€€€€ü€‰XèƒBèƒBëBûB÷FBÃBëFFˆ(€€€€€€€€è€‰XèƒBèƒBËBûBßBûBÇB÷BûBËBïB×B÷BãF8ˆì(€€€€€½ÕÑ½µ••Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É]¥±±•™•…Ğ(€€€€€€€€ü½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰™±•”µ™…¥±•ˆ(€€€€€€€€€€ü€‹BBÃFFFBïF0ƒBËBûBçBÓFGFƒBÈƒFBÃBÓBãFFƒB÷B×BÿBûBÓBËBãBÛB÷BûBÏBøƒBëBÃFBÃBËBÃB÷BÀìƒBËF/BÇFBÃB÷B÷BûBäƒFBëBûFBûFFBà1ƒB÷BÔƒFBËBÃFBãFƒBÓBïF<ƒFBÃBßFF/BËBÀƒBÓBãFFBÃB÷FBãBà¸ˆ(€€€€€€€€€€è€‹BBÃFFFBïF0ƒBËBûBçBÓFGFƒBÈƒFBÃBÓBãFFƒB÷B×BÿBûBÓBËBãBÛB÷BûBÏBøƒBëBÃFBÃBËBÃB÷BÀìAQ}%!PƒBÿFBûFBãBÈƒBÿFB×BËBûFFBûBÓF?F'B×BÏBøA½İ•ÈƒFFBÃB÷B×FƒFB×FBóBãB÷BÃBïF3B÷BûBäƒBÏFBÃB÷BãFB×Bä¸ˆ(€€€€€€€€è™…Ñ…±MÕÁÁ±å	•™½É•I•ÍÕµ”(€€€€€€€€üM%4´ÀÀØƒBãFFB×FBÿBÃB×F€‘í™½Éµ…Ñ•Á±•Ñ¥½¹…ÕÍ”¡½ÕÑ½µ”¹Á±…¹¹•¹™…¥±ÕÉ•…ÕÍ”¤¹Ñ½1½…±•1½İ•É…Í” ‰ÉÔµITˆ¥ôƒBÓBøƒBûBëBûB÷FBÃB÷BãF<ƒBûBÛBãBÓBÃB÷BãF<ìƒBóBÃFF#FFFƒBûFFBÃB÷B×FFF<ƒBÈƒFBûFBëBÔMQ=@¹€(€€€€€€€€èÁ…ÑÉ½±]¥±±%¹Ñ•ÉÉÕÁĞ(€€€€€€€€€€üƒBkBÃFBÃBËBÃBôƒBûFFBÃFGFFF<ƒB÷B×BÿBûBÓBËBãBÛB×BôƒBÓBøƒBËFBûBÓBÀƒBÿBÃFFFBïF<ƒBÈƒFBÃBÓBãFFìƒFFBÿB×F#B÷F/Bä1ƒBûFBóB×B÷BãFƒBûFFBÃFBûBèƒBßBÃBÿBïBÃB÷BãFBûBËBÃB÷B÷F/F€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡½ÕÑ½µ”¹Í¡•‘Õ±•‘%‘±•ÕÉ…Ñ¥½¹M•½¹‘Ì¥ô¹€(€€€€€€€€èƒBFBûF#BïBø€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡½ÕÑ½µ”¹¥‘±•±…ÁÍ•‘M•½¹‘Ì¥ôƒBãBÜ€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡½ÕÑ½µ”¹¥‘±•ÕÉ…Ñ¥½¹M•½¹‘Ì¥ôìM%4´ÀÀÔƒBûFFBÃFGFFF<ƒBÈƒFBûFBëBÔMQ=@°M%4´ÀÀØƒFBÃFFBûBÓFB×F¥‘±”·BßBÃBÿBÃFF,¹€ì(€€€€€½ÕÑ½µ•…ÕÍ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É]¥±±•™•…Ğ(€€€€€€€€üƒBsBûB÷FFF ƒ
+Ü€‘í™½Éµ…Ñ±…ÁÍ•¡½ÕÑ½µ”¹Á±…¹¹•¹…ÑM•½¹‘Ì¥õ€(€€€€€€€€è™…Ñ…±MÕÁÁ±å	•™½É•I•ÍÕµ”(€€€€€€€€üƒBOBãBÇB×BïF0ƒ
+Ü€‘í™½Éµ…Ñ±…ÁÍ•¡½ÕÑ½µ”¹Á±…¹¹•¹…ÑM•½¹‘Ì¥õ€(€€€€€€€€èÁ…ÑÉ½±]¥±±%¹Ñ•ÉÉÕÁĞ(€€€€€€€€€€üƒBkBûB÷FBÃBëFƒBà1ƒ
+Ü€‘í™½Éµ…Ñ±…ÁÍ•¡½ÕÑ½µ”¹É•ÍÕµ•ÑM•½¹‘Ì€üü€À¥õ€(€€€€€€€€èƒBKBûBßBûBÇB÷BûBËBïB×B÷BãBÔƒ
+Ü€‘í™½Éµ…Ñ±…ÁÍ•¡½ÕÑ½µ”¹É•ÍÕµ•ÑM•½¹‘Ì€üü€À¥õ€ì(€€€€€É•ÑÕÉ¸ì(€€€ô(€€€½ÕÑ½µ•MÑ…Ñ”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹BHƒBÿFFBàˆì(€€€½ÕÑ½µ•Q¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹B·BëFBÿB×BÓBãFBãF<ƒBÿFBûBÓBûBïBÛBÃB×FFF<ˆì(€€€½ÕÑ½µ•Ñ¥½¸¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‰XèƒBèƒBãFFBûBÓFˆì(€€€¥˜€¡½ÕÑ½µ”¹Á±…¹¹•¹ÍÑ…ÑÕÌ€ôôô€‰™…¥±•ˆ¤ì(€€€€€½¹ÍĞµ½¹ÍÑ•É•™•…Ğ€ô½ÕÑ½µ”¹™…¥±ÕÉ•I•…Í½¸€ôôô€‰µ½¹ÍÑ•Èˆì(€€€€€½¹ÍĞ™±••…¥±•€ô(€€€€€€€½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰™±•”µ™…¥±•ˆì(€€€€€½ÕÑ½µ••Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É•™•…Ğ(€€€€€€€€ü™±••…¥±•(€€€€€€€€€€ü€‹B‡BëBûFBûFFF0ƒBûFFBûBÓBÀƒB÷BÔƒBËF/F#BÔƒFBëBûFBûFFBàƒBÿBÃFFFBïF<ì1ƒFFBÃB÷B×FƒFB×FBóBãB÷BÃBïF3B÷BûBäƒBÏFBÃB÷BãFB×Bä¸ˆ(€€€€€€€€€€è€‹BKF/BÇFBÃBôAQ}%!PƒBÿFBûFBãBÈƒBÇBûBïB×BÔƒFBãBïF3B÷BûBÏBøƒBóBûB÷FFFBÀìƒBëBûB÷FBÃBëFƒFFBÃB÷B×FƒFB×FBóBãB÷BÃBïF3B÷BûBäƒBÏFBÃB÷BãFB×Bä¸ˆ(€€€€€€€€è€‹BWFBïBàƒBÿBïBÃBôƒB÷BÔƒBãBßBóB×B÷BãFF0°ƒBëFBãFBãFB×FBëBãBÔƒBßBÃBÿBÃFF,ƒBßBÃBëBûB÷FBÃFFF<ƒFBÃB÷F3F#BÔƒFBãB÷BãF#BÀ¸ˆì(€€€€€½ÕÑ½µ•…ÕÍ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É•™•…Ğ(€€€€€€€€ü™±••…¥±•(€€€€€€€€€€ü€‹B‡BãBïF3B÷F/BäƒBóBûB÷FFF ƒ
+Ü1ƒB÷BÔƒFBÓBÃBïFF<ˆ(€€€€€€€€€€è€‹B‡BãBïF3B÷F/BäƒBóBûB÷FFF ƒ
+ÜAQ}%!Pˆ(€€€€€€€€è™½Éµ…Ñ•Á±•Ñ¥½¹…ÕÍ”¡½ÕÑ½µ”¹Á±…¹¹•¹™…¥±ÕÉ•…ÕÍ”¤ì(€€€ô•±Í”¥˜€¡½ÕÑ½µ”¹Á±…¹¹•¹ÍÑ…ÑÕÌ€ôôô€‰Á…ÕÍ•ˆ¤ì(€€€€€½¹ÍĞµ½¹ÍÑ•É½¹Ñ…Ğ€ô½ÕÑ½µ”¹¥¹Ñ•ÉÉÕÁÑ¥½¹…ÕÍ”€ôôô€‰µ½¹ÍÑ•Èµ½¹Ñ…Ğˆì(€€€€€½ÕÑ½µ••Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôÉ½ÕÑ•¹‘•(€€€€€€€€üƒBwBÃFBãFBûBËBÃB÷B÷F/BäƒBóBÃFF#FFFƒBßBÃBëBûB÷FBãFFF<ƒBËB÷BÔƒFBÃBÓBãFFBÀ€‘í™½Éµ…Ñ9Õµ‰•È¡½ÕÑ½µ”¹¥ÑåÉÉ¥Ù…±I…‘¥ÕÍ5•Ñ•ÉÌ€üü€À°€À¥ôƒBğƒBûF€‘í‘•ÍÑ¥¹…Ñ¥½¹9…µ•ôìƒBÿBûBÇB×BÓF,ƒB÷BÔƒBÇFBÓB×F¹€(€€€€€€€€èµ½¹ÍÑ•É½¹Ñ…Ğ(€€€€€€€€€€ü€‹B‡BïB×BÓFF;F'BÃF<ƒBÏFBÃB÷BãFBÀƒBãFBÿBûBïB÷B×B÷BãF<ƒŠP1ƒBûFƒBÇBûBïB×BÔƒFBãBïF3B÷BûBÏBøƒBÓBËBãBÛFF'B×BÏBûFF<ƒBÿBÃFFFBïF<¸ˆ(€€€€€€€€€€è€‹B‡BïB×BÓFF;F'BÃF<ƒBÏFBÃB÷BãFBÀƒBãFBÿBûBïB÷B×B÷BãF<ƒŠPƒBÃBËFBûBóBÃFBãFB×FBëBÃF<ƒBûFFBÃB÷BûBËBëBÀƒFƒB÷BÃBçBÓB×B÷B÷BûBäƒFB×BïBà¸ˆì(€€€€€½ÕÑ½µ•…ÕÍ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÉ½ÕÑ•¹‘•(€€€€€€€€üƒBOBûFBûBĞƒB÷BÔƒBÓBûFFBãBÏB÷FFƒ
+Ü€‘í‘•ÍÑ¥¹…Ñ¥½¹9…µ•õ€(€€€€€€€€èµ½¹ÍÑ•É½¹Ñ…Ğ(€€€€€€€€€€ü€‹B‡BãBïF3B÷F/BäƒBóBûB÷FFF ƒ
+Ü1ˆ(€€€€€€€€€€è€‹BSBûBëFFBãB÷BÀMQ=@ˆì(€€€ô•±Í”ì(€€€€€½ÕÑ½µ••Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ô(€€€€€€€ƒBsBÃFF#FFFƒBàƒBßBÃBÿBÃFƒBÿFBûBËBãBßBãBàƒBÿBûBßBËBûBïF?F;FƒBËBûBçFBàƒBÈƒFBÃBÓBãFFƒBÏBûFBûBÓBÀ€‘í‘•ÍÑ¥¹…Ñ¥½¹9…µ•ô¹€ì(€€€€€½ÕÑ½µ•…ÕÍ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôƒBFBãBÇF/FBãBÔƒ
+Ü€‘í‘•ÍÑ¥¹…Ñ¥½¹9…µ•õ€ì(€€€ô(€€€É•ÑÕÉ¸ì(€ô((€½¹ÍĞ‘¥Í½Ù•ÉåMÑ½À€ô(€€€½ÕÑ½µ”¹ÍÑ…ÑÕÌ€ôôô€‰Á…ÕÍ•ˆ€˜˜(€€€½ÕÑ½µ”¹¥¹Ñ•ÉÉÕÁÑ¥½¹…ÕÍ”€ôôô€‰‘½ÑÉ¥¹”µÍÑ½Àˆì(€½ÕÑ½µ•Ñ¥½¸¹Ñ•áÑ½¹Ñ•¹Ğ€ô‘¥Í½Ù•ÉåMÑ½À(€€€€üƒB[BÓBÃFF0€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡É•…‘MÑ½Á%‘±•ÕÉ…Ñ¥½¹M•½¹‘Ì ¤¥ôƒBàƒBÿFBûBÓBûBïBÛBãFF1€(€€€€è€‹BBûBËFBûFBãFF0ƒF7BëFBÿB×BÓBãFBãF8ˆì(€¥˜€¡½ÕÑ½µ”¹ÍÑ…ÑÕÌ€ôôô€‰™…¥±•ˆ¤ì(€€€½¹ÍĞµ½¹ÍÑ•É•™•…Ğ€ô½ÕÑ½µ”¹™…¥±ÕÉ•I•…Í½¸€ôôô€‰µ½¹ÍÑ•Èˆì(€€€½¹ÍĞ™±••…¥±•€ô(€€€€€½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰™±•”µ™…¥±•ˆì(€€€½ÕÑ½µ•MÑ…Ñ”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹BBûFBÃBÛB×B÷BãBÔˆì(€€€½¹ÍĞ¥‘±•…¥±ÕÉ”€ô½ÕÑ½µ”¹™…¥±ÕÉ•Ñ¥Ù¥Ñä€ôôô€‰¥‘±”ˆì(€€€½ÕÑ½µ•Q¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É•™•…Ğ(€€€€€€ü™±••…¥±•(€€€€€€€€ü€‹BBÃFFFBïF0ƒB÷BÃFFBãBÌƒBëBÃFBÃBËBÃBôˆ(€€€€€€€€è€‹BkBÃFBÃBËBÃBôƒFB÷BãFFBûBÛB×BôƒFBãBïF3B÷F/BğƒBÿBÃFFFBïFGBğˆ(€€€€€€è¥‘±•…¥±ÕÉ”(€€€€€€€€ü€‹BkBÃFBÃBËBÃBôƒBÿBûBÏBãBÄƒB÷BÀƒFFBûF?B÷BëBÔˆ(€€€€€€€€è€‹BkBÃFBÃBËBÃBôƒBÿBûBÏBãBÄƒBÈƒBÿFFBàˆì(€€€½ÕÑ½µ••Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É•™•…Ğ(€€€€€€ü™±••…¥±•(€€€€€€€€ü€‰1ƒB÷BÔƒBûFBëFF/BìƒBÓBãFFBÃB÷FBãF8èƒFBÃBËB÷BÃF<ƒBãBïBàƒBóB×B÷F3F#BÃF<ƒFBëBûFBûFFF0ƒBßBÃBËB×FF#BãBïBÀƒF7BëFBÿB×BÓBãFBãF8ƒB÷BÀƒBÏFBÃB÷BãFBÔƒBëBûB÷FBÃBëFBÀ¸ˆ(€€€€€€€€è€‰AQ}%!PƒBÿFBûFBãBÈƒBÿFB×BËBûFFBûBÓF?F'B×BÏBøA½İ•ÈƒBßBÃBËB×FF#BãBìƒF7BëFBÿB×BÓBãFBãF8ƒB÷BÀƒBÏFBÃB÷BãFBÔƒBëBûB÷FBÃBëFBÀ¸ˆ(€€€€€€è¥‘±•…¥±ÕÉ”(€€€€€€€€ü€‰%‘±”·FBÃFFBûBĞƒBãFFB×FBÿBÃBìƒBëFBãFBãFB×FBëBãBÔƒBßBÃBÿBÃFF,ƒBÓBøƒBËBûBßBûBÇB÷BûBËBïB×B÷BãF<ìƒBëBÃFBÃBËBÃBôƒBûFFBÃBïFF<ƒBÈƒFBûFBëBÔMQ=@¸ˆ(€€€€€€€€è€‹B“BÃFBÃBïF3B÷BûBÔƒBãFFBûF'B×B÷BãBÔƒBûFFBÃB÷BûBËBãBïBøƒBÓBËBãBÛB×B÷BãBÔìƒBÇFBÓFF'BãBÔƒF7FBÃBÿF,ƒBàƒBÿFBãBÇF/FBãBÔƒBûFBóB×B÷B×B÷F,¸ˆì(€€€½ÕÑ½µ•…ÕÍ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôµ½¹ÍÑ•É•™•…Ğ(€€€€€€ü™±••…¥±•(€€€€€€€€ü€‘í™½Éµ…Ñ9Õµ‰•È ¡½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸ü¹…É…Ù…¹MÁ••‘5•Ñ•ÉÍA•ÉM•½¹€üü€À¤€¨€Ì¸Ø°€Ä¥ôƒŠ&€‘í™½Éµ…Ñ9Õµ‰•È ¡½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸ü¹µ½¹ÍÑ•ÉMÁ••‘5•Ñ•ÉÍA•ÉM•½¹€üü€À¤€¨€Ì¸Ø°€Ä¥ôƒBëBğ¿F€(€€€€€€€€èA]H€‘í½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹Á±…å•ÉA½İ•È€üü€‹ŠP‰ô€ğ€‘í½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹µ½¹ÍÑ•ÉA½İ•È€üü€‹ŠP‰õ€(€€€€€€è™½Éµ…Ñ•Á±•Ñ¥½¹…ÕÍ”¡½ÕÑ½µ”¹™…¥±ÕÉ•…ÕÍ”¤ì(€ô•±Í”¥˜€¡½ÕÑ½µ”¹ÍÑ…ÑÕÌ€ôôô€‰½µÁ±•Ñ•ˆ¤ì(€€€½ÕÑ½µ•MÑ…Ñ”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹BFBÿB×Fˆì(€€€½ÕÑ½µ•Q¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ô(€€€€€½ÕÑ½µ”¹¥ÑåÉÉ¥Ù…°ü¹­¥¹€ôôô€‰É••¹ÑÉäˆ(€€€€€€€€üƒBkBÃFBÃBËBÃBôƒBËB×FB÷FBïFF<ƒBÈ€‘í‘•ÍÑ¥¹…Ñ¥½¹9…µ•õ€(€€€€€€€€èƒBkBÃFBÃBËBÃBôƒBÿFBãBÇF/BìƒBÈ€‘í‘•ÍÑ¥¹…Ñ¥½¹9…µ•õ€ì(€€€½ÕÑ½µ••Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ô(€€€€€ƒBCBËFBûFBãFB×FB÷BÃF<ƒBÏFBÃB÷BãFBÀƒBÿB×FB×FB×FB×B÷BÀƒB÷BÀƒBÓBãFFBÃB÷FBãBà€‘í™½Éµ…Ñ9Õµ‰•È¡½ÕÑ½µ”¹¥ÑåÉÉ¥Ù…±I…‘¥ÕÍ5•Ñ•ÉÌ€üü€À°€À¥ôƒBğƒBûFƒFB×B÷FFBÀƒBÏBûFBûBÓBÀ¹€ì(€€€½ÕÑ½µ•…ÕÍ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôƒBOBûFBûBĞƒ
+Ü€‘í‘•ÍÑ¥¹…Ñ¥½¹9…µ•õ€ì(€ô•±Í”ì(€€€½¹ÍĞµ½¹ÍÑ•É½¹Ñ…Ğ€ô½ÕÑ½µ”¹¥¹Ñ•ÉÉÕÁÑ¥½¹…ÕÍ”€ôôô€‰µ½¹ÍÑ•Èµ½¹Ñ…Ğˆì(€€€½ÕÑ½µ•MÑ…Ñ”¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‹BBÃFBßBÀˆì(€€€½ÕÑ½µ•Q¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÉ½ÕÑ•¹‘•(€€€€€€üƒBsBÃFF#FFFƒB÷BÔƒBÓBûFFBãBÌ€‘í‘•ÍÑ¥¹…Ñ¥½¹9…µ•õ€(€€€€€€èµ½¹ÍÑ•É½¹Ñ…Ğ(€€€€€€€€ü€‹BkBÃFBÃBËBÃBôƒBËFFFB×FBãBìƒBÿBÃFFFBïF0ˆ(€€€€€€€€è€‹BkBÃFBÃBËBÃBôƒBûFFBÃB÷BûBËBïB×BôƒFƒFB×BïBàˆì(€€€½ÕÑ½µ••Ñ…¥°¹Ñ•áÑ½¹Ñ•¹Ğ€ôÉ½ÕÑ•¹‘•(€€€€€€ü€‹BkBÃFBÃBËBÃBôƒBÓBûF#FGBìƒBÓBøƒBëBûB÷FBÀƒBßBÃBÓBÃB÷B÷BûBäƒBïBãB÷BãBà°ƒB÷BøƒB÷BÔƒBËBûF#FGBìƒBÈƒBÏBûFBûBĞ¸ƒB·BëFBÿB×BÓBãFBãF<ƒBûFFBÃFGFFF<ƒB÷B×BßBÃBËB×FF#FGB÷B÷BûBä¸ˆ(€€€€€€èµ½¹ÍÑ•É½¹Ñ…Ğ(€€€€€€€€ü€‰1ƒBûBÛBãBÓBÃB×FƒF?BËB÷F/FƒBËFBûBÓB÷F/FƒFBëBûFBûFFB×BäìƒF7FBøƒFB×BßB×FBËB÷BûBÔƒFBûFFBûF?B÷BãBÔA$¸ˆ(€€€€€€€€è€‹BSBûBëFFBãB÷BÀMQ=@ƒBÿFB×FBËBÃBïBÀƒBÓBËBãBÛB×B÷BãBÔ°ƒB÷BøƒF7BëFBÿB×BÓBãFBãF<ƒB÷BÔƒFFBãFBÃB×FFF<ƒBßBÃBËB×FF#FGB÷B÷BûBä¸ƒB¿BËB÷BÃF<ƒBëBûBóBÃB÷BÓBÀƒBÿFBûBÓBûBïBÛB×B÷BãF<ƒBûFBóB×FBãFƒF7FFƒFB×BïF0ƒBàƒFB÷BûBËBÀƒBûFBëFBûB×FƒBãFFBûBÓB÷F/BäƒBóBÃFF#FFF¸ˆì(€€€½ÕÑ½µ•…ÕÍ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÉ½ÕÑ•¹‘•(€€€€€€ü€‹BkBûB÷B×FƒBóBÃFF#FFFBÀƒBËB÷BÔƒBÏBûFBûBÓBÀˆ(€€€€€€èµ½¹ÍÑ•É½¹Ñ…Ğ(€€€€€€€€ü€‹B‡BãBïF3B÷F/BäƒBóBûB÷FFF ƒ
+Ü1ˆ(€€€€€€€€è€‹BSBûBëFFBãB÷BÀMQ=@ˆì(€ô)ô((¼¨¨(€¨Á…É…´í!Q51±•µ•¹Ñô…É(€¨Á…É…´í!Q51±•µ•¹ÑôÉ•µ…¥¹¥¹=ÕÑÁÕĞ(€¨Á…É…´í!Q51AÉ½É•ÍÍ±•µ•¹ÑôÁÉ½É•ÍÌ(€¨Á…É…´í!Q51A…É…É…Á¡±•µ•¹Ñôµ•Ñ„(€¨Á…É…´í¹Õµ‰•ÉôÉ•µ…¥¹¥¹œ(€¨Á…É…´í¹Õµ‰•Éô¥¹¥Ñ¥…°(€¨Á…É…´í¹Õµ‰•Éô™É…Ñ¥½¸(€¨Á…É…´í¹Õµ‰•ÉôÉ…Ñ”(€¨¼)™Õ¹Ñ¥½¸É•¹‘•ÉMÕÁÁ±ä (€…É°(€É•µ…¥¹¥¹=ÕÑÁÕĞ°(€ÁÉ½É•ÍÌ°(€µ•Ñ„°(€É•µ…¥¹¥¹œ°(€¥¹¥Ñ¥…°°(€™É…Ñ¥½¸°(€É…Ñ”°(¤ì(€…É¹‘…Ñ…Í•Ğ¹ÍÑ…Ñ”€ôÉ•µ…¥¹¥¹œ€ôôô€À€ü€‰‘•Á±•Ñ•ˆ€è™É…Ñ¥½¸€ğô€À¸ÈÔ€ü€‰É¥Í¬ˆ€è€‰Í…™”ˆì(€É•µ…¥¹¥¹=ÕÑÁÕĞ¹Ñ•áÑ½¹Ñ•¹Ğ€ô™½Éµ…Ñ9Õµ‰•È¡É•µ…¥¹¥¹œ°€Ä¤ì(€ÁÉ½É•ÍÌ¹Ù…±Õ”€ô™É…Ñ¥½¸ì(€ÁÉ½É•ÍÌ¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í5…Ñ ¹É½Õ¹¡™É…Ñ¥½¸€¨€ÄÀÀ¥ô•€ì(€µ•Ñ„¹Ñ•áÑ½¹Ñ•¹Ğ€ôƒBãBÜ€‘í™½Éµ…Ñ9Õµ‰•È¡¥¹¥Ñ¥…°°€Ä¥ôƒ
+ÜƒFBÃFFBûBĞ€‘í™½Éµ…Ñ9Õµ‰•È¡É…Ñ”°€È¥ô¿F€ì)ô()™Õ¹Ñ¥½¸É•…‘MÕÁÁ±åM•ÑÑ¥¹Ì ¤ì(€É•ÑÕÉ¸ì(€€€¥¹¥Ñ¥…°èì(€€€€€™½½‘U¹¥ÑÌè¥¹¥Ñ¥…±½½¹Ù…±Õ•Í9Õµ‰•È°(€€€€€İ…Ñ•ÉU¹¥ÑÌè¥¹¥Ñ¥…±]…Ñ•È¹Ù…±Õ•Í9Õµ‰•È°(€€€ô°(€€€ÁÉ½™¥±”èì(€€€€€µ½Ù¥¹œèì(€€€€€€€™½½‘U¹¥ÑÍA•É!½ÕÈèµ½Ù¥¹½½‘I…Ñ”¹Ù…±Õ•Í9Õµ‰•È°(€€€€€€€İ…Ñ•ÉU¹¥ÑÍA•É!½ÕÈèµ½Ù¥¹]…Ñ•ÉI…Ñ”¹Ù…±Õ•Í9Õµ‰•È°(€€€€€ô°(€€€€€¥‘±”èì(€€€€€€€™½½‘U¹¥ÑÍA•É!½ÕÈè¥‘±•½½‘I…Ñ”¹Ù…±Õ•Í9Õµ‰•È°(€€€€€€€İ…Ñ•ÉU¹¥ÑÍA•É!½ÕÈè¥‘±•]…Ñ•ÉI…Ñ”¹Ù…±Õ•Í9Õµ‰•È°(€€€€€ô°(€€€ô°(€ôì)ô((¼¨¨É•ÑÕÉ¹Ìí¹Õµ‰•Éô€¨¼)™Õ¹Ñ¥½¸É•…‘MÑ½Á%‘±•ÕÉ…Ñ¥½¹M•½¹‘Ì ¤ì(€½¹ÍĞ¡½ÕÉÌ€ôÍÑ½Á%‘±•!½ÕÉÌ¹Ù…±Õ•Í9Õµ‰•Èì(€¥˜€ …9Õµ‰•È¹¥Í¥¹¥Ñ”¡¡½ÕÉÌ¤ñğ¡½ÕÉÌ€ğ€À¤ì(€€€Ñ¡É½Ü¹•ÜI…¹•ÉÉ½È ‹BSBïBãFB×BïF3B÷BûFFF0ƒFFBûF?B÷BëBàƒBÓBûBïBÛB÷BÀƒBÇF/FF0ƒB÷B×BûFFBãFBÃFB×BïF3B÷BûBäˆ¤ì(€ô(€É•ÑÕÉ¸¡½ÕÉÌ€¨€Í|ØÀÀì)ô((¼¨¨É•ÑÕÉ¹Ìí¥µÁ½ÉĞ ˆ¸¸½Í¥´µ½É”½‘¥ÍĞ½ÍÉŒ½¥¹‘•à¹©Ìˆ¤¹MÑ…Ñ¥=‰©•Ñ¥Í½Ù•Éå½ÑÉ¥¹•ô€¨¼)™Õ¹Ñ¥½¸É•…‘¥Í½Ù•Éå½ÑÉ¥¹” ¤ì(€É•ÑÕÉ¸‘½ÑÉ¥¹•5…É­¹‘½¹Ñ¥¹Õ”¹¡•­•€ü€‰5I-}9}=9Q%9Uˆ€è€‰MQ=@ˆì)ô((¼¨¨É•ÑÕÉ¹Ìí¥µÁ½ÉĞ ˆ¸¸½Í¥´µ½É”½‘¥ÍĞ½ÍÉŒ½¥¹‘•à¹©Ìˆ¤¹MÑÉ½¹5½¹ÍÑ•É½¹Ñ…Ñ½ÑÉ¥¹•ô€¨¼)™Õ¹Ñ¥½¸É•…‘MÑÉ½¹5½¹ÍÑ•É½ÑÉ¥¹” ¤ì(€É•ÑÕÉ¸½¹Ñ…Ñ½ÑÉ¥¹•¥¡Ğ¹¡•­•€ü€‰AQ}%!Pˆ€è€‰1ˆì)ô((¼¨¨(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ••‰Õ5…ÁM¹…ÁÍ¡½ĞùôÍ¹…ÁÍ¡½Ğ(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•½ÕÉM•µ•¹ÑI½ÕÑ•M¹…ÁÍ¡½ĞùôÉ½ÕÑ”(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•IÕµ½ÉM•…É¡M¹…ÁÍ¡½ĞùôÉÕµ½ÉM•…É (€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•¥Í½Ù•Éå½ÑÉ¥¹•M¹…ÁÍ¡½Ğøğ9½¹9Õ±±…‰±”ñI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•¥Í½Ù•ÉåI•ÍÕµ•M¹…ÁÍ¡½Ğøùô‘½ÑÉ¥¹”(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•áÁ•‘¥Ñ¥½¹=ÕÑ½µ•M¹…ÁÍ¡½Ğùô½ÕÑ½µ”(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•5½¹ÍÑ•É½¹Ñ…ÑM¹…ÁÍ¡½Ğøğ¹Õ±±ôµ½¹ÍÑ•É½¹Ñ…Ğ(€¨¼)™Õ¹Ñ¥½¸‘É…İM¹…ÁÍ¡½Ğ (€Í¹…ÁÍ¡½Ğ°(€É½ÕÑ”°(€ÉÕµ½ÉM•…É °(€‘½ÑÉ¥¹”°(€½ÕÑ½µ”°(€µ½¹ÍÑ•É½¹Ñ…Ğ°(¤ì(€İ½É±‘5…À¹É•Á±…•¡¥±‘É•¸ ¤ì(€‘É…İÉ¥ ¤ì((€™½È€¡½¹ÍĞµ½¹ÍÑ•È½˜Í¹…ÁÍ¡½Ğ¹µ½¹ÍÑ•ÉÌ¤ì(€€€™½È€¡½¹ÍĞÁ…Ñ ½˜µ½¹ÍÑ•È¹Á…ÑÉ½±A…Ñ¡Ì¤ì(€€€€€½¹ÍĞÁ½±å±¥¹”€ôÍÙ±•µ•¹Ğ ‰Á½±å±¥¹”ˆ°ì(€€€€€€€±…ÍÌè€‰Á…ÑÉ½°µÁ…Ñ ˆ°(€€€€€€€Á½¥¹ÑÌèÁ…Ñ ¹µ…À ¡Á½¥¹Ğ¤€ôø€‘íÁ½¥¹Ğ¹áô°‘íÁ½¥¹Ğ¹åõ€¤¹©½¥¸ ˆ€ˆ¤°(€€€€€ô¤ì(€€€€€İ½É±‘5…À¹…ÁÁ•¹¡Á½±å±¥¹”¤ì(€€€ô(€ô((€™½È€¡½¹ÍĞÁ…Ñ ½˜É½ÕÑ”¹É½ÕÑ•A…Ñ¡Ì¤ì(€€€İ½É±‘5…À¹…ÁÁ•¹ (€€€€€ÍÙ±•µ•¹Ğ ‰Á½±å±¥¹”ˆ°ì(€€€€€€€±…ÍÌè€‰…É…Ù…¸µÉ½ÕÑ”µÁ…Ñ ˆ°(€€€€€€€Á½¥¹ÑÌèÁ…Ñ ¹µ…À ¡Á½¥¹Ğ¤€ôø€‘íÁ½¥¹Ğ¹áô°‘íÁ½¥¹Ğ¹åõ€¤¹©½¥¸ ˆ€ˆ¤°(€€€€€ô¤°(€€€€¤ì(€ô((€™½È€¡½¹ÍĞÍ•µ•¹Ğ½˜É½ÕÑ”¹Í•µ•¹ÑÌ¤ì(€€€½¹ÍĞÉ½ÕÀ€ôÍÙ±•µ•¹Ğ ‰œˆ°ì(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÑ¥Ñ±”ˆèƒBsBÃFF#FFFƒ
+ÜƒFB×BÏBóB×B÷F€‘íÍ•µ•¹Ğ¹¥¹‘•à€¬€Åõ€°(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÉ½İÌˆè)M=8¹ÍÑÉ¥¹¥™ä¡l(€€€€€€€l‹BCBßBãBóFFˆ°€‘íÍ•µ•¹Ğ¹‰•…É¥¹•œ¹Ñ½¥á• Ä¥÷
+Át°(€€€€€€€l‹BSBãFFBÃB÷FBãF<ˆ°€‘íÍ•µ•¹Ğ¹‘¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ¹Ñ½¥á• Ä¥ôƒBëBñt°(€€€€€€€l‰Qˆ°™½Éµ…ÑÕÉ…Ñ¥½¸¡Í•µ•¹Ğ¹•Ñ…¹‘M•½¹‘Ì¥t°(€€€€€€€l‹B£BãFBûFBÀˆ°Í•µ•¹Ğ¹•¹¹±…Ñ¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€€€l‹BSBûBïBÏBûFBÀˆ°Í•µ•¹Ğ¹•¹¹±½¹¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€t¤°(€€€ô¤ì(€€€½¹ÍĞµ…É­•È€ôÍÙ±•µ•¹Ğ ‰¥É±”ˆ°ì(€€€€€±…ÍÌè€‰É½ÕÑ”µİ…åÁ½¥¹Ğˆ°(€€€€€àèÍ•µ•¹Ğ¹•¹‘A½¥¹Ğ¹à°(€€€€€äèÍ•µ•¹Ğ¹•¹‘A½¥¹Ğ¹ä°(€€€€€Èè€Ô°(€€€ô¤ì(€€€½¹ÍĞ±…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€€€±…ÍÌè€‰É½ÕÑ”µİ…åÁ½¥¹Ğµ±…‰•°ˆ°(€€€€€àèÍ•µ•¹Ğ¹•¹‘A½¥¹Ğ¹à°(€€€€€äèÍ•µ•¹Ğ¹•¹‘A½¥¹Ğ¹ä€¬€Ì°(€€€€€€‰Ñ•áĞµ…¹¡½Èˆè€‰µ¥‘‘±”ˆ°(€€€ô¤ì(€€€±…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ôMÑÉ¥¹œ¡Í•µ•¹Ğ¹¥¹‘•à€¬€Ä¤ì(€€€É½ÕÀ¹…ÁÁ•¹¡µ…É­•È°±…‰•°°ÍÙQ¥Ñ±”¡ƒBkBûB÷B×FƒFB×BÏBóB×B÷FBÀ€‘íÍ•µ•¹Ğ¹¥¹‘•à€¬€Åõ€¤¤ì(€€€İ½É±‘5…À¹…ÁÁ•¹¡É½ÕÀ¤ì(€ô((€™½È€¡½¹ÍĞ¥Ñä½˜Í¹…ÁÍ¡½Ğ¹¥Ñ¥•Ì¤ì(€€€½¹ÍĞ¥Í•ÍÑ¥¹…Ñ¥½¸€ô½ÕÑ½µ”¹‘•ÍÑ¥¹…Ñ¥½¹¥Ñäü¹¥€ôôô¥Ñä¹¥ì(€€€½¹ÍĞÉ½ÕÀ€ôÍÙ±•µ•¹Ğ ‰œˆ°ì(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÑ¥Ñ±”ˆè€‘í¥Ñä¹¹…µ•ôƒ
+Ü€‘í¥Ñä¹¥‘õ€°(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÉ½İÌˆè)M=8¹ÍÑÉ¥¹¥™ä¡l(€€€€€€€l‹B‹BãBüˆ°¥Í•ÍÑ¥¹…Ñ¥½¸€ü€‹BOBûFBûBĞƒB÷BÃBßB÷BÃFB×B÷BãF<ˆ€è€‹BOBûFBûBĞ‰t°(€€€€€€€l‹BƒBÃBÓBãFFƒBÿFBãBÇF/FBãF<ˆ°¥Í•ÍÑ¥¹…Ñ¥½¸€ü€‘í½ÕÑ½µ”¹¥ÑåÉÉ¥Ù…±I…‘¥ÕÍ5•Ñ•ÉÌ€üü€ÁôƒBñ€€è€‹ŠP‰t°(€€€€€€€l‹BwBÃFB×BïB×B÷BãBÔƒFB×BçFBÃFˆ°€‘í¥Ñä¹ÍÑ½­Ì¹¥¹¡…‰¥Ñ…¹ÑÍô9At°(€€€€€€€l‹BwBÃFB×BïB×B÷BãBÔƒBãBßB÷BÃFBÃBïF3B÷Bøˆ°€‘í¥Ñä¹Á½ÁÕ±…Ñ¥½¸¹¥¹¡…‰¥Ñ…¹ÑÍô9At°(€€€€€€€l‹BBûFB×FBàƒBûFƒBÓB×FBãFBãFBÀˆ°€‘í¥Ñä¹ÍÑ½­Ì¹Á½ÁÕ±…Ñ¥½¹1½ÍÑô9At°(€€€€€€€l‹BWBÓBÀƒFB×BçFBÃFˆ°€‘í™½Éµ…Ñ9Õµ‰•È¡¥Ñä¹ÍÑ½­Ì¹™½½‘U¹¥ÑÌ°€Ä¥ôƒB×BĞ¹t°(€€€€€€€l‹BKBûBÓBÀƒFB×BçFBÃFˆ°€‘í™½Éµ…Ñ9Õµ‰•È¡¥Ñä¹ÍÑ½­Ì¹İ…Ñ•ÉU¹¥ÑÌ°€Ä¥ôƒB×BĞ¹t°(€€€€€€€l‹B‡FBÃFFFƒBßBÃBÿBÃFBûBÈˆ°¥ÑåMÑ½­MÑ…ÑÕÍ1…‰•°¡¥Ñä¹ÍÑ½­Ì¹ÍÑ…ÑÕÌ¥t°(€€€€€€€l(€€€€€€€€€€‹BSB×FBãFBãFˆ°(€€€€€€€€€¥Ñä¹ÍÑ½­Ì¹Í¡½ÉÑ…•MÑ…ÉÑ•‘ÑM•½¹‘Ì€ôôô¹Õ±°(€€€€€€€€€€€€ü€‹BwBÔƒBûBÛBãBÓBÃB×FFF<ˆ(€€€€€€€€€€€€è¥Ñä¹ÍÑ½­Ì¹Í¡½ÉÑ…•±…ÁÍ•‘M•½¹‘Ì€ø€À(€€€€€€€€€€€€€€ü€‘í™½Éµ…Ñ9Õµ‰•È¡¥Ñä¹ÍÑ½­Ì¹Í¡½ÉÑ…•±…ÁÍ•‘M•½¹‘Ì€¼€àÙ|ĞÀÀ°€È¥ôƒBÓBô¹€(€€€€€€€€€€€€€€è¥Ñä¹ÍÑ½­Ì¹•±…ÁÍ•‘M•½¹‘Ì€øô¥Ñä¹ÍÑ½­Ì¹Í¡½ÉÑ…•MÑ…ÉÑ•‘ÑM•½¹‘Ì(€€€€€€€€€€€€€€€€ü€‹BwBÃFBÃBïFF<ƒFB×BçFBÃFˆ(€€€€€€€€€€€€€€€€èƒBwBÃFB÷FGFFF<€‘í™½Éµ…Ñ±…ÁÍ•¡¥Ñä¹ÍÑ½­Ì¹Í¡½ÉÑ…•MÑ…ÉÑ•‘ÑM•½¹‘Ì¥õ€°(€€€€€€€t°(€€€€€€€l(€€€€€€€€€€‹B‡BëBûFBûFFF0ƒBÿBûFB×FF0ˆ°(€€€€€€€€€€‘í™½Éµ…Ñ9Õµ‰•È¡¥Ñä¹ÍÑ½­Ì¹‘…¥±åA½ÁÕ±…Ñ¥½¹1½ÍÍÉ…Ñ¥½¸€¨€ÄÀÀ°€È¥ô”€¼ƒBãBÏFBûBËBûBäƒBÓB×B÷F1€°(€€€€€€€t°(€€€€€€€l‹BWBÓBÀƒBãBßB÷BÃFBÃBïF3B÷Bøˆ°€‘í¥Ñä¹¥¹¥Ñ¥…±MÑ½­Ì¹™½½‘U¹¥ÑÍôƒB×BĞ¹t°(€€€€€€€l‹BKBûBÓBÀƒBãBßB÷BÃFBÃBïF3B÷Bøˆ°€‘í¥Ñä¹¥¹¥Ñ¥…±MÑ½­Ì¹İ…Ñ•ÉU¹¥ÑÍôƒB×BĞ¹t°(€€€€€€€l‹B£BãFBûFBÀˆ°¥Ñä¹Á½Í¥Ñ¥½¸¹±…Ñ¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€€€l‹BSBûBïBÏBûFBÀˆ°¥Ñä¹Á½Í¥Ñ¥½¸¹±½¹¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€t¤°(€€€ô¤ì(€€€½¹ÍĞµ…É­•È€ôÍÙ±•µ•¹Ğ ‰¥É±”ˆ°ì(€€€€€±…ÍÌè¥Í•ÍÑ¥¹…Ñ¥½¸(€€€€€€€€ü€‰¥Ñäµµ…É­•È¥Ñäµµ…É­•È´µ‘•ÍÑ¥¹…Ñ¥½¸ˆ(€€€€€€€€è€‰¥Ñäµµ…É­•Èˆ°(€€€€€àè¥Ñä¹Á½¥¹Ğ¹à°(€€€€€äè¥Ñä¹Á½¥¹Ğ¹ä°(€€€€€Èè¥Í•ÍÑ¥¹…Ñ¥½¸€ü€Ü€è€Ô°(€€€ô¤ì(€€€½¹ÍĞ±…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€€€±…ÍÌè€‰¥Ñäµ±…‰•°ˆ°(€€€€€àè¥Ñä¹Á½¥¹Ğ¹à€¬€à°(€€€€€äè¥Ñä¹Á½¥¹Ğ¹ä€´€Ü°(€€€ô¤ì(€€€±…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô¥Ñä¹¹…µ”ì(€€€É½ÕÀ¹…ÁÁ•¹ (€€€€€µ…É­•È°(€€€€€±…‰•°°(€€€€€ÍÙQ¥Ñ±” (€€€€€€€€‘í¥Ñä¹¹…µ•ô€ ‘í¥Ñä¹¥‘ô¤‘í¥Í•ÍÑ¥¹…Ñ¥½¸€ü€ˆƒ
+ÜƒB÷BÃBßB÷BÃFB×B÷BãBÔˆ€è€ˆ‰õ€°(€€€€€€¤°(€€€€¤ì(€€€İ½É±‘5…À¹…ÁÁ•¹¡É½ÕÀ¤ì(€ô((€™½È€¡½¹ÍĞ½‰©•Ğ½˜Í¹…ÁÍ¡½Ğ¹ÍÑ…Ñ¥=‰©•ÑÌ¤ì(€€€½¹ÍĞ±…‰•°€ôMQQ%}-%9}1	1Mm½‰©•Ğ¹­¥¹‘tì(€€€½¹ÍĞµ…É­•È€ôÍÙ±•µ•¹Ğ ‰É•Ğˆ°ì(€€€€€±…ÍÌè½‰©•Ğµµ…É­•È½‰©•Ğµµ…É­•È´´‘í½‰©•Ğ¹­¥¹‘õ€°(€€€€€àè½‰©•Ğ¹Á½¥¹Ğ¹à€´€Ğ°(€€€€€äè½‰©•Ğ¹Á½¥¹Ğ¹ä€´€Ğ°(€€€€€İ¥‘Ñ è€à°(€€€€€¡•¥¡Ğè€à°(€€€€€Éàè½‰©•Ğ¹­¥¹€ôôô€‰½…Í¥Ìˆ€ü€Ğ€è€Ä°(€€€€€ÑÉ…¹Í™½É´è(€€€€€€€½‰©•Ğ¹­¥¹€ôôô€‰µ¥¹”ˆ(€€€€€€€€€€üÉ½Ñ…Ñ” ĞÔ€‘í½‰©•Ğ¹Á½¥¹Ğ¹áô€‘í½‰©•Ğ¹Á½¥¹Ğ¹åô¥€(€€€€€€€€€€è€ˆˆ°(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÑ¥Ñ±”ˆè€‘í±…‰•±ôƒ
+Ü€‘í½‰©•Ğ¹¥‘õ€°(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÉ½İÌˆè)M=8¹ÍÑÉ¥¹¥™ä¡l(€€€€€€€l‹B‹BãBüˆ°±…‰•±t°(€€€€€€€l‹B‡FBÃFFFˆ°€‹B‡BëFF/FF/BäƒBûBÇF+B×BëF‰t°(€€€€€€€l‹B£BãFBûFBÀˆ°½‰©•Ğ¹Á½Í¥Ñ¥½¸¹±…Ñ¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€€€l‹BSBûBïBÏBûFBÀˆ°½‰©•Ğ¹Á½Í¥Ñ¥½¸¹±½¹¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€t¤°(€€€ô¤ì(€€€µ…É­•È¹…ÁÁ•¹¡ÍÙQ¥Ñ±”¡€‘í±…‰•±ô€ ‘í½‰©•Ğ¹¥‘ô¥€¤¤ì(€€€İ½É±‘5…À¹…ÁÁ•¹¡µ…É­•È¤ì(€ô((€½¹ÍĞÉÕµ½ÉQ…É•Ğ€ôÉÕµ½ÉM•…É ¹Í•ÉÙ•ÉQÉÕÑ ¹Ñ…É•Ğì(€½¹ÍĞÉÕµ½ÉQ…É•ÑA½¥¹Ğ€ôÁÉ½©•Ñ½½É‘¥¹…Ñ”¡ÉÕµ½ÉQ…É•Ğ¹Á½Í¥Ñ¥½¸¤ì(€½¹ÍĞÉÕµ½ÉQ…É•Ñ5…É­•È€ôÍÙ±•µ•¹Ğ ‰¥É±”ˆ°ì(€€€±…ÍÌè€‰ÉÕµ½Èµİ½É±µÑ…É•Ğˆ°(€€€àèÉÕµ½ÉQ…É•ÑA½¥¹Ğ¹à°(€€€äèÉÕµ½ÉQ…É•ÑA½¥¹Ğ¹ä°(€€€Èè€à°(€€€€‰‘…Ñ„µ‘•Ñ…¥°µÑ¥Ñ±”ˆèƒB›B×BïF0ƒFBïFFBÀƒ
+Ü€‘íÉÕµ½ÉQ…É•Ğ¹¥‘õ€°(€€€€‰‘…Ñ„µ‘•Ñ…¥°µÉ½İÌˆè)M=8¹ÍÑÉ¥¹¥™ä¡l(€€€€€l‹B‹BãBüˆ°ÍÑ…Ñ¥-¥¹‘1…‰•°¡ÉÕµ½ÉQ…É•Ğ¹­¥¹¥t°(€€€€€l‹B‡FBÃFFFˆ°€‹B‹BûFB÷BÃF<Í•ÉÙ•ÈÑÉÕÑ ƒ
+ÜX‰t°(€€€€€l‹BCBßBãBóFFˆ°€‘íÉÕµ½ÉM•…É ¹Í•ÉÙ•ÉQÉÕÑ ¹•á…Ñ	•…É¥¹•œ¹Ñ½¥á• Ø¥÷
+Át°(€€€€€l‹BSBãFFBÃB÷FBãF<ˆ°€‘íÉÕµ½ÉM•…É ¹Í•ÉÙ•ÉQÉÕÑ ¹•á…Ñ¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ¹Ñ½¥á• Ø¥ôƒBëBñt°(€€€€€l‹B£BãFBûFBÀˆ°ÉÕµ½ÉQ…É•Ğ¹Á½Í¥Ñ¥½¸¹±…Ñ¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€l‹BSBûBïBÏBûFBÀˆ°ÉÕµ½ÉQ…É•Ğ¹Á½Í¥Ñ¥½¸¹±½¹¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€t¤°(€ô¤ì(€ÉÕµ½ÉQ…É•Ñ5…É­•È¹…ÁÁ•¹¡ÍÙQ¥Ñ±” ‹B‹BûFB÷BÃF<ƒFB×BïF0ƒFBïFFBÀƒŠPƒFBûBïF3BëBøXˆ¤¤ì(€½¹ÍĞÉÕµ½ÉQ…É•Ñ1…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€±…ÍÌè€‰ÉÕµ½Èµİ½É±µÑ…É•Ğµ±…‰•°ˆ°(€€€àèÉÕµ½ÉQ…É•ÑA½¥¹Ğ¹à€¬€ÄÄ°(€€€äèÉÕµ½ÉQ…É•ÑA½¥¹Ğ¹ä€´€ä°(€ô¤ì(€ÉÕµ½ÉQ…É•Ñ1…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‰IU5=HQIPˆì(€İ½É±‘5…À¹…ÁÁ•¹¡ÉÕµ½ÉQ…É•Ñ5…É­•È°ÉÕµ½ÉQ…É•Ñ1…‰•°¤ì((€¥˜€¡µ½¹ÍÑ•É½¹Ñ…Ğü¹½¹Ñ…Ğ¤ì(€€€½¹ÍĞ½¹Ñ…Ğ€ôµ½¹ÍÑ•É½¹Ñ…Ğ¹½¹Ñ…Ğì(€€€½¹ÍĞ½¹Ñ…ÑI•Í½±ÕÑ¥½¸€ô(€€€€€½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…Ğü¹µ½¹ÍÑ•É%€ôôô½¹Ñ…Ğ¹µ½¹ÍÑ•É%(€€€€€€€€ü½ÕÑ½µ”¹µ½¹ÍÑ•É½¹Ñ…ÑI•Í½±ÕÑ¥½¸(€€€€€€€€è¹Õ±°ì(€€€½¹ÍĞ½¹Ñ…ÑI•ÍÕ±Ñ1…‰•°€ô(€€€€€½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰µ½¹ÍÑ•Èµ‘•™•…Ñ•ˆ(€€€€€€€€ü€‰Y%Q=Idˆ(€€€€€€€€è½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰™±•”µÍÕ••‘•ˆ(€€€€€€€€€€ü€‰1=,ˆ(€€€€€€€€€€è½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰™±•”µ™…¥±•ˆ(€€€€€€€€€€€€ü€‰1%0ˆ(€€€€€€€€è½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰™±•”µÉ•ÅÕ¥É•ˆ(€€€€€€€€€€ü€‰1ˆ(€€€€€€€€€€è½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€ôôô€‰•áÁ•‘¥Ñ¥½¸µ‘•™•…Ñ•ˆ(€€€€€€€€€€€€ü€‰Pˆ(€€€€€€€€€€€€è€‰=9QPˆì(€€€½¹ÍĞµ…É­•È€ôÍÙ±•µ•¹Ğ ‰¥É±”ˆ°ì(€€€€€±…ÍÌè€‰½¹Ñ…Ğµİ½É±µµ…É­•Èˆ°(€€€€€àè½¹Ñ…Ğ¹…É…Ù…¹A½¥¹Ğ¹à°(€€€€€äè½¹Ñ…Ğ¹…É…Ù…¹A½¥¹Ğ¹ä°(€€€€€Èè€ÄÈ°(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÑ¥Ñ±”ˆèƒBkBûB÷FBÃBëFƒ
+Ü€‘í½¹Ñ…Ğ¹µ½¹ÍÑ•É%‘õ€°(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÉ½İÌˆè)M=8¹ÍÑÉ¥¹¥™ä¡l(€€€€€€€l‹BKFB×BóF<ˆ°™½Éµ…Ñ±…ÁÍ•¡½¹Ñ…Ğ¹…ÑM•½¹‘Ì¥t°(€€€€€€€l‹BsBûB÷FFF ˆ°½¹Ñ…Ğ¹µ½¹ÍÑ•É%‘t°(€€€€€€€l‰A±…å•ÈA½İ•Èˆ°MÑÉ¥¹œ¡½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹Á±…å•ÉA½İ•È€üü€ÄÀÀ¥t°(€€€€€€€l‰5½¹ÍÑ•ÈA½İ•Èˆ°MÑÉ¥¹œ¡½¹Ñ…Ğ¹µ½¹ÍÑ•ÉA½İ•È¥t°(€€€€€€€l‹BƒBÃBßFB×F#B×B÷BãBÔˆ°½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹ÍÑ…ÑÕÌ€üü€‹BwBÔƒBãFBÿBûBïB÷BãFFF<‰t°(€€€€€€€l‹BSBûBëFFBãB÷BÀˆ°½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹‘½ÑÉ¥¹”€üü€‰UQ<‰t°(€€€€€€€l‹B‡BëBûFBûFFF0ƒBóBûB÷FFFBÀˆ°€‘ì¡½¹Ñ…Ğ¹µ½¹ÍÑ•ÉMÁ••‘5•Ñ•ÉÍA•ÉM•½¹€¨€Ì¸Ø¤¹Ñ½¥á• Ä¥ôƒBëBğ¿Ft°(€€€€€€€l(€€€€€€€€€€‹B‡BëBûFBûFFF0ƒBûFFBûBÓBÀˆ°(€€€€€€€€€½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸(€€€€€€€€€€€€ü€‘ì¡½¹Ñ…ÑI•Í½±ÕÑ¥½¸¹™±••I•Í½±ÕÑ¥½¸¹…É…Ù…¹MÁ••‘5•Ñ•ÉÍA•ÉM•½¹€¨€Ì¸Ø¤¹Ñ½¥á• Ä¥ôƒBëBğ¿F€(€€€€€€€€€€€€è€‹ŠPˆ°(€€€€€€€t°(€€€€€€€l(€€€€€€€€€€‹BSBøƒBÇB×BßBûBÿBÃFB÷BûBäƒBÓBãFFBÃB÷FBãBàˆ°(€€€€€€€€€½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸ü¹Í•½¹‘ÍQ½M…™•M•Á…É…Ñ¥½¸€ôôô¹Õ±°ñğ(€€€€€€€€€½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸€ôôô¹Õ±°ñğ(€€€€€€€€€½¹Ñ…ÑI•Í½±ÕÑ¥½¸ü¹™±••I•Í½±ÕÑ¥½¸€ôôôÕ¹‘•™¥¹•(€€€€€€€€€€€€ü€‹ŠPˆ(€€€€€€€€€€€€è™½Éµ…ÑÕÉ…Ñ¥½¸ (€€€€€€€€€€€€€€€½¹Ñ…ÑI•Í½±ÕÑ¥½¸¹™±••I•Í½±ÕÑ¥½¸¹Í•½¹‘ÍQ½M…™•M•Á…É…Ñ¥½¸°(€€€€€€€€€€€€€€¤°(€€€€€€€t°(€€€€€€€l‹BƒBÃBÓBãFFˆ°€‘í½¹Ñ…Ğ¹¥¹Ñ•É…Ñ¥½¹I…‘¥ÕÍ5•Ñ•ÉÍôƒBñt°(€€€€€€€l‹BƒBÃBßBÓB×BïB×B÷BãBÔˆ°€‘í½¹Ñ…Ğ¹Í•Á…É…Ñ¥½¹5•Ñ•ÉÌ¹Ñ½¥á• Ì¥ôƒBñt°(€€€€€€€l‹BFFF0ˆ°€‘í½¹Ñ…Ğ¹É½ÕÑ•¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ¹Ñ½¥á• Ä¥ôƒBëBñt°(€€€€€t¤°(€€€ô¤ì(€€€½¹ÍĞ±…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€€€±…ÍÌè€‰½¹Ñ…Ğµİ½É±µ±…‰•°ˆ°(€€€€€àè½¹Ñ…Ğ¹…É…Ù…¹A½¥¹Ğ¹à€¬€ÄÔ°(€€€€€äè½¹Ñ…Ğ¹…É…Ù…¹A½¥¹Ğ¹ä€´€ÄÄ°(€€€ô¤ì(€€€±…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô½¹Ñ…ÑI•ÍÕ±Ñ1…‰•°ì(€€€µ…É­•È¹…ÁÁ•¹ (€€€€€ÍÙQ¥Ñ±”¡€‘í½¹Ñ…ÑI•ÍÕ±Ñ1…‰•±ôèƒBëBûB÷FBÃBëFƒF€‘í½¹Ñ…Ğ¹µ½¹ÍÑ•É%‘õ€¤°(€€€€¤ì(€€€İ½É±‘5…À¹…ÁÁ•¹¡µ…É­•È°±…‰•°¤ì(€ô((€™½È€¡½¹ÍĞµ½¹ÍÑ•È½˜Í¹…ÁÍ¡½Ğ¹µ½¹ÍÑ•ÉÌ¤ì(€€€½¹ÍĞµ…É­•È€ôÍÙ±•µ•¹Ğ ‰Á½±å½¸ˆ°ì(€€€€€±…ÍÌè€‰µ½¹ÍÑ•Èµµ…É­•Èˆ°(€€€€€Á½¥¹ÑÌè€‘íµ½¹ÍÑ•È¹Á½¥¹Ğ¹áô°‘íµ½¹ÍÑ•È¹Á½¥¹Ğ¹ä€´€İô€‘íµ½¹ÍÑ•È¹Á½¥¹Ğ¹à€¬€İô°‘íµ½¹ÍÑ•È¹Á½¥¹Ğ¹ä€¬€Ùô€‘íµ½¹ÍÑ•È¹Á½¥¹Ğ¹à€´€İô°‘íµ½¹ÍÑ•È¹Á½¥¹Ğ¹ä€¬€Ùõ€°(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÑ¥Ñ±”ˆèƒBGBïFBÛBÓBÃF;F'BãBäƒBóBûB÷FFF ƒ
+Ü€‘íµ½¹ÍÑ•È¹¥‘õ€°(€€€€€€‰‘…Ñ„µ‘•Ñ…¥°µÉ½İÌˆè)M=8¹ÍÑÉ¥¹¥™ä¡l(€€€€€€€l‰A½İ•Èˆ°MÑÉ¥¹œ¡µ½¹ÍÑ•È¹Á½İ•È¥t°(€€€€€€€l‹B›BãBëBìˆ°MÑÉ¥¹œ¡µ½¹ÍÑ•È¹å±•%¹‘•à¥t°(€€€€€€€l‹B‡B×BÏBóB×B÷Fˆ°MÑÉ¥¹œ¡µ½¹ÍÑ•È¹Í•µ•¹Ñ%¹‘•à€¬€Ä¥t°(€€€€€€€l‹B{BÇBßBûF ˆ°€‘íµ½¹ÍÑ•È¹Ù¥Í¥½¹I…‘¥ÕÍ5•Ñ•ÉÍôƒBñt°(€€€€€€€l‹BkBûB÷FBÃBëFˆ°€‘íµ½¹ÍÑ•È¹¥¹Ñ•É…Ñ¥½¹I…‘¥ÕÍ5•Ñ•ÉÍôƒBñt°(€€€€€€€l‹B£BãFBûFBÀˆ°µ½¹ÍÑ•È¹Á½Í¥Ñ¥½¸¹±…Ñ¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€€€l‹BSBûBïBÏBûFBÀˆ°µ½¹ÍÑ•È¹Á½Í¥Ñ¥½¸¹±½¹¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€t¤°(€€€ô¤ì(€€€µ…É­•È¹…ÁÁ•¹¡ÍÙQ¥Ñ±”¡ƒBsBûB÷FFF €‘íµ½¹ÍÑ•È¹¥‘õ€¤¤ì(€€€½¹ÍĞ±…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€€€±…ÍÌè€‰µ½¹ÍÑ•Èµ±…‰•°ˆ°(€€€€€àèµ½¹ÍÑ•È¹Á½¥¹Ğ¹à€¬€ÄÀ°(€€€€€äèµ½¹ÍÑ•È¹Á½¥¹Ğ¹ä€¬€Ğ°(€€€ô¤ì(€€€±…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ôA]H€‘íµ½¹ÍÑ•È¹Á½İ•Éõ€ì(€€€İ½É±‘5…À¹…ÁÁ•¹¡µ…É­•È°±…‰•°¤ì(€ô((€½¹ÍĞ…É…Ù…¹M•µ•¹Ğ€ô(€€€½ÕÑ½µ”¹ÍÑ…ÑÕÌ€ôôô€‰™…¥±•ˆ(€€€€€€üƒBBûBÏBãBÄƒ
+ÜƒFB×BÏBóB×B÷F€‘ì¡É½ÕÑ”¹Á½Í¥Ñ¥½¸¹Í•µ•¹Ñ%¹‘•à€üü€À¤€¬€Åõ€(€€€€€€è½ÕÑ½µ”¹ÍÑ…ÑÕÌ€ôôô€‰Á…ÕÍ•ˆ(€€€€€€ü½ÕÑ½µ”¹¥¹Ñ•ÉÉÕÁÑ¥½¹…ÕÍ”€ôôô€‰É½ÕÑ”µ•¹ˆ(€€€€€€€€ü€‹BkBûB÷B×FƒBóBÃFF#FFFBÀƒBËB÷BÔƒBÏBûFBûBÓBÀˆ(€€€€€€€€èƒB{FFBÃB÷BûBËBïB×Bôƒ
+ÜƒFB×BÏBóB×B÷F€‘ì¡É½ÕÑ”¹Á½Í¥Ñ¥½¸¹Í•µ•¹Ñ%¹‘•à€üü€À¤€¬€Åõ€(€€€€€€è½ÕÑ½µ”¹ÍÑ…ÑÕÌ€ôôô€‰½µÁ±•Ñ•ˆ(€€€€€€€€ü€‹B·BëFBÿB×BÓBãFBãF<ƒBßBÃBËB×FF#B×B÷BÀˆ(€€€€€€èÉ½ÕÑ”¹Á½Í¥Ñ¥½¸¹Í•µ•¹Ñ%¹‘•à€ôôô¹Õ±°(€€€€€€ü€‹BFBãBÇF/Bìˆ(€€€€€€èƒB‡B×BÏBóB×B÷F€‘íÉ½ÕÑ”¹Á½Í¥Ñ¥½¸¹Í•µ•¹Ñ%¹‘•à€¬€Åõ€ì(€½¹ÍĞ…É…Ù…¸€ôÍÙ±•µ•¹Ğ ‰œˆ°ì(€€€€‰‘…Ñ„µ‘•Ñ…¥°µÑ¥Ñ±”ˆè€‹BkBÃFBÃBËBÃBôƒ
+ÜƒBÃBëFBãBËB÷F/BäƒBóBÃFF#FFFˆ°(€€€€‰‘…Ñ„µ‘•Ñ…¥°µÉ½İÌˆè)M=8¹ÍÑÉ¥¹¥™ä¡l(€€€€€l‹B‡FBÃFFFˆ°…É…Ù…¹M•µ•¹Ñt°(€€€€€l‹BcFFBûBĞˆ°½ÕÑ½µ”¹ÍÑ…ÑÕÍt°(€€€€€l(€€€€€€€€‹BSBûBëFFBãB÷BÀˆ°(€€€€€€€‘½ÑÉ¥¹”¹ÍÑ…ÑÕÌ€ôôô€‰É•ÍÕµ•µ…¹µ½¹Ñ¥¹Õ¥¹œˆ(€€€€€€€€€€ü€‰MQ=@ƒ
+ÜIMU5ˆ(€€€€€€€€€€è‘½ÑÉ¥¹”¹ÍÑ…ÑÕÌ€ôôô€‰­¹½İ¸µ…¹µ½¹Ñ¥¹Õ¥¹œˆ(€€€€€€€€€€€€ü€‘í‘½ÑÉ¥¹”¹‘½ÑÉ¥¹•ôƒ
+Ü-9=]9€(€€€€€€€€€€è‘½ÑÉ¥¹”¹‘½ÑÉ¥¹”°(€€€€€t°(€€€€€l‹B‡BëBûFBûFFF0ˆ°€‘íÉ½ÕÑ”¹ÍÁ••‘-¥±½µ•Ñ•ÉÍA•É!½ÕÈ¹Ñ½¥á• Ä¥ôƒBëBğ¿Ft°(€€€€€l‹BFBûBçBÓB×B÷Bøˆ°€‘ì¡É½ÕÑ”¹Á½Í¥Ñ¥½¸¹ÑÉ…Ù•±•‘¥ÍÑ…¹•5•Ñ•ÉÌ€¼€Å|ÀÀÀ¤¹Ñ½¥á• Ä¥ôƒBëBñt°(€€€€€l‹B{FFBÃBïBûFF0ˆ°€‘ì¡É½ÕÑ”¹Á½Í¥Ñ¥½¸¹É•µ…¥¹¥¹¥ÍÑ…¹•5•Ñ•ÉÌ€¼€Å|ÀÀÀ¤¹Ñ½¥á• Ä¥ôƒBëBñt°(€€€€€l‹BKFB×BóF<ˆ°™½Éµ…Ñ±…ÁÍ•¡É½ÕÑ”¹Á½Í¥Ñ¥½¸¹•±…ÁÍ•‘M•½¹‘Ì¥t°(€€€€€l‹B£BãFBûFBÀˆ°É½ÕÑ”¹Á½Í¥Ñ¥½¸¹½½É‘¥¹…Ñ”¹±…Ñ¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€€€l‹BSBûBïBÏBûFBÀˆ°É½ÕÑ”¹Á½Í¥Ñ¥½¸¹½½É‘¥¹…Ñ”¹±½¹¥ÑÕ‘••œ¹Ñ½¥á• Ø¥t°(€€€t¤°(€ô¤ì(€…É…Ù…¸¹…ÁÁ•¹ (€€€ÍÙ±•µ•¹Ğ ‰¥É±”ˆ°ì(€€€€€±…ÍÌè…É…Ù…¸µµ…É­•È…É…Ù…¸µµ…É­•È´´‘í½ÕÑ½µ”¹ÍÑ…ÑÕÍõ€°(€€€€€àèÉ½ÕÑ”¹Á½Í¥Ñ¥½¸¹Á½¥¹Ğ¹à°(€€€€€äèÉ½ÕÑ”¹Á½Í¥Ñ¥½¸¹Á½¥¹Ğ¹ä°(€€€€€Èè€à°(€€€ô¤°(€€€ÍÙQ¥Ñ±” ‹BkBÃFBÃBËBÃBôˆ¤°(€€¤ì(€İ½É±‘5…À¹…ÁÁ•¹¡…É…Ù…¸¤ì)ô((¼¨¨Á…É…´í¥µÁ½ÉĞ ˆ¸¸½Í¥´µ½É”½‘¥ÍĞ½ÍÉŒ½¥¹‘•à¹©Ìˆ¤¹¥ÑåMÑ½­MÑ…ÑÕÍôÍÑ…ÑÕÌ€¨¼)™Õ¹Ñ¥½¸¥ÑåMÑ½­MÑ…ÑÕÍ1…‰•°¡ÍÑ…ÑÕÌ¤ì(€¥˜€¡ÍÑ…ÑÕÌ€ôôô€‰™½½µ‘•Á±•Ñ•ˆ¤É•ÑÕÉ¸€‹BwB×FƒB×BÓF,ˆì(€¥˜€¡ÍÑ…ÑÕÌ€ôôô€‰İ…Ñ•Èµ‘•Á±•Ñ•ˆ¤É•ÑÕÉ¸€‹BwB×FƒBËBûBÓF,ˆì(€¥˜€¡ÍÑ…ÑÕÌ€ôôô€‰™½½µ…¹µİ…Ñ•Èµ‘•Á±•Ñ•ˆ¤É•ÑÕÉ¸€‹BwB×FƒB×BÓF,ƒBàƒBËBûBÓF,ˆì(€É•ÑÕÉ¸€‹B_BÃBÿBÃFF,ƒB×FFF0ˆì)ô((¼¨¨(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ••‰Õ5…ÁM¹…ÁÍ¡½Ğùl‰¥Ñ¥•Ì‰uô¥Ñ¥•Ì(€¨¼)™Õ¹Ñ¥½¸Íå¹¥Ñå=ÁÑ¥½¹Ì¡¥Ñ¥•Ì¤ì(€½¹ÍĞ¹•áÑ%‘Ì€ô¥Ñ¥•Ì¹µ…À ¡¥Ñä¤€ôø¥Ñä¹¥¤ì(€Íå¹¥ÑåM•±•Ğ¡É½ÕÑ•MÑ…ÉÑ¥Ñä°¥Ñ¥•Ì°¹•áÑ%‘Ì¤ì(€Íå¹¥ÑåM•±•Ğ¡É½ÕÑ••ÍÑ¥¹…Ñ¥½¹¥Ñä°¥Ñ¥•Ì°¹•áÑ%‘Ì¤ì)ô((¼¨¨(€¨Á…É…´í!Q51M•±•Ñ±•µ•¹ÑôÍ•±•Ğ(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ••‰Õ5…ÁM¹…ÁÍ¡½Ğùl‰¥Ñ¥•Ì‰uô¥Ñ¥•Ì(€¨Á…É…´íÉ•…‘½¹±äÍÑÉ¥¹muô¹•áÑ%‘Ì(€¨¼)™Õ¹Ñ¥½¸Íå¹¥ÑåM•±•Ğ¡Í•±•Ğ°¥Ñ¥•Ì°¹•áÑ%‘Ì¤ì(€½¹ÍĞÕÉÉ•¹Ñ%‘Ì€ôÉÉ…ä¹™É½´¡Í•±•Ğ¹½ÁÑ¥½¹Ì°€¡½ÁÑ¥½¸¤€ôø½ÁÑ¥½¸¹Ù…±Õ”¤ì(€¥˜€ (€€€ÕÉÉ•¹Ñ%‘Ì¹±•¹Ñ €ôôô¹•áÑ%‘Ì¹±•¹Ñ €˜˜(€€€ÕÉÉ•¹Ñ%‘Ì¹•Ù•Éä ¡¥°¥¹‘•à¤€ôø¥€ôôô¹•áÑ%‘Ím¥¹‘•át¤(€€¤ì(€€€É•ÑÕÉ¸ì(€ô((€½¹ÍĞÍ•±•Ñ•‘%€ôÍ•±•Ğ¹Ù…±Õ”ì(€Í•±•Ğ¹É•Á±…•¡¥±‘É•¸ (€€€€¸¸¹¥Ñ¥•Ì¹µ…À ¡¥Ñä¤€ôøì(€€€€€½¹ÍĞ½ÁÑ¥½¸€ô‘½Õµ•¹Ğ¹É•…Ñ•±•µ•¹Ğ ‰½ÁÑ¥½¸ˆ¤ì(€€€€€½ÁÑ¥½¸¹Ù…±Õ”€ô¥Ñä¹¥ì(€€€€€½ÁÑ¥½¸¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í¥Ñä¹¹…µ•ôƒ
+Ü€‘í¥Ñä¹¥‘õ€ì(€€€€€É•ÑÕÉ¸½ÁÑ¥½¸ì(€€€ô¤°(€€¤ì(€Í•±•Ğ¹Ù…±Õ”€ô¹•áÑ%‘Ì¹¥¹±Õ‘•Ì¡Í•±•Ñ•‘%¤(€€€€üÍ•±•Ñ•‘%(€€€€è€¡¹•áÑ%‘ÍlÁt€üü€ˆˆ¤ì)ô((¼¨¨(€¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ••‰Õ5…ÁM¹…ÁÍ¡½Ğùl‰µ½¹ÍÑ•ÉÌ‰uôµ½¹ÍÑ•ÉÌ(€¨¼)™Õ¹Ñ¥½¸Íå¹½¹Ñ…Ñ5½¹ÍÑ•É=ÁÑ¥½¹Ì¡µ½¹ÍÑ•ÉÌ¤ì(€½¹ÍĞÕÉÉ•¹Ñ%‘Ì€ôÉÉ…ä¹™É½´¡½¹Ñ…Ñ5½¹ÍÑ•ÉM•±•Ğ¹½ÁÑ¥½¹Ì°€¡½ÁÑ¥½¸¤€ôø½ÁÑ¥½¸¹Ù…±Õ”¤ì(€½¹ÍĞ¹•áÑ%‘Ì€ôµ½¹ÍÑ•ÉÌ¹µ…À ¡µ½¹ÍÑ•È¤€ôøµ½¹ÍÑ•È¹¥¤ì(€¥˜€ (€€€ÕÉÉ•¹Ñ%‘Ì¹±•¹Ñ €ôôô¹•áÑ%‘Ì¹±•¹Ñ €˜˜(€€€ÕÉÉ•¹Ñ%‘Ì¹•Ù•Éä ¡¥°¥¹‘•à¤€ôø¥€ôôô¹•áÑ%‘Ím¥¹‘•át¤(€€¤ì(€€€É•ÑÕÉ¸ì(€ô((€½¹ÍĞÍ•±•Ñ•‘%€ô½¹Ñ…Ñ5½¹ÍÑ•ÉM•±•Ğ¹Ù…±Õ”ì(€½¹Ñ…Ñ5½¹ÍÑ•ÉM•±•Ğ¹É•Á±…•¡¥±‘É•¸ (€€€€¸¸¹µ½¹ÍÑ•ÉÌ¹µ…À ¡µ½¹ÍÑ•È¤€ôøì(€€€€€½¹ÍĞ½ÁÑ¥½¸€ô‘½Õµ•¹Ğ¹É•…Ñ•±•µ•¹Ğ ‰½ÁÑ¥½¸ˆ¤ì(€€€€€½ÁÑ¥½¸¹Ù…±Õ”€ôµ½¹ÍÑ•È¹¥ì(€€€€€½ÁÑ¥½¸¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘íµ½¹ÍÑ•È¹¥‘ôƒ
+ÜA]H€‘íµ½¹ÍÑ•È¹Á½İ•Éõ€ì(€€€€€É•ÑÕÉ¸½ÁÑ¥½¸ì(€€€ô¤°(€€¤ì(€½¹Ñ…Ñ5½¹ÍÑ•ÉM•±•Ğ¹Ù…±Õ”€ô¹•áÑ%‘Ì¹¥¹±Õ‘•Ì¡Í•±•Ñ•‘%¤(€€€€üÍ•±•Ñ•‘%(€€€€è€¡¹•áÑ%‘ÍlÁt€üü€ˆˆ¤ì)ô()™Õ¹Ñ¥½¸É•…‘I½ÕÑ•½µµ…¹‘Ì ¤ì(€É•ÑÕÉ¸É½ÕÑ•	•…É¥¹%¹ÁÕÑÌ¹µ…À ¡¥¹ÁÕĞ°¥¹‘•à¤€ôø€¡ì(€€€‰•…É¥¹•œè¥¹ÁÕĞ¹Ù…±Õ•Í9Õµ‰•È°(€€€‘¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌèÉ½ÕÑ•¥ÍÑ…¹•%¹ÁÕÑÍm¥¹‘•átü¹Ù…±Õ•Í9Õµ‰•È€üü9Õµ‰•È¹9…8°(€ô¤¤ì)ô()™Õ¹Ñ¥½¸‘É…İÉ¥ ¤ì(€™½È€¡±•Ğ±½¹¥ÑÕ‘”€ô€´ÄàÀì±½¹¥ÑÕ‘”€ğô€ÄàÀì±½¹¥ÑÕ‘”€¬ô€ØÀ¤ì(€€€½¹ÍĞà€ô€ ¡±½¹¥ÑÕ‘”€¬€ÄàÀ¤€¼€ÌØÀ¤€¨	U}5A}]%Q ì(€€€İ½É±‘5…À¹…ÁÁ•¹ (€€€€€ÍÙ±•µ•¹Ğ ‰±¥¹”ˆ°ì(€€€€€€€±…ÍÌè±½¹¥ÑÕ‘”€ôôô€À€ü€‰µ…Àµµ•É¥‘¥…¸ˆ€è€‰µ…ÀµÉ¥ˆ°(€€€€€€€àÄèà°(€€€€€€€àÈèà°(€€€€€€€äÄè€À°(€€€€€€€äÈè	U}5A}!%!P°(€€€€€ô¤°(€€€€¤ì(€€€¥˜€¡±½¹¥ÑÕ‘”€ø€´ÄàÀ€˜˜±½¹¥ÑÕ‘”€ğ€ÄàÀ¤ì(€€€€€½¹ÍĞ±…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€€€€€±…ÍÌè€‰µ…Àµ…á¥Ìµ±…‰•°ˆ°(€€€€€€€àèà€¬€Ô°(€€€€€€€äè	U}5A}!%!P€´€Ü°(€€€€€ô¤ì(€€€€€±…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í±½¹¥ÑÕ‘•÷
+Á€ì(€€€€€İ½É±‘5…À¹…ÁÁ•¹¡±…‰•°¤ì(€€€ô(€ô((€™½È€¡±•Ğ±…Ñ¥ÑÕ‘”€ô€´ØÀì±…Ñ¥ÑÕ‘”€ğô€ØÀì±…Ñ¥ÑÕ‘”€¬ô€ÌÀ¤ì(€€€½¹ÍĞä€ô€  äÀ€´±…Ñ¥ÑÕ‘”¤€¼€ÄàÀ¤€¨	U}5A}!%!Pì(€€€İ½É±‘5…À¹…ÁÁ•¹ (€€€€€ÍÙ±•µ•¹Ğ ‰±¥¹”ˆ°ì(€€€€€€€±…ÍÌè±…Ñ¥ÑÕ‘”€ôôô€À€ü€‰µ…Àµ•ÅÕ…Ñ½Èˆ€è€‰µ…ÀµÉ¥ˆ°(€€€€€€€àÄè€À°(€€€€€€€àÈè	U}5A}]%Q °(€€€€€€€äÄèä°(€€€€€€€äÈèä°(€€€€€ô¤°(€€€€¤ì(€€€½¹ÍĞ±…‰•°€ôÍÙ±•µ•¹Ğ ‰Ñ•áĞˆ°ì(€€€€€±…ÍÌè€‰µ…Àµ…á¥Ìµ±…‰•°ˆ°(€€€€€àè€Ü°(€€€€€äèä€´€Ô°(€€€ô¤ì(€€€±…‰•°¹Ñ•áÑ½¹Ñ•¹Ğ€ô€‘í±…Ñ¥ÑÕ‘•÷
+Á€ì(€€€İ½É±‘5…À¹…ÁÁ•¹¡±…‰•°¤ì(€ô)ô((¼¨¨Á…É…´íÍÑÉ¥¹ôÑ¥Ñ±”Á…É…´íÕ¹­¹½İ¹ôÉ½İÍY…±Õ”€¨¼)™Õ¹Ñ¥½¸Í¡½İ•Ñ…¥±Ì¡Ñ¥Ñ±”°É½İÍY…±Õ”¤ì(€¥˜€ …ÉÉ…ä¹¥ÍÉÉ…ä¡É½İÍY…±Õ”¤¤É•ÑÕÉ¸ì(€‘•Ñ…¥±Q¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÑ¥Ñ±”ì(€‘•Ñ…¥±1¥ÍĞ¹É•Á±…•¡¥±‘É•¸ ¤ì((€™½È€¡½¹ÍĞÉ½Ü½˜É½İÍY…±Õ”¤ì(€€€¥˜€ …ÉÉ…ä¹¥ÍÉÉ…ä¡É½Ü¤ñğÉ½Ü¹±•¹Ñ €„ôô€È¤½¹Ñ¥¹Õ”ì(€€€½¹ÍĞİÉ…ÁÁ•È€ô‘½Õµ•¹Ğ¹É•…Ñ•±•µ•¹Ğ ‰‘¥Øˆ¤ì(€€€½¹ÍĞÑ•É´€ô‘½Õµ•¹Ğ¹É•…Ñ•±•µ•¹Ğ ‰‘Ğˆ¤ì(€€€½¹ÍĞÙ…±Õ”€ô‘½Õµ•¹Ğ¹É•…Ñ•±•µ•¹Ğ ‰‘ˆ¤ì(€€€Ñ•É´¹Ñ•áÑ½¹Ñ•¹Ğ€ôMÑÉ¥¹œ¡É½İlÁt¤ì(€€€Ù…±Õ”¹Ñ•áÑ½¹Ñ•¹Ğ€ôMÑÉ¥¹œ¡É½İlÅt¤ì(€€€İÉ…ÁÁ•È¹…ÁÁ•¹¡Ñ•É´°Ù…±Õ”¤ì(€€€‘•Ñ…¥±1¥ÍĞ¹…ÁÁ•¹¡İÉ…ÁÁ•È¤ì(€ô)ô((¼¨¨(€¨Ñ•µÁ±…Ñ”í±•µ•¹ÑôP(€¨Á…É…´íÍÑÉ¥¹ô¥(€¨Á…É…´íì¹•Ü€ ¸¸¹…ÉÌè…¹åmt¤èPõô½¹ÍÑÉÕÑ½È(€¨É•ÑÕÉ¹ÌíQô(€¨¼)™Õ¹Ñ¥½¸É•ÅÕ¥É•±•µ•¹Ğ¡¥°½¹ÍÑÉÕÑ½È¤ì(€½¹ÍĞ•±•µ•¹Ğ€ô‘½Õµ•¹Ğ¹•Ñ±•µ•¹Ñ	å%¡¥¤ì(€¥˜€ „¡•±•µ•¹Ğ¥¹ÍÑ…¹•½˜½¹ÍÑÉÕÑ½È¤¤ì(€€€Ñ¡É½Ü¹•ÜÉÉ½È¡5¥ÍÍ¥¹œÉ•ÅÕ¥É••±•µ•¹Ğ€Œ‘í¥‘õ€¤ì(€ô(€É•ÑÕÉ¸•±•µ•¹Ğì)ô((¼¨¨(€¨Á…É…´í­•å½˜MY±•µ•¹ÑQ…9…µ•5…ÁôÑ…9…µ”(€¨Á…É…´íI•½ÉñÍÑÉ¥¹œ°ÍÑÉ¥¹œğ¹Õµ‰•Èùôm…ÑÑÉ¥‰ÕÑ•Ít(€¨¼)™Õ¹Ñ¥½¸ÍÙ±•µ•¹Ğ¡Ñ…9…µ”°…ÑÑÉ¥‰ÕÑ•Ì€ôíô¤ì(€½¹ÍĞ•±•µ•¹Ğ€ô‘½Õµ•¹Ğ¹É•…Ñ•±•µ•¹Ñ9L¡MY}95MA°Ñ…9…µ”¤ì(€™½È€¡½¹ÍĞm¹…µ”°Ù…±Õ•t½˜=‰©•Ğ¹•¹ÑÉ¥•Ì¡…ÑÑÉ¥‰ÕÑ•Ì¤¤ì(€€€¥˜€¡Ù…±Õ”€„ôô€ˆˆ¤•±•µ•¹Ğ¹Í•ÑÑÑÉ¥‰ÕÑ”¡¹…µ”°MÑÉ¥¹œ¡Ù…±Õ”¤¤ì(€ô(€É•ÑÕÉ¸•±•µ•¹Ğì)ô((¼¨¨Á…É…´íÍÑÉ¥¹ôÑ•áĞ€¨¼)™Õ¹Ñ¥½¸ÍÙQ¥Ñ±”¡Ñ•áĞ¤ì(€½¹ÍĞÑ¥Ñ±”€ôÍÙ±•µ•¹Ğ ‰Ñ¥Ñ±”ˆ¤ì(€Ñ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ğ€ôÑ•áĞì(€É•ÑÕÉ¸Ñ¥Ñ±”ì)ô((¼¨¨Á…É…´í¹Õµ‰•ÉôÍ•½¹‘Ì€¨¼)™Õ¹Ñ¥½¸™½Éµ…Ñ±…ÁÍ•¡Í•½¹‘Ì¤ì(€½¹ÍĞİ¡½±•M•½¹‘Ì€ô5…Ñ ¹µ…à À°5…Ñ ¹™±½½È¡Í•½¹‘Ì¤¤ì(€½¹ÍĞ¡½ÕÉÌ€ô5…Ñ ¹™±½½È¡İ¡½±•M•½¹‘Ì€¼€Í|ØÀÀ¤ì(€½¹ÍĞµ¥¹ÕÑ•Ì€ô5…Ñ ¹™±½½È ¡İ¡½±•M•½¹‘Ì€”€Í|ØÀÀ¤€¼€ØÀ¤ì(€½¹ÍĞÉ•µ…¥¹‘•È€ôİ¡½±•M•½¹‘Ì€”€ØÀì(€É•ÑÕÉ¸P¬‘íMÑÉ¥¹œ¡¡½ÕÉÌ¤¹Á…‘MÑ…ÉĞ È°€ˆÀˆ¥ôè‘íMÑÉ¥¹œ¡µ¥¹ÕÑ•Ì¤¹Á…‘MÑ…ÉĞ È°€ˆÀˆ¥ôè‘íMÑÉ¥¹œ¡É•µ…¥¹‘•È¤¹Á…‘MÑ…ÉĞ È°€ˆÀˆ¥õ€ì)ô((¼¨¨Á…É…´í¹Õµ‰•ÉôÍ•½¹‘Ì€¨¼)™Õ¹Ñ¥½¸™½Éµ…ÑÕÉ…Ñ¥½¸¡Í•½¹‘Ì¤ì(€½¹ÍĞ¡½ÕÉÌ€ôÍ•½¹‘Ì€¼€Í|ØÀÀì(€É•ÑÕÉ¸¡½ÕÉÌ€øô€Ğà€ü€‘ì¡¡½ÕÉÌ€¼€ÈĞ¤¹Ñ½¥á• Ä¥ôƒBÓBõ€€è€‘í¡½ÕÉÌ¹Ñ½¥á• Ä¥ôƒF€ì)ô((¼¨¨Á…É…´í¹Õµ‰•ÉôÙ…±Õ”Á…É…´í¹Õµ‰•Éômµ…á¥µÕµÉ…Ñ¥½¹¥¥ÑÍt€¨¼)™Õ¹Ñ¥½¸™½Éµ…Ñ9Õµ‰•È¡Ù…±Õ”°µ…á¥µÕµÉ…Ñ¥½¹¥¥ÑÌ€ô€Ä¤ì(€É•ÑÕÉ¸Ù…±Õ”¹Ñ½1½…±•MÑÉ¥¹œ ‰ÉÔµITˆ°ìµ…á¥µÕµÉ…Ñ¥½¹¥¥ÑÌô¤ì)ô((¼¨¨Á…É…´ì‰™½½ˆğ€‰İ…Ñ•Èˆğ€‰‰½Ñ ˆğ¹Õ±±ô…ÕÍ”€¨¼)™Õ¹Ñ¥½¸™½Éµ…Ñ•Á±•Ñ¥½¹…ÕÍ”¡…ÕÍ”¤ì(€¥˜€¡…ÕÍ”€ôôô€‰™½½ˆ¤É•ÑÕÉ¸€‹BWBÓBÀˆì(€¥˜€¡…ÕÍ”€ôôô€‰İ…Ñ•Èˆ¤É•ÑÕÉ¸€‹BKBûBÓBÀˆì(€¥˜€¡…ÕÍ”€ôôô€‰‰½Ñ ˆ¤É•ÑÕÉ¸€‹BWBÓBÀƒBàƒBËBûBÓBÀˆì(€É•ÑÕÉ¸€‹B_BÃBÿBÃFF,ˆì)ô((¼¨¨Á…É…´í­•å½˜ÑåÁ•½˜MQQ%}-%9}1	1Lğ¹Õ±±ô­¥¹€¨¼)™Õ¹Ñ¥½¸ÍÑ…Ñ¥-¥¹‘1…‰•°¡­¥¹¤ì(€É•ÑÕÉ¸­¥¹€üMQQ%}-%9}1	1Mm­¥¹‘t€è€‹B‡BëFF/FF/BäƒBûBÇF+B×BëFˆì)ô((¼¨¨Á…É…´íI•ÑÕÉ¹QåÁ”ñÑåÁ•½˜É•…Ñ•½ÕÉM•µ•¹ÑI½ÕÑ•M¹…ÁÍ¡½ĞùôÉ½ÕÑ”€¨¼)™Õ¹Ñ¥½¸™½Éµ…ÑI½ÕÑ•MÕµµ…Éä¡É½ÕÑ”¤ì(€É•ÑÕÉ¸€‘íÉ½ÕÑ”¹Ñ½Ñ…±¥ÍÑ…¹•-¥±½µ•Ñ•ÉÌ¹Ñ½1½…±•MÑÉ¥¹œ ‰ÉÔµITˆ°ìµ…á¥µÕµÉ…Ñ¥½¹¥¥ÑÌè€Äô¥ôƒBëBğƒ
+ÜQ€‘í™½Éµ…ÑÕÉ…Ñ¥½¸¡É½ÕÑ”¹Ñ½Ñ…±ÕÉ…Ñ¥½¹M•½¹‘Ì¥ôƒ
+Ü€‘íÉ½ÕÑ”¹ÍÁ••‘-¥±½µ•Ñ•ÉÍA•É!½ÕÈ¹Ñ½¥á• Ä¥ôƒBëBğ¿F€ì)ô(

@@ -43,6 +43,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-016`: after authoritative arrival, record the reached city as a confirmed relative personal-map landmark without exposing or globally joining server coordinates.
 - [x] `CITY-001`: give every seeded city deterministic finite food and water stocks, visible in DEV tools but not yet consumed or traded.
 - [x] `CITY-002`: generate aggregate NPC populations and project their food/water consumption from authoritative world time.
+- [x] `CITY-003`: reduce aggregate population deterministically after the first food or water shortage and slow remaining consumption as the city shrinks.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors

@@ -22,7 +22,7 @@ import {
   greatCircleDistance,
   kilometers,
   positionAtTime,
-  projectCityStocksAtTime,
+  projectCitySettlementAtTime,
   projectMixedActivitySupplies,
   resolveMonsterPowerContact,
   resumeStaticObjectDiscoveryDoctrine,
@@ -255,7 +255,7 @@ export function createDebugMapSnapshot(
         point: projectCoordinate(city.position),
         population,
         initialStocks,
-        stocks: projectCityStocksAtTime(
+        stocks: projectCitySettlementAtTime(
           initialStocks,
           population,
           elapsedSeconds,
