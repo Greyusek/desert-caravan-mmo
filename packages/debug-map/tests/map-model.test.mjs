@@ -38,6 +38,7 @@ import {
   createPlayerTravelLedger,
   recordDirectDiscoveryObservation,
   recordExpeditionTravelProgress,
+  recordReachedCityLandmark,
 } from "../../sim-core/dist/src/index.js";
 
 function approx(actual, expected, tolerance = 1e-9) {
@@ -3101,4 +3102,31 @@ test("GAME-015: an empty session has no invented visibility aperture", () => {
   assert.equal(map.visibilityRadiusPixels, 0);
   assert.equal(map.visibilityDiameterPixels, 0);
   assert.deepEqual(map.tracks, []);
+});
+
+test("GAME-016: a reached city projects only on its origin-city chart", () => {
+  const travel = recordReachedCityLandmark(
+    createPlayerTravelLedger("checkpoint-04"),
+    {
+      expeditionNumber: 1,
+      originCityId: "city-01",
+      cityId: "city-02",
+      arrivedAtSeconds: 3_600,
+      originBearingDeg: 90,
+      originDistanceMeters: 25_000,
+    },
+  );
+  const map = createSessionKnowledgeMapSnapshot(
+    createPlayerDiscoveryLedger("checkpoint-04"),
+    "city-01",
+    travel,
+  );
+
+  assert.deepEqual(map.originCityIds, ["city-01"]);
+  assert.equal(map.cityLandmarks.length, 1);
+  assert.equal(map.cityLandmarks[0]?.cityId, "city-02");
+  assert.equal(map.cityLandmarks[0]?.x, 318);
+  assert.equal(map.cityLandmarks[0]?.y, 150);
+  assert.equal(JSON.stringify(map.cityLandmarks).includes("latitude"), false);
+  assert.equal(JSON.stringify(map.cityLandmarks).includes("longitude"), false);
 });

@@ -468,6 +468,11 @@ input[type="range"] {
   fill: #a98ed8;
 }
 
+.knowledge-map-marker--city {
+  fill: #f4b860;
+  stroke: #fff0c9;
+}
+
 .knowledge-map-label,
 .knowledge-map-distance,
 .knowledge-map-empty-label {

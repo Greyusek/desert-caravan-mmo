@@ -6,6 +6,7 @@ import {
   createPlayerTravelLedger,
   recordDirectDiscoveryObservation,
   recordExpeditionTravelProgress,
+  recordReachedCityLandmark,
   wasObjectKnownBeforeExpedition,
 } from "../dist/src/index.js";
 
@@ -234,6 +235,36 @@ test("GAME-014: zero movement does not invent a travelled corridor", () => {
   assert.equal(result.ledger, ledger);
   assert.equal(result.track, null);
   assert.deepEqual(result.ledger.tracks, []);
+});
+
+test("GAME-016: authoritative arrival stores one coordinate-free city landmark", () => {
+  const input = {
+    expeditionNumber: 1,
+    originCityId: "city-01",
+    cityId: "city-02",
+    arrivedAtSeconds: 7_200,
+    originBearingDeg: -45,
+    originDistanceMeters: 42_000,
+  };
+  const first = recordReachedCityLandmark(
+    createPlayerTravelLedger("session-world"),
+    input,
+  );
+  const repeated = recordReachedCityLandmark(first, input);
+
+  assert.equal(repeated, first);
+  assert.deepEqual(first.reachedCityLandmarks, [{
+    expeditionNumber: 1,
+    originCityId: "city-01",
+    cityId: "city-02",
+    arrivedAtSeconds: 7_200,
+    bearingDeg: 315,
+    distanceMeters: 42_000,
+    source: "authoritative-arrival",
+    confidence: "confirmed",
+  }]);
+  assert.equal(JSON.stringify(first).includes("latitude"), false);
+  assert.equal(JSON.stringify(first).includes("longitude"), false);
 });
 
 test("GAME-014: only the executed route prefix enters session knowledge", () => {

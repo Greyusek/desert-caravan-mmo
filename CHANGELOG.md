@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.30 — Checkpoint 30
+
+- Added `GAME-016`: a city enters personal session knowledge only after the expedition completes at its authoritative arrival boundary.
+- Stored only a confirmed relative bearing/distance fix from the expedition's origin city; no latitude or longitude enters the player ledger or knowledge-map snapshot.
+- Kept planned routes, interrupted journeys, depletion and failed arrivals from revealing destination cities.
+- Rendered reached cities as named landmarks on the matching local origin-city chart without joining independent charts through server truth.
+- Made repeated browser renders idempotent for the same expedition and city.
+- Added GAME-016 regressions for coordinate-free storage and local-chart projection.
+
 ## Unreleased — Design consolidation
 
 - Adopted autonomous «Искины» as a long-term design pillar without moving it ahead of the functional checkpoint sequence.

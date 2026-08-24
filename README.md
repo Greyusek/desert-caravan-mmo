@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 29 — GAME-015: implemented and covered by automated tests.**
+**Checkpoint 30 — GAME-016: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -46,10 +46,11 @@ Also implemented:
 - GAME-013 — confirmed ledger entries render on a player-facing north-up session knowledge map derived only from first-observation bearings and distances; independent city anchors are never joined through hidden coordinates.
 - GAME-014 — each expedition adds only its actually travelled bearing/distance prefix to the matching local session chart; future route legs stay hidden and prior progress cannot be erased by rewinding the DEV clock.
 - GAME-015 — a physically scaled 300 m visibility radius around those travelled tracks cuts the first session fog-of-war corridor; map scale changes pixels, never the underlying survey distance.
+- GAME-016 — an authoritatively reached city becomes a confirmed relative landmark on the matching origin-city chart; planned routes and unsuccessful journeys reveal nothing, and the player record contains no absolute coordinates.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
-Not implemented yet (intentionally): reached-city personal landmarks, several simultaneous patrol contacts, pursuit route replanning, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, and autonomous neural NPC / City / Species agents.
+Not implemented yet (intentionally): several simultaneous patrol contacts, pursuit route replanning, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, and autonomous neural NPC / City / Species agents.
 
 ## Requirements
 
@@ -84,17 +85,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 29:
+Expected for Checkpoint 30:
 
 ```text
-# tests 265
-# pass 265
+# tests 267
+# pass 267
 # fail 0
 ```
 
-This total contains 260 simulation/UI tests and 5 tooling regression tests.
+This total contains 262 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_29.md` for GAME-015 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_30.md` for GAME-016 details.
 
 ## Developer debug map
 
