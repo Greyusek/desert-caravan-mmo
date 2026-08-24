@@ -202,6 +202,26 @@ test("CITY-002: debug world time projects aggregate city consumption", () => {
   );
 });
 
+test("CITY-003: debug world time exposes population loss after shortage", () => {
+  const atStart = createDebugMapSnapshot("city-shortage", 0);
+  const initial = atStart.cities[0];
+  assert.ok(initial);
+  const shortageAt = initial.stocks.firstDepletionAtSeconds;
+  assert.ok(shortageAt !== null);
+
+  const afterShortage = createDebugMapSnapshot(
+    "city-shortage",
+    shortageAt + 10 * 86_400,
+  ).cities[0];
+  assert.ok(afterShortage);
+  assert.ok(
+    afterShortage.stocks.inhabitants <
+      afterShortage.population.inhabitants,
+  );
+  assert.ok(afterShortage.stocks.populationLost > 0);
+  assert.equal(afterShortage.stocks.shortageElapsedSeconds, 10 * 86_400);
+});
+
 test("UI-001: changing the seed changes projected world positions", () => {
   const first = createDebugMapSnapshot("debug-map-a");
   const second = createDebugMapSnapshot("debug-map-b");

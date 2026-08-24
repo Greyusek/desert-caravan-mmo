@@ -13,6 +13,15 @@ export const DEFAULT_CITY_NPC_CONSUMPTION: CityNpcConsumptionProfile =
     waterUnitsPerPersonPerDay: 2,
   });
 
+export interface CityShortageProfile {
+  readonly dailyPopulationLossFraction: number;
+}
+
+export const DEFAULT_CITY_SHORTAGE_PROFILE: CityShortageProfile =
+  Object.freeze({
+    dailyPopulationLossFraction: 0.01,
+  });
+
 export type CityStockStatus =
   | "supplied"
   | "food-depleted"
@@ -32,6 +41,16 @@ export interface CityStockProjection {
   readonly status: CityStockStatus;
   readonly firstDepletionAtSeconds: number | null;
   readonly firstDepletionCause: CityStockDepletionCause | null;
+}
+
+export interface CitySettlementProjection extends CityStockProjection {
+  readonly initialPopulation: number;
+  readonly inhabitants: number;
+  readonly populationLost: number;
+  readonly shortageStartedAtSeconds: number | null;
+  readonly shortageElapsedSeconds: number;
+  readonly shortageCause: CityStockDepletionCause | null;
+  readonly dailyPopulationLossFraction: number;
 }
 
 /**
@@ -105,6 +124,134 @@ export function projectCityStocksAtTime(
       : null,
     firstDepletionCause,
   };
+}
+
+/**
+ * CITY-003 applies deterministic population attrition after the first food or
+ * water shortage. Consumption after that boundary integrates the declining
+ * aggregate population, so a shrinking city also consumes its remaining
+ * resource more slowly. A city retains at least one inhabitant in this MVP
+ * slice; abandonment and destruction require a later explicit rule.
+ */
+export function projectCitySettlementAtTime(
+  stocks: CityStocks,
+  population: CityPopulation,
+  elapsedSeconds: number,
+  consumptionProfile: CityNpcConsumptionProfile =
+    DEFAULT_CITY_NPC_CONSUMPTION,
+  shortageProfile: CityShortageProfile = DEFAULT_CITY_SHORTAGE_PROFILE,
+): CitySettlementProjection {
+  const baseline = projectCityStocksAtTime(
+    stocks,
+    population,
+    elapsedSeconds,
+    consumptionProfile,
+  );
+  assertShortageProfile(shortageProfile);
+
+  const shortageStartedAtSeconds = baseline.firstDepletionAtSeconds;
+  if (
+    shortageStartedAtSeconds === null ||
+    elapsedSeconds <= shortageStartedAtSeconds
+  ) {
+    return {
+      ...baseline,
+      initialPopulation: population.inhabitants,
+      inhabitants: population.inhabitants,
+      populationLost: 0,
+      shortageStartedAtSeconds,
+      shortageElapsedSeconds: 0,
+      shortageCause: baseline.firstDepletionCause,
+      dailyPopulationLossFraction:
+        shortageProfile.dailyPopulationLossFraction,
+    };
+  }
+
+  const atShortage = projectCityStocksAtTime(
+    stocks,
+    population,
+    shortageStartedAtSeconds,
+    consumptionProfile,
+  );
+  const shortageElapsedSeconds = elapsedSeconds - shortageStartedAtSeconds;
+  const shortageDays = shortageElapsedSeconds / SECONDS_PER_CITY_DAY;
+  const dailySurvivalFraction =
+    1 - shortageProfile.dailyPopulationLossFraction;
+  const exactSurvivingPopulation =
+    population.inhabitants * dailySurvivalFraction ** shortageDays;
+  const inhabitants = Math.max(1, Math.floor(exactSurvivingPopulation));
+  const populationDays = integratedPopulationDays(
+    population.inhabitants,
+    shortageDays,
+    dailySurvivalFraction,
+  );
+  const foodUnits = Math.max(
+    0,
+    atShortage.foodUnits -
+      populationDays * consumptionProfile.foodUnitsPerPersonPerDay,
+  );
+  const waterUnits = Math.max(
+    0,
+    atShortage.waterUnits -
+      populationDays * consumptionProfile.waterUnitsPerPersonPerDay,
+  );
+
+  return {
+    ...baseline,
+    foodUnits,
+    waterUnits,
+    foodConsumedUnits: stocks.foodUnits - foodUnits,
+    waterConsumedUnits: stocks.waterUnits - waterUnits,
+    status: cityStockStatus(foodUnits, waterUnits),
+    initialPopulation: population.inhabitants,
+    inhabitants,
+    populationLost: population.inhabitants - inhabitants,
+    shortageStartedAtSeconds,
+    shortageElapsedSeconds,
+    shortageCause: baseline.firstDepletionCause,
+    dailyPopulationLossFraction:
+      shortageProfile.dailyPopulationLossFraction,
+  };
+}
+
+function integratedPopulationDays(
+  initialPopulation: number,
+  elapsedDays: number,
+  dailySurvivalFraction: number,
+): number {
+  if (elapsedDays === 0) return 0;
+  if (dailySurvivalFraction === 1) return initialPopulation * elapsedDays;
+  const exponent = Math.log(dailySurvivalFraction);
+  return (
+    (initialPopulation * Math.expm1(exponent * elapsedDays)) / exponent
+  );
+}
+
+function cityStockStatus(
+  foodUnits: number,
+  waterUnits: number,
+): CityStockStatus {
+  const foodDepleted = foodUnits === 0;
+  const waterDepleted = waterUnits === 0;
+  return foodDepleted
+    ? waterDepleted
+      ? "food-and-water-depleted"
+      : "food-depleted"
+    : waterDepleted
+      ? "water-depleted"
+      : "supplied";
+}
+
+function assertShortageProfile(profile: CityShortageProfile): void {
+  if (
+    !Number.isFinite(profile.dailyPopulationLossFraction) ||
+    profile.dailyPopulationLossFraction < 0 ||
+    profile.dailyPopulationLossFraction >= 1
+  ) {
+    throw new RangeError(
+      "dailyPopulationLossFraction must be finite and in [0, 1)",
+    );
+  }
 }
 
 function assertCityInputs(

@@ -2439,10 +2439,26 @@ function drawSnapshot(
       "data-detail-rows": JSON.stringify([
         ["Тип", isDestination ? "Город назначения" : "Город"],
         ["Радиус прибытия", isDestination ? `${outcome.cityArrivalRadiusMeters ?? 0} м` : "—"],
-        ["Население", `${city.population.inhabitants} NPC`],
+        ["Население сейчас", `${city.stocks.inhabitants} NPC`],
+        ["Население изначально", `${city.population.inhabitants} NPC`],
+        ["Потери от дефицита", `${city.stocks.populationLost} NPC`],
         ["Еда сейчас", `${formatNumber(city.stocks.foodUnits, 1)} ед.`],
         ["Вода сейчас", `${formatNumber(city.stocks.waterUnits, 1)} ед.`],
         ["Статус запасов", cityStockStatusLabel(city.stocks.status)],
+        [
+          "Дефицит",
+          city.stocks.shortageStartedAtSeconds === null
+            ? "Не ожидается"
+            : city.stocks.shortageElapsedSeconds > 0
+              ? `${formatNumber(city.stocks.shortageElapsedSeconds / 86_400, 2)} дн.`
+              : city.stocks.elapsedSeconds >= city.stocks.shortageStartedAtSeconds
+                ? "Начался сейчас"
+                : `Начнётся ${formatElapsed(city.stocks.shortageStartedAtSeconds)}`,
+        ],
+        [
+          "Скорость потерь",
+          `${formatNumber(city.stocks.dailyPopulationLossFraction * 100, 2)}% / игровой день`,
+        ],
         ["Еда изначально", `${city.initialStocks.foodUnits} ед.`],
         ["Вода изначально", `${city.initialStocks.waterUnits} ед.`],
         ["Широта", city.position.latitudeDeg.toFixed(6)],

@@ -21,6 +21,7 @@ import {
   kilometers,
   meters,
   positionAtTime,
+  projectCitySettlementAtTime,
   projectCityStocksAtTime,
   projectSupplies,
   recordDirectDiscoveryObservation,
@@ -44,7 +45,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 32 demo");
+console.log("Desert Caravan MMO — Checkpoint 33 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -147,6 +148,21 @@ if (firstCityStocks && firstCityPopulation) {
   console.log(
     `CITY-002 ${firstCityStocks.cityId} after 10 days: population=${projected.population}, food=${projected.foodUnits.toFixed(1)}, water=${projected.waterUnits.toFixed(1)}, status=${projected.status}`,
   );
+  const initialSettlement = projectCitySettlementAtTime(
+    firstCityStocks,
+    firstCityPopulation,
+    0,
+  );
+  if (initialSettlement.firstDepletionAtSeconds !== null) {
+    const afterTenShortageDays = projectCitySettlementAtTime(
+      firstCityStocks,
+      firstCityPopulation,
+      initialSettlement.firstDepletionAtSeconds + 10 * SECONDS_PER_CITY_DAY,
+    );
+    console.log(
+      `CITY-003 ${firstCityStocks.cityId} after 10 shortage days: population=${afterTenShortageDays.inhabitants}/${afterTenShortageDays.initialPopulation}, lost=${afterTenShortageDays.populationLost}, food=${afterTenShortageDays.foodUnits.toFixed(1)}, water=${afterTenShortageDays.waterUnits.toFixed(1)}, status=${afterTenShortageDays.status}`,
+    );
+  }
 }
 console.log(`WORLD-002 hidden static objects: ${world.staticObjects.length}`);
 for (const object of world.staticObjects) {
@@ -435,5 +451,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 32 aggregate NPC consumption: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 33 shortage population decline: npm run debug-map -> http://127.0.0.1:4173",
 );
