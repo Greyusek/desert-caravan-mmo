@@ -99,6 +99,33 @@ test("CITY-001: changing city count does not perturb existing city stocks", () =
   assert.deepEqual(small, large.slice(0, 3));
 });
 
+test("CITY-002: every city has a deterministic aggregate NPC population", () => {
+  const first = generateSeededWorld("city-population");
+  const repeated = generateSeededWorld("city-population");
+
+  assert.deepEqual(first.cityPopulations, repeated.cityPopulations);
+  assert.deepEqual(
+    first.cityPopulations.map(({ cityId }) => cityId),
+    first.cities.map(({ id }) => id),
+  );
+  for (const population of first.cityPopulations) {
+    assert.ok(Number.isSafeInteger(population.inhabitants));
+    assert.ok(population.inhabitants >= 100);
+    assert.ok(population.inhabitants <= 500);
+  }
+});
+
+test("CITY-002: population streams are independent from configured city count", () => {
+  const small = generateSeededWorld("stable-population", {
+    cityCount: 2,
+  }).cityPopulations;
+  const large = generateSeededWorld("stable-population", {
+    cityCount: 20,
+  }).cityPopulations;
+
+  assert.deepEqual(small, large.slice(0, 2));
+});
+
 test("WORLD-002: the default world contains one object of every kind in fixed order", () => {
   const objects = generateSeededWorld("mvp-world").staticObjects;
   assert.equal(objects.length, 4);

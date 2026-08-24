@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.32 — Checkpoint 32
+
+- Added `CITY-002`: every seeded city now has a deterministic aggregate NPC population of 100–500 inhabitants.
+- Added a pure authoritative world-time projection for aggregate food and water consumption.
+- Set explicit provisional rates of 1 food and 2 water units per NPC per game day.
+- Calculated exact first-depletion time and cause while clamping later stocks at zero.
+- Exposed current stocks, initial stocks, population and depletion status in DEV city details.
+- Kept population loss, trading, production and persistence outside this checkpoint.
+- Added eight CITY-002 regressions; repository verification now runs 278 tests.
+
 ## 0.0.31 — Checkpoint 31
 
 - Added `CITY-001`: every seeded city now has finite food and water stocks.

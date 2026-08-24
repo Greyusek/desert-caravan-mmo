@@ -22,6 +22,7 @@ import {
   greatCircleDistance,
   kilometers,
   positionAtTime,
+  projectCityStocksAtTime,
   projectMixedActivitySupplies,
   resolveMonsterPowerContact,
   resumeStaticObjectDiscoveryDoctrine,
@@ -231,17 +232,36 @@ export function createDebugMapSnapshot(
 ) {
   assertNonNegativeFinite(elapsedSeconds, "elapsedSeconds");
   const world = generateSeededWorld(seed, { wanderingMonsterCount });
+  const stocksByCityId = new Map(
+    world.cityStocks.map((stocks) => [stocks.cityId, stocks]),
+  );
+  const populationsByCityId = new Map(
+    world.cityPopulations.map((population) => [population.cityId, population]),
+  );
 
   return {
     seed: world.seed,
     elapsedSeconds,
-    cities: world.cities.map((city) => ({
-      id: city.id,
-      name: city.name,
-      position: city.position,
-      point: projectCoordinate(city.position),
-      stocks: world.cityStocks.find((stocks) => stocks.cityId === city.id),
-    })),
+    cities: world.cities.map((city) => {
+      const initialStocks = stocksByCityId.get(city.id);
+      const population = populationsByCityId.get(city.id);
+      if (!initialStocks || !population) {
+        throw new Error(`city resource invariant failed for ${city.id}`);
+      }
+      return {
+        id: city.id,
+        name: city.name,
+        position: city.position,
+        point: projectCoordinate(city.position),
+        population,
+        initialStocks,
+        stocks: projectCityStocksAtTime(
+          initialStocks,
+          population,
+          elapsedSeconds,
+        ),
+      };
+    }),
     staticObjects: world.staticObjects.map((object) => ({
       id: object.id,
       kind: object.kind,

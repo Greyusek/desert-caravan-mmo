@@ -21,12 +21,14 @@ import {
   kilometers,
   meters,
   positionAtTime,
+  projectCityStocksAtTime,
   projectSupplies,
   recordDirectDiscoveryObservation,
   resolveMonsterPowerContact,
   resumeStaticObjectDiscoveryDoctrine,
   timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
+  SECONDS_PER_CITY_DAY,
 } from "./index.js";
 
 const start = createWorldCoordinate(55.755864, 37.617698);
@@ -42,7 +44,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 31 demo");
+console.log("Desert Caravan MMO — Checkpoint 32 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -132,6 +134,18 @@ console.log("CITY-001 finite city stocks:");
 for (const stocks of world.cityStocks) {
   console.log(
     `  ${stocks.cityId}: food=${stocks.foodUnits}, water=${stocks.waterUnits}`,
+  );
+}
+const firstCityStocks = world.cityStocks[0];
+const firstCityPopulation = world.cityPopulations[0];
+if (firstCityStocks && firstCityPopulation) {
+  const projected = projectCityStocksAtTime(
+    firstCityStocks,
+    firstCityPopulation,
+    10 * SECONDS_PER_CITY_DAY,
+  );
+  console.log(
+    `CITY-002 ${firstCityStocks.cityId} after 10 days: population=${projected.population}, food=${projected.foodUnits.toFixed(1)}, water=${projected.waterUnits.toFixed(1)}, status=${projected.status}`,
   );
 }
 console.log(`WORLD-002 hidden static objects: ${world.staticObjects.length}`);
@@ -421,5 +435,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 31 finite city stocks: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 32 aggregate NPC consumption: npm run debug-map -> http://127.0.0.1:4173",
 );
