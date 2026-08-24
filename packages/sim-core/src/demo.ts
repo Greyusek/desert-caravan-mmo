@@ -7,6 +7,7 @@ import {
   createWorldCoordinate,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
+  evaluateDiscoveryStopLifecycle,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
   findFirstCityArrival,
@@ -37,7 +38,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 22 demo");
+console.log("Desert Caravan MMO — Checkpoint 23 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -183,6 +184,18 @@ if (rumorOrigin) {
     console.log(
       `GAME-008 resume: object=${resumed.resumeDecision.objectId}, resumed-at=${(resumed.resumeDecision.resumedAtSeconds / 3_600).toFixed(6)} h, route-time=${(resumed.movementElapsedSeconds / 3_600).toFixed(6)} h`,
     );
+    const idleDurationSeconds = 6 * 3_600;
+    const stopLifecycle = evaluateDiscoveryStopLifecycle(
+      rumorRoute,
+      supplies,
+      consumption,
+      rumorDiscovery.elapsedSeconds + 3 * 3_600,
+      rumorDiscovery.elapsedSeconds,
+      idleDurationSeconds,
+    );
+    console.log(
+      `GAME-009 STOP lifecycle: phase=${stopLifecycle.phase}, world-time=${(stopLifecycle.evaluatedAtSeconds / 3_600).toFixed(6)} h, route-time=${(stopLifecycle.movementElapsedSeconds / 3_600).toFixed(6)} h, idle=${(stopLifecycle.idleElapsedSeconds / 3_600).toFixed(3)} / ${(idleDurationSeconds / 3_600).toFixed(3)} h`,
+    );
   }
 }
 
@@ -325,5 +338,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 22 STOP resume: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 23 STOP idle lifecycle: npm run debug-map -> http://127.0.0.1:4173",
 );

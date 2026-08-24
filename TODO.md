@@ -28,12 +28,13 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `UI-005`: add deterministic play/pause controls with x1 / x10 / x100 / x1000 development speeds.
 - [x] `UI-006`: add local map/time zoom so short monster patrol loops and close encounters remain readable beside long caravan routes.
 - [x] `GAME-008`: resume a discovery-STOP expedition from its exact authoritative pause without rediscovering the same target.
+- [x] `GAME-009`: model explicit time spent at a discovery STOP with SIM-006 idle consumption before resume.
 - [x] `DESIGN-001`: consolidate GDD v0.3 and MVP_SPEC v0.3 around production world scale and the physical map/library information economy.
 - [x] `DESIGN-002`: integrate the world bible, magic, bestiary, ecology, System 256 and presentation canon into GDD v0.4 without changing the GAME-005 implementation.
 
 ## Next
 
-- [ ] `GAME-009`: model explicit time spent at a discovery STOP with SIM-006 idle consumption before resume.
+- [ ] `GAME-010`: resolve cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Maintenance rules

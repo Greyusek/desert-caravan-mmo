@@ -43,6 +43,7 @@
 - `CHECKPOINT_20.md` — детерминированные play/pause-часы и четыре скорости запуска симуляции.
 - `CHECKPOINT_21.md` — локальный пространственный/временной zoom траекторий каравана и патруля.
 - `CHECKPOINT_22.md` — явное возобновление маршрута после discovery STOP без повторного обнаружения цели.
+- `CHECKPOINT_23.md` — явная idle-стоянка после discovery STOP с отдельным мировым/маршрутным временем и расходом запасов.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006` и `GAME-001..GAME-008` покрыты 209 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 214 тестов в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006` и `GAME-001..GAME-009` покрыты 224 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 229 тестов в pull request.

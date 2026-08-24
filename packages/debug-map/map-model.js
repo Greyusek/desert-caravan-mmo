@@ -5,22 +5,25 @@ import {
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
   DEFAULT_PLAYER_POWER,
-  canSurviveDuration,
   createRoutePlan,
   createRumorSearchScenario,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
+  evaluateDiscoveryStopLifecycle,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
+  expeditionTimeToRouteTime,
   findFirstCityArrival,
   findFirstExpeditionMonsterContact,
+  findFirstExpeditionMonsterContactWithIdleStop,
   generateSeededWorld,
   greatCircleDistance,
   kilometers,
   positionAtTime,
-  projectSupplies,
+  projectMixedActivitySupplies,
   resolveMonsterPowerContact,
   resumeStaticObjectDiscoveryDoctrine,
+  routeTimeToExpeditionTime,
   timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
 } from "../sim-core/dist/src/index.js";
@@ -136,6 +139,8 @@ export function advanceSimulationClock(
  * @property {number} [cityRadiusMeters]
  * @property {number} [distanceToCityMeters]
  * @property {import("../sim-core/dist/src/index.js").CityArrivalKind} [arrivalKind]
+ * @property {number} [idleDurationSeconds]
+ * @property {import("../sim-core/dist/src/index.js").CaravanActivity | null} [failureActivity]
  */
 
 /**
@@ -264,32 +269,40 @@ export function createDebugMapSnapshot(
  * the browser without moving encounter authority into the UI.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
  */
-export function createMonsterContactSnapshot(route, monster) {
-  const contact = findFirstExpeditionMonsterContact(
-    route.authoritativeRoute,
-    monster.authoritativeMonster,
-  );
+export function createMonsterContactSnapshot(
+  route,
+  monster,
+  stopLifecycle = null,
+) {
+  const contact = stopLifecycle && stopLifecycle.resumeAtSeconds !== null
+    ? findFirstExpeditionMonsterContactWithIdleStop(
+        route.authoritativeRoute,
+        monster.authoritativeMonster,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+      )
+    : findFirstExpeditionMonsterContact(
+        route.authoritativeRoute,
+        monster.authoritativeMonster,
+      );
 
   if (!contact) {
     return {
       status: /** @type {const} */ ("clear"),
-      evaluatedAtSeconds: Math.min(
-        route.position.elapsedSeconds,
-        route.totalDurationSeconds,
-      ),
+      evaluatedAtSeconds: stopLifecycle?.evaluatedAtSeconds ??
+        Math.min(route.position.elapsedSeconds, route.totalDurationSeconds),
       contact: null,
     };
   }
 
   const routePosition = positionAtTime(
     route.authoritativeRoute,
-    contact.expeditionElapsedSeconds,
+    contact.routeElapsedSeconds,
   );
-  const evaluatedAtSeconds = Math.min(
-    route.position.elapsedSeconds,
-    route.totalDurationSeconds,
-  );
+  const evaluatedAtSeconds = stopLifecycle?.evaluatedAtSeconds ??
+    Math.min(route.position.elapsedSeconds, route.totalDurationSeconds);
 
   return {
     status:
@@ -319,6 +332,7 @@ export function createMonsterContactSnapshot(route, monster) {
  * @param {ReturnType<typeof createMonsterContactSnapshot> | null} [contactSnapshot]
  * @param {number} [spatialRadiusMeters]
  * @param {number} [timeRadiusSeconds]
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
  */
 export function createContactZoomSnapshot(
   route,
@@ -326,6 +340,7 @@ export function createContactZoomSnapshot(
   contactSnapshot = null,
   spatialRadiusMeters = 25_000,
   timeRadiusSeconds = 3 * 3_600,
+  stopLifecycle = null,
 ) {
   if (!CONTACT_ZOOM_SPATIAL_RADII_METERS.includes(spatialRadiusMeters)) {
     throw new RangeError(
@@ -345,10 +360,19 @@ export function createContactZoomSnapshot(
 
   const focusAtSeconds = contact
     ? contact.atSeconds
-    : Math.min(route.position.elapsedSeconds, route.totalDurationSeconds);
+    : stopLifecycle?.evaluatedAtSeconds ??
+      Math.min(route.position.elapsedSeconds, route.totalDurationSeconds);
+  const focusRouteAtSeconds = stopLifecycle
+    ? expeditionTimeToRouteTime(
+        focusAtSeconds,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+        stopLifecycle.resumeAtSeconds !== null,
+      )
+    : focusAtSeconds;
   const evaluatedCaravan = positionAtTime(
     route.authoritativeRoute,
-    focusAtSeconds,
+    focusRouteAtSeconds,
   );
   const evaluatedMonster = wanderingMonsterPositionAtTime(
     monster.authoritativeMonster,
@@ -374,7 +398,9 @@ export function createContactZoomSnapshot(
     );
   const windowStartSeconds = Math.max(0, focusAtSeconds - timeRadiusSeconds);
   const windowEndSeconds = Math.min(
-    route.totalDurationSeconds,
+    stopLifecycle && stopLifecycle.resumeAtSeconds !== null
+      ? route.totalDurationSeconds + stopLifecycle.idleDurationSeconds
+      : route.totalDurationSeconds,
     focusAtSeconds + timeRadiusSeconds,
   );
   const sampleTimes = sampleTimeRange(
@@ -399,7 +425,18 @@ export function createContactZoomSnapshot(
     interactionRadiusPixels:
       monster.authoritativeMonster.interactionRadiusMeters / metersPerPixel,
     caravanPath: sampleTimes.map((atSeconds) => {
-      const position = positionAtTime(route.authoritativeRoute, atSeconds);
+      const routeAtSeconds = stopLifecycle
+        ? expeditionTimeToRouteTime(
+            atSeconds,
+            stopLifecycle.stopAtRouteSeconds,
+            stopLifecycle.idleDurationSeconds,
+            stopLifecycle.resumeAtSeconds !== null,
+          )
+        : atSeconds;
+      const position = positionAtTime(
+        route.authoritativeRoute,
+        routeAtSeconds,
+      );
       return {
         atSeconds,
         coordinate: position.coordinate,
@@ -812,6 +849,43 @@ export function createDiscoveryResumeSnapshot(
 }
 
 /**
+ * GAME-009 turns a stored GAME-008 resume command into a scheduled idle phase.
+ * Browser elapsed time is expedition/world time; movement time remains pinned
+ * to the authoritative discovery coordinate until the duration expires.
+ *
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {SupplyStock} initialSupplies
+ * @param {ConsumptionProfile} consumptionProfile
+ * @param {ReturnType<typeof createDiscoveryResumeSnapshot> | null} resume
+ * @param {number} idleDurationSeconds
+ * @param {number} expeditionElapsedSeconds
+ * @param {ReturnType<typeof createCityArrivalSnapshot> | null} [cityDestination]
+ */
+export function createDiscoveryStopLifecycleSnapshot(
+  route,
+  initialSupplies,
+  consumptionProfile,
+  resume,
+  idleDurationSeconds,
+  expeditionElapsedSeconds,
+  cityDestination = null,
+) {
+  if (!resume) return null;
+  const completionAtRouteSeconds = cityDestination
+    ? cityDestination.arrival?.atSeconds ?? null
+    : route.totalDurationSeconds;
+  return evaluateDiscoveryStopLifecycle(
+    route.authoritativeRoute,
+    initialSupplies,
+    consumptionProfile,
+    expeditionElapsedSeconds,
+    resume.resumeDecision.resumedAtSeconds,
+    idleDurationSeconds,
+    completionAtRouteSeconds,
+  );
+}
+
+/**
  * Re-evaluates only the live route position after doctrine. The original plan,
  * waypoints and ETA remain intact for comparison in the debug overlay.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
@@ -845,6 +919,7 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
  * @param {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine} [strongMonsterDoctrine]
  * @param {number} [fleeSpeedMetersPerSecond]
  * @param {ReturnType<typeof createCityArrivalSnapshot> | null} [cityDestination]
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
  */
 export function createExpeditionOutcomeSnapshot(
   route,
@@ -855,6 +930,7 @@ export function createExpeditionOutcomeSnapshot(
   strongMonsterDoctrine = "FLEE",
   fleeSpeedMetersPerSecond = route.authoritativeRoute.speedMetersPerSecond,
   cityDestination = null,
+  stopLifecycle = null,
 ) {
   const doctrinePauseAtSeconds =
     doctrine?.status === "stopped"
@@ -865,14 +941,17 @@ export function createExpeditionOutcomeSnapshot(
   const completionAtSeconds = cityDestination
     ? cityDestination.arrival?.atSeconds ?? null
     : route.totalDurationSeconds;
-  const baselineEvaluation = evaluateExpeditionOutcome(
-    route.authoritativeRoute,
-    initialSupplies,
-    consumptionProfile,
-    route.position.elapsedSeconds,
-    doctrinePauseAtSeconds,
-    completionAtSeconds,
-  );
+  const baselineEvaluation = stopLifecycle ??
+    evaluateExpeditionOutcome(
+      route.authoritativeRoute,
+      initialSupplies,
+      consumptionProfile,
+      route.position.elapsedSeconds,
+      doctrinePauseAtSeconds,
+      completionAtSeconds,
+    );
+  const evaluatedAtSeconds = stopLifecycle?.evaluatedAtSeconds ??
+    route.position.elapsedSeconds;
   const contact = monsterContact?.contact ?? null;
   const fleeAttempt =
     contact && strongMonsterDoctrine === "FLEE"
@@ -896,7 +975,9 @@ export function createExpeditionOutcomeSnapshot(
   const contactExecutes =
     monsterPauseAtSeconds !== null &&
     monsterPauseAtSeconds <
-      route.totalDurationSeconds - EVENT_TIME_EPSILON_SECONDS &&
+      route.totalDurationSeconds +
+        (stopLifecycle?.idleDurationSeconds ?? 0) -
+        EVENT_TIME_EPSILON_SECONDS &&
     (monsterPauseAtSeconds <
       baselineEvaluation.planned.atSeconds - EVENT_TIME_EPSILON_SECONDS ||
       (Math.abs(
@@ -908,6 +989,8 @@ export function createExpeditionOutcomeSnapshot(
     : null;
 
   let evaluation = baselineEvaluation;
+  /** @type {number | null} */
+  let contactBoundaryMovementSeconds = null;
   /** @type {"doctrine-stop" | "monster-contact" | "monster-defeat" | "route-end" | null} */
   let interruptionCause =
     baselineEvaluation.planned.status === "paused"
@@ -920,46 +1003,88 @@ export function createExpeditionOutcomeSnapshot(
         : /** @type {const} */ ("doctrine-stop")
       : null;
 
-  if (contactDisposition === "pause" && monsterPauseAtSeconds !== null) {
-    evaluation = evaluateExpeditionOutcome(
-      route.authoritativeRoute,
-      initialSupplies,
-      consumptionProfile,
-      route.position.elapsedSeconds,
-      monsterPauseAtSeconds,
-      completionAtSeconds,
-    );
-    interruptionCause = /** @type {const} */ ("monster-contact");
-  } else if (contactDisposition === "fail" && monsterPauseAtSeconds !== null) {
+  if (
+    (contactDisposition === "pause" || contactDisposition === "fail") &&
+    monsterPauseAtSeconds !== null
+  ) {
     const occurred =
-      route.position.elapsedSeconds + EVENT_TIME_EPSILON_SECONDS >=
+      evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
       monsterPauseAtSeconds;
-    /** @type {"failed" | "in-progress"} */
-    const contactStatus = occurred ? "failed" : "in-progress";
+    const contactRouteAtSeconds =
+      contact?.routeElapsedSeconds ?? monsterPauseAtSeconds;
+    contactBoundaryMovementSeconds = contactRouteAtSeconds;
+    const plannedStatus = contactDisposition === "fail"
+      ? /** @type {const} */ ("failed")
+      : /** @type {const} */ ("paused");
+    const contactStatus = occurred
+      ? plannedStatus
+      : /** @type {const} */ ("in-progress");
     evaluation = {
       status: contactStatus,
-      evaluatedAtSeconds: route.position.elapsedSeconds,
+      evaluatedAtSeconds,
       movementElapsedSeconds: occurred
-        ? monsterPauseAtSeconds
-        : route.position.elapsedSeconds,
+        ? contactRouteAtSeconds
+        : baselineEvaluation.movementElapsedSeconds,
       planned: {
-        status: /** @type {const} */ ("failed"),
+        status: plannedStatus,
         atSeconds: monsterPauseAtSeconds,
         failureCause: null,
       },
       endedAtSeconds: occurred ? monsterPauseAtSeconds : null,
       failureCause: null,
-      terminal: occurred,
+      terminal: occurred && contactDisposition === "fail",
     };
-    interruptionCause = /** @type {const} */ ("monster-defeat");
+    interruptionCause = contactDisposition === "fail"
+      ? /** @type {const} */ ("monster-defeat")
+      : /** @type {const} */ ("monster-contact");
   }
+  const boundaryMovementElapsedSeconds =
+    contactBoundaryMovementSeconds ??
+    stopLifecycle?.planned.movementElapsedSeconds ??
+    evaluation.planned.atSeconds;
   const boundaryPosition = positionAtTime(
     route.authoritativeRoute,
+    boundaryMovementElapsedSeconds,
+  );
+  const evaluatedBoundarySeconds = Math.min(
+    evaluatedAtSeconds,
     evaluation.planned.atSeconds,
+  );
+  const idleElapsedSeconds = !stopLifecycle ||
+    stopLifecycle.resumeAtSeconds === null
+    ? 0
+    : Math.min(
+        stopLifecycle.idleDurationSeconds,
+        Math.max(
+          0,
+          evaluatedBoundarySeconds - stopLifecycle.stopAtRouteSeconds,
+        ),
+      );
+  const supplies = projectMixedActivitySupplies(
+    initialSupplies,
+    consumptionProfile,
+    evaluation.movementElapsedSeconds,
+    idleElapsedSeconds,
   );
 
   return {
     ...evaluation,
+    phase:
+      evaluation.status === "in-progress"
+        ? stopLifecycle?.phase ?? /** @type {const} */ ("moving-to-stop")
+        : /** @type {const} */ ("ended"),
+    idleDurationSeconds: stopLifecycle?.idleDurationSeconds ?? 0,
+    idleElapsedSeconds,
+    resumeAtSeconds: stopLifecycle?.resumeAtSeconds ?? null,
+    completionAtSeconds:
+      stopLifecycle?.completionAtSeconds ?? completionAtSeconds,
+    failureActivity:
+      interruptionCause === "monster-defeat"
+        ? null
+        : stopLifecycle?.failureActivity ??
+          (evaluation.planned.status === "failed" ? "moving" : null),
+    supplies,
+    stopLifecycle,
     interruptionCause,
     destinationCity: cityDestination?.city ?? null,
     cityArrivalRadiusMeters: cityDestination?.radiusMeters ?? null,
@@ -1020,31 +1145,49 @@ export function createCaravanStatusSnapshot(
   doctrine = null,
   outcome = null,
 ) {
-  const expeditionDurationSeconds =
+  const routeCompletionSeconds =
     outcome?.cityArrival?.atSeconds ?? route.totalDurationSeconds;
+  const stopLifecycle = outcome?.stopLifecycle ?? null;
+  const scheduledIdleSeconds =
+    stopLifecycle &&
+    stopLifecycle.resumeAtSeconds !== null &&
+    routeCompletionSeconds >
+      stopLifecycle.stopAtRouteSeconds + EVENT_TIME_EPSILON_SECONDS
+      ? stopLifecycle.idleDurationSeconds
+      : 0;
+  const expeditionDurationSeconds =
+    routeCompletionSeconds + scheduledIdleSeconds;
   const expeditionDistanceMeters =
     (outcome?.cityArrival?.routeDistanceKilometers ??
       route.totalDistanceKilometers) * 1_000;
   const evaluatedAtSeconds = Math.min(
-    route.position.elapsedSeconds,
+    outcome?.evaluatedAtSeconds ?? route.position.elapsedSeconds,
     expeditionDurationSeconds,
   );
-  const supplies = projectSupplies(
+  const supplies = outcome?.supplies ?? projectMixedActivitySupplies(
     initialSupplies,
     consumptionProfile,
-    "moving",
-    evaluatedAtSeconds,
+    Math.min(route.position.elapsedSeconds, routeCompletionSeconds),
+    0,
   );
-  const firstDepletion = timeToFirstDepletion(
+  const movingFirstDepletion = timeToFirstDepletion(
     initialSupplies,
     consumptionProfile,
     "moving",
   );
-  const atArrival = projectSupplies(
+  const firstDepletion = stopLifecycle
+    ? stopLifecycle.planned.status === "failed"
+      ? {
+          atSeconds: stopLifecycle.planned.atSeconds,
+          cause: stopLifecycle.planned.failureCause,
+        }
+      : { atSeconds: null, cause: null }
+    : movingFirstDepletion;
+  const atArrival = projectMixedActivitySupplies(
     initialSupplies,
     consumptionProfile,
-    "moving",
-    expeditionDurationSeconds,
+    routeCompletionSeconds,
+    scheduledIdleSeconds,
   );
   const routeProgress =
     expeditionDistanceMeters === 0
@@ -1064,6 +1207,7 @@ export function createCaravanStatusSnapshot(
       progress: routeProgress,
       elapsedSeconds: route.position.elapsedSeconds,
       evaluatedAtSeconds,
+      idleElapsedSeconds: outcome?.idleElapsedSeconds ?? 0,
       totalDurationSeconds: expeditionDurationSeconds,
       traveledDistanceKilometers:
         route.position.traveledDistanceMeters / 1_000,
@@ -1080,6 +1224,10 @@ export function createCaravanStatusSnapshot(
       waterRemaining: supplies.waterRemaining,
       foodConsumed: supplies.foodConsumed,
       waterConsumed: supplies.waterConsumed,
+      activity:
+        outcome?.phase === "idle-at-stop"
+          ? /** @type {const} */ ("idle")
+          : /** @type {const} */ ("moving"),
       foodFraction: remainingFraction(
         supplies.foodRemaining,
         initialSupplies.foodUnits,
@@ -1092,12 +1240,7 @@ export function createCaravanStatusSnapshot(
       depletionCause: supplies.depleted ? supplies.depletionCause : null,
     },
     forecast: {
-      canFinish: canSurviveDuration(
-        initialSupplies,
-        consumptionProfile,
-        "moving",
-        expeditionDurationSeconds,
-      ),
+      canFinish: !atArrival.depleted,
       firstDepletionAtSeconds: firstDepletion.atSeconds,
       depletionCause: firstDepletion.cause,
       depletionBeforeOrAtArrival:
@@ -1120,6 +1263,7 @@ export function createCaravanStatusSnapshot(
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} [doctrine]
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} [outcome]
  * @param {ReturnType<typeof createDiscoveryResumeSnapshot> | null} [resume]
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
  */
 export function createExpeditionEventLogSnapshot(
   route,
@@ -1129,12 +1273,48 @@ export function createExpeditionEventLogSnapshot(
   doctrine = null,
   outcome = null,
   resume = null,
+  stopLifecycle = null,
 ) {
-  const firstDepletion = timeToFirstDepletion(
+  /** @param {number} routeElapsedSeconds */
+  const routeToExpeditionTime = (routeElapsedSeconds) =>
+    stopLifecycle
+      ? routeTimeToExpeditionTime(
+          routeElapsedSeconds,
+          stopLifecycle.stopAtRouteSeconds,
+          stopLifecycle.idleDurationSeconds,
+          stopLifecycle.resumeAtSeconds !== null,
+        )
+      : routeElapsedSeconds;
+  const expeditionDurationSeconds = routeToExpeditionTime(
+    route.totalDurationSeconds,
+  );
+  const movingFirstDepletion = timeToFirstDepletion(
     initialSupplies,
     consumptionProfile,
     "moving",
   );
+  const firstDepletion = stopLifecycle
+    ? stopLifecycle.planned.status === "failed"
+      ? {
+          atSeconds: stopLifecycle.planned.atSeconds,
+          routeAtSeconds: stopLifecycle.planned.movementElapsedSeconds,
+          cause: stopLifecycle.planned.failureCause,
+          activity: stopLifecycle.failureActivity,
+        }
+      : {
+          atSeconds: null,
+          routeAtSeconds: null,
+          cause: null,
+          activity: null,
+        }
+    : {
+        atSeconds: movingFirstDepletion.atSeconds,
+        routeAtSeconds: movingFirstDepletion.atSeconds,
+        cause: movingFirstDepletion.cause,
+        activity: movingFirstDepletion.atSeconds === null
+          ? null
+          : /** @type {const} */ ("moving"),
+      };
   /** @type {PlannedExpeditionEvent[]} */
   const events = [
     {
@@ -1154,7 +1334,7 @@ export function createExpeditionEventLogSnapshot(
     events.push({
       id: `segment-${String(segment.index + 1).padStart(2, "0")}`,
       kind: "segment-completed",
-      atSeconds: segment.etaEndSeconds,
+      atSeconds: routeToExpeditionTime(segment.etaEndSeconds),
       segmentIndex: segment.index,
       cause: null,
       distanceKilometers: cumulativeDistanceKilometers,
@@ -1167,7 +1347,8 @@ export function createExpeditionEventLogSnapshot(
     initialSupplies,
     consumptionProfile,
     firstDepletion.atSeconds,
-    route.totalDurationSeconds,
+    expeditionDurationSeconds,
+    stopLifecycle,
   );
 
   addRumorSearchEvent(
@@ -1175,7 +1356,8 @@ export function createExpeditionEventLogSnapshot(
     rumorSearch,
     doctrine,
     resume,
-    route.totalDurationSeconds,
+    expeditionDurationSeconds,
+    stopLifecycle,
   );
 
   if (outcome?.monsterContact && outcome.monsterContactResolution) {
@@ -1183,9 +1365,9 @@ export function createExpeditionEventLogSnapshot(
       id: `monster-contact-${outcome.monsterContact.monsterId}`,
       kind: "monster-contact",
       atSeconds: outcome.monsterContact.expeditionElapsedSeconds,
-      segmentIndex: outcome.planned.segmentIndex,
+      segmentIndex: outcome.monsterContact.segmentIndex,
       cause: null,
-      distanceKilometers: outcome.planned.routeDistanceKilometers,
+      distanceKilometers: outcome.monsterContact.routeDistanceKilometers,
       monsterId: outcome.monsterContact.monsterId,
       monsterPower: outcome.monsterContact.monsterPower,
       separationMeters: outcome.monsterContact.separationMeters,
@@ -1214,11 +1396,11 @@ export function createExpeditionEventLogSnapshot(
   if (
     firstDepletion.atSeconds !== null &&
     firstDepletion.atSeconds <=
-      route.totalDurationSeconds + EVENT_TIME_EPSILON_SECONDS
+      expeditionDurationSeconds + EVENT_TIME_EPSILON_SECONDS
   ) {
     const depletionPosition = positionAtTime(
       route.authoritativeRoute,
-      firstDepletion.atSeconds,
+      firstDepletion.routeAtSeconds ?? firstDepletion.atSeconds,
     );
     events.push({
       id: "supplies-depleted",
@@ -1226,6 +1408,7 @@ export function createExpeditionEventLogSnapshot(
       atSeconds: firstDepletion.atSeconds,
       segmentIndex: depletionPosition.segmentIndex,
       cause: firstDepletion.cause,
+      failureActivity: firstDepletion.activity,
       distanceKilometers:
         depletionPosition.traveledDistanceMeters / 1_000,
       order: 30,
@@ -1237,7 +1420,7 @@ export function createExpeditionEventLogSnapshot(
       events.push({
         id: `arrival-${outcome.destinationCity.id}`,
         kind: "arrival",
-        atSeconds: outcome.cityArrival.atSeconds,
+        atSeconds: routeToExpeditionTime(outcome.cityArrival.atSeconds),
         segmentIndex: outcome.cityArrival.segmentIndex,
         cause: null,
         distanceKilometers: outcome.cityArrival.routeDistanceKilometers,
@@ -1252,7 +1435,7 @@ export function createExpeditionEventLogSnapshot(
       events.push({
         id: "route-ended-outside-city",
         kind: "route-ended",
-        atSeconds: route.totalDurationSeconds,
+        atSeconds: expeditionDurationSeconds,
         segmentIndex: null,
         cause: null,
         distanceKilometers: route.totalDistanceKilometers,
@@ -1271,7 +1454,7 @@ export function createExpeditionEventLogSnapshot(
     events.push({
       id: "arrival",
       kind: "arrival",
-      atSeconds: route.totalDurationSeconds,
+      atSeconds: expeditionDurationSeconds,
       segmentIndex: null,
       cause: null,
       distanceKilometers: route.totalDistanceKilometers,
@@ -1307,8 +1490,8 @@ export function createExpeditionEventLogSnapshot(
   );
 
   const evaluatedAtSeconds = Math.min(
-    route.position.elapsedSeconds,
-    route.totalDurationSeconds,
+    outcome?.evaluatedAtSeconds ?? route.position.elapsedSeconds,
+    expeditionDurationSeconds,
   );
   let activeEventIndex = -1;
   for (let index = 0; index < executionEvents.length; index += 1) {
@@ -1349,6 +1532,8 @@ export function createExpeditionEventLogSnapshot(
     cityRadiusMeters: event.cityRadiusMeters ?? null,
     distanceToCityMeters: event.distanceToCityMeters ?? null,
     arrivalKind: event.arrivalKind ?? null,
+    idleDurationSeconds: event.idleDurationSeconds ?? null,
+    failureActivity: event.failureActivity ?? null,
     distanceKilometers: event.distanceKilometers,
     occurred: index <= activeEventIndex,
     active: index === activeEventIndex,
@@ -1377,6 +1562,7 @@ export function createExpeditionEventLogSnapshot(
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | null} doctrine
  * @param {ReturnType<typeof createDiscoveryResumeSnapshot> | null} resume
  * @param {number} routeDurationSeconds
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} stopLifecycle
  */
 function addRumorSearchEvent(
   events,
@@ -1384,6 +1570,7 @@ function addRumorSearchEvent(
   doctrine,
   resume,
   routeDurationSeconds,
+  stopLifecycle,
 ) {
   if (!rumorSearch) return;
 
@@ -1415,17 +1602,27 @@ function addRumorSearchEvent(
         order: 16,
       });
     }
-    if (resume?.resumeDecision) {
+    const resumeAtSeconds = stopLifecycle?.resumeAtSeconds ??
+      resume?.resumeDecision.resumedAtSeconds ?? null;
+    const resumeExecutes =
+      resumeAtSeconds !== null &&
+      !(
+        stopLifecycle?.planned.status === "failed" &&
+        stopLifecycle.planned.atSeconds <=
+          resumeAtSeconds + EVENT_TIME_EPSILON_SECONDS
+      );
+    if (resume?.resumeDecision && resumeExecutes && resumeAtSeconds !== null) {
       events.push({
         id: "discovery-route-resumed",
         kind: "route-resumed",
-        atSeconds: resume.resumeDecision.resumedAtSeconds,
+        atSeconds: resumeAtSeconds,
         segmentIndex: resume.resumeDecision.segmentIndex,
         cause: null,
         distanceKilometers:
           resume.resumeDecision.routeDistanceKilometers,
         objectId: resume.resumeDecision.objectId,
         objectKind: resume.resumeDecision.objectKind,
+        idleDurationSeconds: stopLifecycle?.idleDurationSeconds ?? 0,
         order: 17,
       });
     }
@@ -1452,6 +1649,7 @@ function addRumorSearchEvent(
  * @param {ConsumptionProfile} consumptionProfile
  * @param {number | null} firstDepletionAtSeconds
  * @param {number} routeDurationSeconds
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} stopLifecycle
  */
 function addLowSupplyEvents(
   events,
@@ -1459,12 +1657,29 @@ function addLowSupplyEvents(
   consumptionProfile,
   firstDepletionAtSeconds,
   routeDurationSeconds,
+  stopLifecycle,
 ) {
-  const foodAtSeconds = lowSupplyAtSeconds(
+  const foodAtSeconds = stopLifecycle
+    ? lowSupplyAtSecondsAcrossStop(
+        initialSupplies.foodUnits,
+        consumptionProfile.moving.foodUnitsPerHour,
+        consumptionProfile.idle.foodUnitsPerHour,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+      )
+    : lowSupplyAtSeconds(
     initialSupplies.foodUnits,
     consumptionProfile.moving.foodUnitsPerHour,
   );
-  const waterAtSeconds = lowSupplyAtSeconds(
+  const waterAtSeconds = stopLifecycle
+    ? lowSupplyAtSecondsAcrossStop(
+        initialSupplies.waterUnits,
+        consumptionProfile.moving.waterUnitsPerHour,
+        consumptionProfile.idle.waterUnitsPerHour,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+      )
+    : lowSupplyAtSeconds(
     initialSupplies.waterUnits,
     consumptionProfile.moving.waterUnitsPerHour,
   );
@@ -1520,6 +1735,47 @@ function lowSupplyEvent(cause, atSeconds) {
 function lowSupplyAtSeconds(stock, ratePerHour) {
   if (stock === 0 || ratePerHour === 0) return null;
   return (stock * (1 - LOW_SUPPLY_FRACTION) * 3_600) / ratePerHour;
+}
+
+/**
+ * @param {number} stock
+ * @param {number} movingRatePerHour
+ * @param {number} idleRatePerHour
+ * @param {number} stopAtSeconds
+ * @param {number} idleDurationSeconds
+ */
+function lowSupplyAtSecondsAcrossStop(
+  stock,
+  movingRatePerHour,
+  idleRatePerHour,
+  stopAtSeconds,
+  idleDurationSeconds,
+) {
+  if (stock === 0) return null;
+  let remainingConsumption = stock * (1 - LOW_SUPPLY_FRACTION);
+  const preStopConsumption =
+    movingRatePerHour * (stopAtSeconds / 3_600);
+  if (
+    movingRatePerHour > 0 &&
+    remainingConsumption <= preStopConsumption + EVENT_TIME_EPSILON_SECONDS
+  ) {
+    return (remainingConsumption * 3_600) / movingRatePerHour;
+  }
+  remainingConsumption -= preStopConsumption;
+
+  const idleConsumption =
+    idleRatePerHour * (idleDurationSeconds / 3_600);
+  if (
+    idleRatePerHour > 0 &&
+    remainingConsumption <= idleConsumption + EVENT_TIME_EPSILON_SECONDS
+  ) {
+    return stopAtSeconds +
+      (Math.max(0, remainingConsumption) * 3_600) / idleRatePerHour;
+  }
+  remainingConsumption -= idleConsumption;
+  if (movingRatePerHour === 0) return null;
+  return stopAtSeconds + idleDurationSeconds +
+    (Math.max(0, remainingConsumption) * 3_600) / movingRatePerHour;
 }
 
 /**

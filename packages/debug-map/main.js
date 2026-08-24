@@ -15,6 +15,7 @@ import {
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
+  createDiscoveryStopLifecycleSnapshot,
   createExpeditionEventLogSnapshot,
   createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
@@ -88,6 +89,7 @@ const outcomeTime = requireElement("outcome-time", HTMLElement);
 const outcomeCause = requireElement("outcome-cause", HTMLElement);
 const outcomePosition = requireElement("outcome-position", HTMLElement);
 const outcomeAction = requireElement("outcome-action", HTMLButtonElement);
+const stopIdleHours = requireElement("stop-idle-hours", HTMLInputElement);
 const supplyForm = requireElement("supply-form", HTMLFormElement);
 const initialFood = requireElement("initial-food", HTMLInputElement);
 const initialWater = requireElement("initial-water", HTMLInputElement);
@@ -234,6 +236,7 @@ doctrineMarkAndContinue.addEventListener(
   "change",
   clearDiscoveryResumeAndRender,
 );
+stopIdleHours.addEventListener("change", clearDiscoveryResumeAndRender);
 contactMonsterSelect.addEventListener("change", () => {
   resetSimulationClock();
   render();
@@ -257,7 +260,16 @@ outcomeAction.addEventListener("click", () => {
     return;
   }
   if (activeOutcome.status === "in-progress") {
-    elapsedSeconds = activeOutcome.planned.atSeconds;
+    elapsedSeconds =
+      activeOutcome.phase === "idle-at-stop" &&
+      activeOutcome.resumeAtSeconds !== null &&
+      !(
+        activeOutcome.planned.status === "failed" &&
+        activeOutcome.planned.atSeconds <=
+          activeOutcome.resumeAtSeconds + 1e-9
+      )
+        ? activeOutcome.resumeAtSeconds
+        : activeOutcome.planned.atSeconds;
   } else {
     resetSimulationClock();
   }
@@ -376,12 +388,74 @@ function render() {
       throw new Error("Выберите существующий город назначения");
     }
 
-    const plannedRoute = createFourSegmentRouteSnapshot(
+    const timelineRoute = createFourSegmentRouteSnapshot(
       startCity.position,
       readRouteCommands(),
       routeSpeed.valueAsNumber,
       elapsedSeconds,
     );
+    const timelineRumorSearch = createRumorSearchSnapshot(
+      snapshot.seed,
+      startCity,
+      timelineRoute,
+    );
+    const timelineDoctrine = createDiscoveryDoctrineSnapshot(
+      timelineRoute,
+      timelineRumorSearch,
+      readDiscoveryDoctrine(),
+    );
+    const timelineResume = createDiscoveryResumeSnapshot(
+      timelineDoctrine,
+      resumedDiscoveryObjectId,
+    );
+    const cityTimelineDestination = createCityArrivalSnapshot(
+      timelineRoute,
+      destinationCity,
+    );
+    let lifecycleResume = timelineResume;
+    if (
+      lifecycleResume === null &&
+      resumedDiscoveryObjectId !== null &&
+      timelineRumorSearch.serverTruth.plannedDiscoveryAtSeconds !== null
+    ) {
+      const stopRoute = createFourSegmentRouteSnapshot(
+        startCity.position,
+        readRouteCommands(),
+        routeSpeed.valueAsNumber,
+        timelineRumorSearch.serverTruth.plannedDiscoveryAtSeconds,
+      );
+      const stopSearch = createRumorSearchSnapshot(
+        snapshot.seed,
+        startCity,
+        stopRoute,
+      );
+      const stoppedDoctrine = createDiscoveryDoctrineSnapshot(
+        stopRoute,
+        stopSearch,
+        readDiscoveryDoctrine(),
+      );
+      lifecycleResume = createDiscoveryResumeSnapshot(
+        stoppedDoctrine,
+        resumedDiscoveryObjectId,
+      );
+    }
+    const stopLifecycle = createDiscoveryStopLifecycleSnapshot(
+      timelineRoute,
+      supplySettings.initial,
+      supplySettings.profile,
+      lifecycleResume,
+      readStopIdleDurationSeconds(),
+      elapsedSeconds,
+      cityTimelineDestination,
+    );
+    const plannedRoute = stopLifecycle
+      ? createFourSegmentRouteSnapshot(
+          startCity.position,
+          readRouteCommands(),
+          routeSpeed.valueAsNumber,
+          stopLifecycle.movementElapsedSeconds,
+        )
+      : timelineRoute;
     const plannedRumorSearch = createRumorSearchSnapshot(
       snapshot.seed,
       startCity,
@@ -400,7 +474,11 @@ function render() {
       (monster) => monster.id === contactMonsterSelect.value,
     );
     const monsterContact = selectedMonster
-      ? createMonsterContactSnapshot(plannedRoute, selectedMonster)
+      ? createMonsterContactSnapshot(
+          plannedRoute,
+          selectedMonster,
+          stopLifecycle,
+        )
       : null;
     const cityDestination = createCityArrivalSnapshot(
       plannedRoute,
@@ -415,6 +493,7 @@ function render() {
       readStrongMonsterDoctrine(),
       contactFleeSpeed.valueAsNumber / 3.6,
       cityDestination,
+      stopLifecycle,
     );
     const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
     const rumorSearch = createRumorSearchSnapshot(
@@ -450,7 +529,8 @@ function render() {
       rumorSearch,
       doctrine,
       outcome,
-      resume,
+      resume ?? lifecycleResume,
+      stopLifecycle,
     );
     const maximumElapsedSeconds = outcome.planned.atSeconds;
 
@@ -468,11 +548,16 @@ function render() {
     monsterCount.textContent = String(snapshot.monsters.length);
     timeOutput.textContent = formatElapsed(elapsedSeconds);
     routeSummary.textContent = formatRouteSummary(route);
-    renderRumorSearch(rumorSearch, effectiveDoctrine);
+    renderRumorSearch(rumorSearch, effectiveDoctrine, outcome);
     renderCaravanStatus(caravanStatus);
     renderExpeditionOutcome(outcome);
     renderMonsterContact(monsterContact, outcome);
-    renderContactZoom(route, selectedMonster ?? null, monsterContact);
+    renderContactZoom(
+      route,
+      selectedMonster ?? null,
+      monsterContact,
+      stopLifecycle,
+    );
     renderEventLog(eventLog, route);
 
     timeSlider.max = String(Math.max(1, Math.ceil(maximumElapsedSeconds)));
@@ -635,8 +720,9 @@ function updateClockControls() {
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number] | null} monster
  * @param {ReturnType<typeof createMonsterContactSnapshot> | null} contact
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} stopLifecycle
  */
-function renderContactZoom(route, monster, contact) {
+function renderContactZoom(route, monster, contact, stopLifecycle) {
   contactZoomMap.replaceChildren();
   if (!monster) {
     contactZoomCaption.textContent = "Выберите патруль для локального окна.";
@@ -649,6 +735,7 @@ function renderContactZoom(route, monster, contact) {
     contact,
     Number(contactSpatialZoom.value),
     Number(contactTimeZoom.value),
+    stopLifecycle,
   );
   const centerX = CONTACT_ZOOM_WIDTH / 2;
   const centerY = CONTACT_ZOOM_HEIGHT / 2;
@@ -1018,7 +1105,7 @@ function eventDetail(event, route) {
     return "Порог раннего предупреждения";
   }
   if (event.kind === "supplies-depleted") {
-    return `${formatDepletionCause(event.cause)} · гибель на ${formatNumber(event.distanceKilometers ?? 0, 1)} км пути`;
+    return `${formatDepletionCause(event.cause)} · ${event.failureActivity === "idle" ? "гибель на стоянке" : "гибель в пути"} · ${formatNumber(event.distanceKilometers ?? 0, 1)} км маршрута`;
   }
   if (event.kind === "target-discovered") {
     return `Сегмент ${(event.segmentIndex ?? 0) + 1} · ${formatNumber(event.distanceKilometers ?? 0, 1)} км пути`;
@@ -1029,7 +1116,7 @@ function eventDetail(event, route) {
       : "Цель добавлена в знания экспедиции; курс не изменён";
   }
   if (event.kind === "route-resumed") {
-    return `${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
+    return `${event.idleDurationSeconds ? `Стоянка ${formatDuration(event.idleDurationSeconds)} завершена · ` : ""}${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
   }
   if (event.kind === "monster-contact") {
     const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
@@ -1063,13 +1150,24 @@ function eventDetail(event, route) {
 /**
  * @param {ReturnType<typeof createRumorSearchSnapshot>} search
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | NonNullable<ReturnType<typeof createDiscoveryResumeSnapshot>>} doctrine
+ * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
  */
-function renderRumorSearch(search, doctrine) {
-  const resumed = doctrine.status === "resumed-and-continuing";
+function renderRumorSearch(search, doctrine, outcome) {
+  const waiting = outcome.phase === "idle-at-stop";
+  const idleFailure =
+    outcome.status === "failed" && outcome.failureActivity === "idle";
+  const resumed =
+    doctrine.status === "resumed-and-continuing" &&
+    !waiting &&
+    !idleFailure;
   rumorPanel.dataset.state = search.status;
   rumorState.textContent =
     search.status === "found"
-      ? resumed
+      ? idleFailure
+        ? "Стоянка прервана"
+        : waiting
+          ? "Стоянка у цели"
+          : resumed
         ? "Маршрут возобновлён"
         : doctrine.status === "stopped"
         ? "Караван остановлен"
@@ -1085,7 +1183,11 @@ function renderRumorSearch(search, doctrine) {
   if (search.status === "found" && search.discovery) {
     rumorResult.textContent = `Рудник обнаружен на ${formatElapsed(search.discovery.atSeconds)} · сегмент ${search.discovery.segmentIndex + 1} · ${formatNumber(search.discovery.routeDistanceKilometers, 1)} км пути.`;
     doctrineResult.textContent =
-      resumed
+      idleFailure
+        ? `STOP выполнена, но критические запасы исчерпались во время стоянки до возобновления.`
+        : waiting
+          ? `STOP выполнена: стоянка ${formatDuration(outcome.idleElapsedSeconds)} / ${formatDuration(outcome.idleDurationSeconds)}, маршрутное время заморожено.`
+          : resumed
         ? `STOP исполнена и явно снята: цель уже отмечена, исходный маршрут снова открыт.`
         : doctrine.status === "stopped"
         ? `STOP выполнена: маршрут поставлен на паузу в точке обнаружения.`
@@ -1230,6 +1332,9 @@ function renderCaravanStatus(status) {
   const outcomeFailed = status.outcome?.status === "failed";
   const outcomeCompleted = status.outcome?.status === "completed";
   const paused = status.outcome?.status === "paused";
+  const waitingAtStop = status.outcome?.phase === "idle-at-stop";
+  const idleFailure =
+    outcomeFailed && status.outcome?.failureActivity === "idle";
   const monsterDefeat =
     outcomeFailed && status.outcome?.failureReason === "monster";
   const fleeFailed =
@@ -1250,7 +1355,9 @@ function renderCaravanStatus(status) {
     status.route.evaluatedAtSeconds + 1e-9 >=
       status.outcome.monsterContact.expeditionElapsedSeconds;
   const doctrineResumed =
-    status.doctrine?.status === "resumed-and-continuing";
+    status.doctrine?.status === "resumed-and-continuing" &&
+    !waitingAtStop &&
+    !idleFailure;
   const doctrineContinues =
     status.doctrine?.status === "marked-and-continuing";
   const panelState = outcomeFailed
@@ -1258,6 +1365,8 @@ function renderCaravanStatus(status) {
     : outcomeCompleted
       ? "completed"
     : paused
+      ? "stopped"
+    : waitingAtStop
       ? "stopped"
     : status.forecast.canFinish
       ? "safe"
@@ -1276,6 +1385,8 @@ function renderCaravanStatus(status) {
           : monsterContactPause
           ? "Контакт с монстром"
           : "Остановлен у цели"
+        : waitingAtStop
+          ? "Стоянка у найденной цели"
         : doctrineResumed
           ? "Цель отмечена · маршрут возобновлён"
         : doctrineContinues
@@ -1295,6 +1406,8 @@ function renderCaravanStatus(status) {
         ? `Прибыл · ${status.outcome?.destinationCity?.name ?? "город"}`
       : paused
       ? `${routeEnded ? "Конец маршрута" : monsterContactPause ? "Контакт" : "Стоянка"} · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
+      : waitingAtStop
+        ? `Idle-стоянка · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`
       : status.route.status === "arrived"
       ? "Прибыл · маршрут завершён"
       : `В пути · сегмент ${(status.route.segmentIndex ?? 0) + 1}/4`;
@@ -1307,6 +1420,8 @@ function renderCaravanStatus(status) {
       ? `100% · ГОРОД ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
       : paused
         ? `${Math.round(status.route.progress * 100)}% · ${routeEnded ? "ВНЕ ГОРОДА" : monsterContactPause ? "КОНТАКТ" : "STOP"} ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}`
+        : waitingAtStop
+          ? `${Math.round(status.route.progress * 100)}% · IDLE ${formatDuration(status.route.idleElapsedSeconds)} / ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)}`
         : `${Math.round(status.route.progress * 100)}% · ETA ${formatDuration(status.route.totalDurationSeconds)}`;
 
   renderSupply(
@@ -1317,7 +1432,9 @@ function renderCaravanStatus(status) {
     status.supplies.foodRemaining,
     status.supplies.initialFoodUnits,
     status.supplies.foodFraction,
-    supplySettings.profile.moving.foodUnitsPerHour,
+    status.supplies.activity === "idle"
+      ? supplySettings.profile.idle.foodUnitsPerHour
+      : supplySettings.profile.moving.foodUnitsPerHour,
   );
   renderSupply(
     waterCard,
@@ -1327,7 +1444,9 @@ function renderCaravanStatus(status) {
     status.supplies.waterRemaining,
     status.supplies.initialWaterUnits,
     status.supplies.waterFraction,
-    supplySettings.profile.moving.waterUnitsPerHour,
+    status.supplies.activity === "idle"
+      ? supplySettings.profile.idle.waterUnitsPerHour
+      : supplySettings.profile.moving.waterUnitsPerHour,
   );
 
   if (outcomeFailed) {
@@ -1340,7 +1459,7 @@ function renderCaravanStatus(status) {
       ? fleeFailed
         ? `Скорость отхода ${formatNumber((status.outcome?.monsterContactResolution?.fleeResolution?.caravanSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч не выше скорости патруля ${formatNumber((status.outcome?.monsterContactResolution?.fleeResolution?.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч.`
         : `Player PWR ${status.outcome?.monsterContactResolution?.playerPower ?? "—"} < Monster PWR ${status.outcome?.monsterContactResolution?.monsterPower ?? "—"}; ACCEPT_FIGHT завершил экспедицию.`
-      : `${formatDepletionCause(status.outcome?.failureCause ?? null)} исчерпаны на ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}.`;
+      : `${formatDepletionCause(status.outcome?.failureCause ?? null)} исчерпаны ${idleFailure ? "во время стоянки" : "в пути"} на ${formatElapsed(status.outcome?.endedAtSeconds ?? 0)}.`;
   } else if (outcomeCompleted) {
     forecastTitle.textContent = `Прибытие в ${status.outcome?.destinationCity?.name ?? "город"}`;
     forecastDetail.textContent = `В городе: еда ${formatNumber(status.supplies.foodRemaining, 1)} · вода ${formatNumber(status.supplies.waterRemaining, 1)}`;
@@ -1355,6 +1474,18 @@ function renderCaravanStatus(status) {
       : monsterContactPause
         ? "Сильный патруль остановил маршрут: для FLEE не переданы явные скорости."
         : "Караван ждёт у найденной цели; это не финальный исход.";
+  } else if (waitingAtStop) {
+    const fatalBeforeResume =
+      status.outcome?.planned.status === "failed" &&
+      status.outcome.resumeAtSeconds !== null &&
+      status.outcome.planned.atSeconds <=
+        status.outcome.resumeAtSeconds + 1e-9;
+    forecastTitle.textContent = fatalBeforeResume
+      ? "Запасов не хватит на стоянку"
+      : "Идёт стоянка у цели";
+    forecastDetail.textContent = fatalBeforeResume
+      ? `${formatDepletionCause(status.outcome?.planned.failureCause ?? null)} закончатся на ${formatElapsed(status.outcome?.planned.atSeconds ?? 0)} до возобновления.`
+      : `Маршрутное время заморожено; idle-расход действует до ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}.`;
   } else if (doctrineResumed) {
     forecastTitle.textContent = "Маршрут возобновлён";
     forecastDetail.textContent =
@@ -1390,6 +1521,27 @@ function renderExpeditionOutcome(outcome) {
       : `Сегмент ${outcome.planned.segmentIndex + 1} · ${formatNumber(outcome.planned.routeDistanceKilometers, 1)} км`;
 
   if (outcome.status === "in-progress") {
+    if (outcome.phase === "idle-at-stop") {
+      const fatalBeforeResume =
+        outcome.resumeAtSeconds !== null &&
+        outcome.planned.status === "failed" &&
+        outcome.planned.atSeconds <= outcome.resumeAtSeconds + 1e-9;
+      outcomePanel.dataset.state = "paused";
+      outcomeState.textContent = "Стоянка";
+      outcomeTitle.textContent = fatalBeforeResume
+        ? "Караван не переживёт стоянку"
+        : "Караван ждёт у найденной цели";
+      outcomeAction.textContent = fatalBeforeResume
+        ? "DEV: к гибели"
+        : "DEV: к возобновлению";
+      outcomeDetail.textContent = fatalBeforeResume
+        ? `SIM-006 исчерпает ${formatDepletionCause(outcome.planned.failureCause).toLocaleLowerCase("ru-RU")} до окончания ожидания; маршрут останется в точке STOP.`
+        : `Прошло ${formatDuration(outcome.idleElapsedSeconds)} из ${formatDuration(outcome.idleDurationSeconds)}; SIM-005 остаётся в точке STOP, SIM-006 расходует idle-запасы.`;
+      outcomeCause.textContent = fatalBeforeResume
+        ? `Гибель · ${formatElapsed(outcome.planned.atSeconds)}`
+        : `Возобновление · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`;
+      return;
+    }
     outcomeState.textContent = "В пути";
     outcomeTitle.textContent = "Экспедиция продолжается";
     outcomeAction.textContent = "DEV: к исходу";
@@ -1431,23 +1583,28 @@ function renderExpeditionOutcome(outcome) {
     outcome.status === "paused" &&
     outcome.interruptionCause === "doctrine-stop";
   outcomeAction.textContent = discoveryStop
-    ? "Продолжить маршрут"
+    ? `Ждать ${formatDuration(readStopIdleDurationSeconds())} и продолжить`
     : "Повторить экспедицию";
   if (outcome.status === "failed") {
     const monsterDefeat = outcome.failureReason === "monster";
     const fleeFailed =
       outcome.monsterContactResolution?.status === "flee-failed";
     outcomeState.textContent = "Поражение";
+    const idleFailure = outcome.failureActivity === "idle";
     outcomeTitle.textContent = monsterDefeat
       ? fleeFailed
         ? "Патруль настиг караван"
         : "Караван уничтожен сильным патрулём"
-      : "Караван погиб в пути";
+      : idleFailure
+        ? "Караван погиб на стоянке"
+        : "Караван погиб в пути";
     outcomeDetail.textContent = monsterDefeat
       ? fleeFailed
         ? "FLEE не открыл дистанцию: равная или меньшая скорость завершила экспедицию на границе контакта."
         : "ACCEPT_FIGHT против превосходящего Power завершил экспедицию на границе контакта."
-      : "Фатальное истощение остановило движение; будущие этапы и прибытие отменены.";
+      : idleFailure
+        ? "Idle-расход исчерпал критические запасы до возобновления; караван остался в точке STOP."
+        : "Фатальное истощение остановило движение; будущие этапы и прибытие отменены.";
     outcomeCause.textContent = monsterDefeat
       ? fleeFailed
         ? `${formatNumber((outcome.monsterContactResolution?.fleeResolution?.caravanSpeedMetersPerSecond ?? 0) * 3.6, 1)} ≤ ${formatNumber((outcome.monsterContactResolution?.fleeResolution?.monsterSpeedMetersPerSecond ?? 0) * 3.6, 1)} км/ч`
@@ -1527,6 +1684,15 @@ function readSupplySettings() {
       },
     },
   };
+}
+
+/** @returns {number} */
+function readStopIdleDurationSeconds() {
+  const hours = stopIdleHours.valueAsNumber;
+  if (!Number.isFinite(hours) || hours < 0) {
+    throw new RangeError("Длительность стоянки должна быть неотрицательной");
+  }
+  return hours * 3_600;
 }
 
 /** @returns {import("../sim-core/dist/src/index.js").StaticObjectDiscoveryDoctrine} */

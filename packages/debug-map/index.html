@@ -84,7 +84,7 @@
         <div class="rumor-copy">
           <div class="rumor-heading">
             <div>
-              <p class="section-kicker">GAME-002 / GAME-008 · Discovery lifecycle</p>
+              <p class="section-kicker">GAME-002 / GAME-009 · Discovery lifecycle</p>
               <h2 id="rumor-title">Слух о руднике</h2>
             </div>
             <p id="rumor-state" class="rumor-state">Идёт поиск</p>
@@ -426,8 +426,9 @@
             <button type="submit">Применить запасы</button>
           </form>
           <p class="supply-settings__note">
-            В пути применяются moving-расходы SIM-006. Немедленное возобновление
-            после STOP не добавляет время стоянки; длительная idle-жизнь пока вне scope.
+            В пути применяются moving-расходы SIM-006, а между STOP и
+            возобновлением — заданные idle-расходы. Нулевой запас фатален и
+            отменяет продолжение маршрута.
           </p>
         </details>
         <p class="caravan-panel__scope-note">
@@ -442,7 +443,7 @@
         aria-labelledby="outcome-title"
       >
         <div class="outcome-copy">
-          <p class="section-kicker">GAME-003 · Expedition outcome</p>
+          <p class="section-kicker">GAME-003 / GAME-009 · Expedition lifecycle</p>
           <div class="outcome-heading">
             <div>
               <h2 id="outcome-title">Экспедиция продолжается</h2>
@@ -459,8 +460,19 @@
           </dl>
         </div>
         <div class="outcome-actions">
+          <label class="stop-idle-field" for="stop-idle-hours">
+            <span>Стоянка после STOP, ч</span>
+            <input
+              id="stop-idle-hours"
+              type="number"
+              min="0"
+              step="0.5"
+              value="6"
+              required
+            />
+          </label>
           <button id="outcome-action" type="button">DEV: к исходу</button>
-          <p>На discovery STOP кнопка продолжает маршрут; после терминального исхода — повторяет план с T+00:00:00.</p>
+          <p>На discovery STOP кнопка планирует указанную стоянку и продолжение; во время ожидания — переходит к моменту возобновления.</p>
         </div>
       </section>
 

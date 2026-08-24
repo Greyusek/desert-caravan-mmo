@@ -5,6 +5,7 @@ import {
   createWorldCoordinate,
   destinationPoint,
   findFirstExpeditionMonsterContact,
+  findFirstExpeditionMonsterContactWithIdleStop,
 } from "../dist/src/index.js";
 
 const PLANET_RADIUS_METERS = 1_000_000;
@@ -53,7 +54,59 @@ test("GAME-004: expedition contact preserves authoritative monster metadata", ()
   assert.equal(contact.interactionRadiusMeters, 100);
   assert.ok(Math.abs(contact.separationMeters - 100) < 0.0001);
   assert.equal(contact.atSeconds, contact.expeditionElapsedSeconds);
+  assert.equal(contact.routeElapsedSeconds, contact.expeditionElapsedSeconds);
   assert.equal(contact.atSeconds, contact.monsterPatrolElapsedSeconds);
+});
+
+test("GAME-009: an idle STOP shifts post-resume contact in world time only", () => {
+  const { expeditionRoute, monster } = crossingScenario();
+  const uninterrupted = findFirstExpeditionMonsterContact(
+    expeditionRoute,
+    monster,
+  );
+  assert.ok(uninterrupted);
+  const stopAtSeconds = 50;
+  assert.ok(uninterrupted.routeElapsedSeconds > stopAtSeconds);
+
+  const delayed = findFirstExpeditionMonsterContactWithIdleStop(
+    expeditionRoute,
+    monster,
+    stopAtSeconds,
+    monster.patrolRoute.totalDurationSeconds,
+  );
+
+  assert.ok(delayed);
+  assert.ok(
+    Math.abs(
+      delayed.routeElapsedSeconds - uninterrupted.routeElapsedSeconds,
+    ) < 1e-6,
+  );
+  assert.ok(
+    Math.abs(
+      delayed.expeditionElapsedSeconds -
+        uninterrupted.expeditionElapsedSeconds -
+        monster.patrolRoute.totalDurationSeconds,
+    ) < 1e-6,
+  );
+  assert.equal(delayed.atSeconds, delayed.expeditionElapsedSeconds);
+});
+
+test("GAME-009: a contact before STOP remains the first world boundary", () => {
+  const { expeditionRoute, monster } = crossingScenario();
+  const uninterrupted = findFirstExpeditionMonsterContact(
+    expeditionRoute,
+    monster,
+  );
+  assert.ok(uninterrupted);
+
+  const withLaterStop = findFirstExpeditionMonsterContactWithIdleStop(
+    expeditionRoute,
+    monster,
+    uninterrupted.routeElapsedSeconds + 1,
+    99_999,
+  );
+
+  assert.deepEqual(withLaterStop, uninterrupted);
 });
 
 test("GAME-004: delayed expedition route uses absolute patrol world time", () => {

@@ -254,4 +254,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `UI-005` — deterministic play/pause clock with x1 / x10 / x100 / x1000 development speeds.
 - [x] `UI-006` — local spatial/time zoom for short patrol loops and close encounters.
 - [x] `GAME-008` — explicit route resume after an authoritative discovery STOP without rediscovering the acknowledged target.
-- [ ] `GAME-009` — explicit discovery-STOP duration and SIM-006 idle consumption before resume.
+- [x] `GAME-009` — explicit discovery-STOP duration and SIM-006 idle consumption before resume.
+- [ ] `GAME-010` — cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.

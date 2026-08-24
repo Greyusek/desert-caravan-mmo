@@ -8,6 +8,16 @@
 - Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
 - Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
 
+## 0.0.23 — Checkpoint 23
+
+- Added `GAME-009`: an explicit discovery-STOP duration with separate expedition/world time and SIM-005 route time.
+- Kept the caravan at the exact discovery coordinate while applying SIM-006 idle consumption, then resumed the unchanged route after the scheduled wait.
+- Made food, water or simultaneous depletion during the stop fatal at its exact world time; depletion tied with resume wins and removes the impossible resume event.
+- Shifted later milestones, arrival, route completion, supply warnings and post-resume moving contacts by the full idle duration while cyclic patrol world time continues uninterrupted.
+- Added an editable stop-duration control plus live wait progress, idle rates, shifted journal facts and an idle-death state to the debug map.
+- Added fifteen GAME-009 regressions; repository verification now runs 229 tests.
+- Designated `GAME-010`, patrol contact with a stationary caravan during discovery STOP, as the next checkpoint.
+
 ## 0.0.18 — Checkpoint 18
 
 - Added `GAME-006`: a public deterministic FLEE resolver driven by explicit caravan speed, monster speed, contact separation and safe separation.

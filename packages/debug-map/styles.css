@@ -1567,6 +1567,35 @@ input[type="range"] {
   text-align: center;
 }
 
+.stop-idle-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: #8f816a;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.stop-idle-field input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(25, 21, 16, 0.7);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.stop-idle-field input:focus {
+  border-color: var(--accent);
+  outline: 2px solid rgba(194, 132, 65, 0.2);
+}
+
 .outcome-actions button {
   width: 100%;
 }

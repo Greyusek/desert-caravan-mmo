@@ -18,6 +18,7 @@ import {
   createDebugMapSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
+  createDiscoveryStopLifecycleSnapshot,
   createExpeditionEventLogSnapshot,
   createExpeditionOutcomeSnapshot,
   createFourSegmentRouteSnapshot,
@@ -2077,5 +2078,294 @@ test("GAME-008: a stored resume is dormant before STOP and rejects another targe
   assert.throws(
     () => createDiscoveryResumeSnapshot(stopped, "another-target"),
     /objectId must match the stopped discovery/,
+  );
+});
+
+function game009ScenarioAt(
+  expeditionElapsedSeconds,
+  idleDurationSeconds,
+  initialSupplies,
+  profile,
+) {
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const timelineRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    expeditionElapsedSeconds,
+  );
+  const timelineSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    timelineRoute,
+  );
+  const stopAtSeconds = timelineSearch.serverTruth.plannedDiscoveryAtSeconds;
+  assert.ok(stopAtSeconds);
+  const stopRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    stopAtSeconds,
+  );
+  const stopSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    stopRoute,
+  );
+  const stoppedDoctrine = createDiscoveryDoctrineSnapshot(
+    stopRoute,
+    stopSearch,
+    "STOP",
+  );
+  const scheduledResume = createDiscoveryResumeSnapshot(
+    stoppedDoctrine,
+    stopSearch.serverTruth.target.id,
+  );
+  assert.ok(scheduledResume);
+  const lifecycle = createDiscoveryStopLifecycleSnapshot(
+    timelineRoute,
+    initialSupplies,
+    profile,
+    scheduledResume,
+    idleDurationSeconds,
+    expeditionElapsedSeconds,
+  );
+  assert.ok(lifecycle);
+  const plannedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    lifecycle.movementElapsedSeconds,
+  );
+  const search = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    plannedRoute,
+  );
+  const doctrine = createDiscoveryDoctrineSnapshot(
+    plannedRoute,
+    search,
+    "STOP",
+  );
+  const resume = createDiscoveryResumeSnapshot(
+    doctrine,
+    search.serverTruth.target.id,
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    plannedRoute,
+    initialSupplies,
+    profile,
+    resume ?? doctrine,
+    null,
+    "FLEE",
+    plannedRoute.authoritativeRoute.speedMetersPerSecond,
+    null,
+    lifecycle,
+  );
+  const route = applyExpeditionOutcomeToRoute(plannedRoute, outcome);
+  const status = createCaravanStatusSnapshot(
+    route,
+    initialSupplies,
+    profile,
+    resume ?? doctrine,
+    outcome,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    route,
+    initialSupplies,
+    profile,
+    search,
+    doctrine,
+    outcome,
+    resume ?? scheduledResume,
+    lifecycle,
+  );
+
+  return {
+    stopAtSeconds,
+    lifecycle,
+    route,
+    outcome,
+    status,
+    log,
+  };
+}
+
+const game009Consumption = {
+  moving: { foodUnitsPerHour: 1, waterUnitsPerHour: 2 },
+  idle: { foodUnitsPerHour: 4, waterUnitsPerHour: 6 },
+};
+const game009Supplies = { foodUnits: 1_000, waterUnits: 2_000 };
+
+test("GAME-009: explicit idle time consumes idle supplies without route movement", () => {
+  const idleDurationSeconds = 6 * 3_600;
+  const probe = game009ScenarioAt(
+    0,
+    idleDurationSeconds,
+    game009Supplies,
+    game009Consumption,
+  );
+  const scenario = game009ScenarioAt(
+    probe.stopAtSeconds + 2 * 3_600,
+    idleDurationSeconds,
+    game009Supplies,
+    game009Consumption,
+  );
+  const stopHours = scenario.stopAtSeconds / 3_600;
+
+  assert.equal(scenario.outcome.status, "in-progress");
+  assert.equal(scenario.outcome.phase, "idle-at-stop");
+  assert.equal(scenario.route.position.elapsedSeconds, scenario.stopAtSeconds);
+  assert.equal(scenario.status.supplies.activity, "idle");
+  approx(
+    scenario.status.supplies.foodRemaining,
+    game009Supplies.foodUnits - stopHours - 8,
+    1e-6,
+  );
+  approx(
+    scenario.status.supplies.waterRemaining,
+    game009Supplies.waterUnits - stopHours * 2 - 12,
+    1e-6,
+  );
+  const resumeEvent = scenario.log.events.find(
+    (event) => event.kind === "route-resumed",
+  );
+  assert.equal(
+    resumeEvent?.atSeconds,
+    scenario.stopAtSeconds + idleDurationSeconds,
+  );
+  assert.equal(resumeEvent?.occurred, false);
+});
+
+test("GAME-009: route completion and journal ETA shift by the full stop", () => {
+  const idleDurationSeconds = 6 * 3_600;
+  const probe = game009ScenarioAt(
+    0,
+    idleDurationSeconds,
+    game009Supplies,
+    game009Consumption,
+  );
+  const routeCompletion = probe.route.totalDurationSeconds;
+  const scenario = game009ScenarioAt(
+    routeCompletion + idleDurationSeconds,
+    idleDurationSeconds,
+    game009Supplies,
+    game009Consumption,
+  );
+
+  assert.equal(scenario.outcome.status, "completed");
+  assert.equal(scenario.route.position.status, "arrived");
+  assert.equal(
+    scenario.outcome.endedAtSeconds,
+    routeCompletion + idleDurationSeconds,
+  );
+  assert.equal(
+    scenario.log.events.at(-1)?.atSeconds,
+    routeCompletion + idleDurationSeconds,
+  );
+  assert.equal(
+    scenario.log.events.filter((event) => event.kind === "route-resumed")
+      .length,
+    1,
+  );
+});
+
+test("GAME-009: idle depletion cancels resume and arrival at the STOP point", () => {
+  const idleDurationSeconds = 6 * 3_600;
+  const probe = game009ScenarioAt(
+    0,
+    idleDurationSeconds,
+    game009Supplies,
+    game009Consumption,
+  );
+  const stopHours = probe.stopAtSeconds / 3_600;
+  const waterAtDeath =
+    stopHours * game009Consumption.moving.waterUnitsPerHour +
+    2 * game009Consumption.idle.waterUnitsPerHour;
+  const scenario = game009ScenarioAt(
+    probe.route.totalDurationSeconds + idleDurationSeconds,
+    idleDurationSeconds,
+    { foodUnits: 1_000, waterUnits: waterAtDeath },
+    game009Consumption,
+  );
+
+  assert.equal(scenario.outcome.status, "failed");
+  assert.equal(scenario.outcome.failureActivity, "idle");
+  assert.equal(scenario.outcome.failureCause, "water");
+  assert.equal(
+    scenario.outcome.endedAtSeconds,
+    scenario.stopAtSeconds + 2 * 3_600,
+  );
+  assert.equal(scenario.route.position.elapsedSeconds, scenario.stopAtSeconds);
+  assert.equal(
+    scenario.log.events.some((event) => event.kind === "route-resumed"),
+    false,
+  );
+  assert.equal(
+    scenario.log.events.some((event) => event.kind === "arrival"),
+    false,
+  );
+  assert.equal(scenario.log.events.at(-1)?.failureActivity, "idle");
+});
+
+test("GAME-009: depletion tied with the end of STOP still prevents resume", () => {
+  const idleDurationSeconds = 3 * 3_600;
+  const probe = game009ScenarioAt(
+    0,
+    idleDurationSeconds,
+    game009Supplies,
+    game009Consumption,
+  );
+  const stopHours = probe.stopAtSeconds / 3_600;
+  const waterAtTie =
+    stopHours * game009Consumption.moving.waterUnitsPerHour +
+    3 * game009Consumption.idle.waterUnitsPerHour;
+  const scenario = game009ScenarioAt(
+    probe.stopAtSeconds + idleDurationSeconds,
+    idleDurationSeconds,
+    { foodUnits: 1_000, waterUnits: waterAtTie },
+    game009Consumption,
+  );
+
+  assert.equal(scenario.outcome.status, "failed");
+  assert.equal(
+    scenario.outcome.endedAtSeconds,
+    scenario.stopAtSeconds + idleDurationSeconds,
+  );
+  assert.equal(
+    scenario.log.events.some((event) => event.kind === "route-resumed"),
+    false,
+  );
+});
+
+test("GAME-009: the 25-percent warning can occur inside the idle interval", () => {
+  const idleDurationSeconds = 3.5 * 3_600;
+  const profile = {
+    moving: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+    idle: { foodUnitsPerHour: 0, waterUnitsPerHour: 4 },
+  };
+  const probe = game009ScenarioAt(
+    0,
+    idleDurationSeconds,
+    { foodUnits: 100, waterUnits: 16 },
+    profile,
+  );
+  const scenario = game009ScenarioAt(
+    probe.stopAtSeconds + 3 * 3_600,
+    idleDurationSeconds,
+    { foodUnits: 100, waterUnits: 16 },
+    profile,
+  );
+  const warning = scenario.log.events.find(
+    (event) => event.kind === "supplies-low",
+  );
+
+  assert.equal(warning?.cause, "water");
+  assert.equal(warning?.atSeconds, scenario.stopAtSeconds + 3 * 3_600);
+  assert.equal(warning?.occurred, true);
+  assert.equal(
+    scenario.log.events.some((event) => event.kind === "supplies-depleted"),
+    false,
   );
 });
