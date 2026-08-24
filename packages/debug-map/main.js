@@ -150,6 +150,10 @@ const knowledgeMapScale = requireElement(
   "knowledge-map-scale",
   HTMLOutputElement,
 );
+const knowledgeMapVisibility = requireElement(
+  "knowledge-map-visibility",
+  HTMLOutputElement,
+);
 const knowledgeRouteStatus = requireElement(
   "knowledge-route-status",
   HTMLOutputElement,
@@ -1586,6 +1590,7 @@ function syncKnowledgeMapOriginOptions(map, cities) {
 function drawSessionKnowledgeMap(map, cities) {
   knowledgeMap.replaceChildren();
   const city = cities.find((candidate) => candidate.id === map.originCityId);
+  knowledgeMapVisibility.textContent = `Обзор ${formatNumber(map.visibilityRadiusMeters, 0)} м`;
 
   if (!map.originCityId) {
     const empty = svgElement("text", {
@@ -1626,13 +1631,55 @@ function drawSessionKnowledgeMap(map, cities) {
     }),
   );
 
+  if (map.tracks.length > 0) {
+    const maskId = "knowledge-map-visibility-mask";
+    const definitions = svgElement("defs");
+    const mask = svgElement("mask", {
+      id: maskId,
+      x: 0,
+      y: 0,
+      width: map.width,
+      height: map.height,
+      maskUnits: "userSpaceOnUse",
+      "mask-type": "luminance",
+    });
+    mask.append(
+      svgElement("rect", {
+        x: 0,
+        y: 0,
+        width: map.width,
+        height: map.height,
+        fill: "white",
+      }),
+      ...map.tracks.map((track) =>
+        svgElement("polyline", {
+          points: knowledgeMapPoints(track.points),
+          fill: "none",
+          stroke: "black",
+          "stroke-width": map.visibilityDiameterPixels,
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+        }),
+      ),
+    );
+    definitions.append(mask);
+    const fog = svgElement("rect", {
+      class: "knowledge-map-fog",
+      x: 0,
+      y: 0,
+      width: map.width,
+      height: map.height,
+      mask: `url(#${maskId})`,
+    });
+    knowledgeMap.append(definitions, fog);
+  }
+
   for (const track of map.tracks) {
-    const points = track.points
-      .map((point) => `${point.x},${point.y}`)
-      .join(" ");
+    const points = knowledgeMapPoints(track.points);
     const corridor = svgElement("polyline", {
       class: "knowledge-map-corridor",
       points,
+      "stroke-width": map.visibilityDiameterPixels,
     });
     const path = svgElement("polyline", {
       class: "knowledge-map-track",
@@ -1719,6 +1766,11 @@ function drawSessionKnowledgeMap(map, cities) {
   knowledgeMap.append(origin, originLabel);
 
   knowledgeMapScale.textContent = `Радиус ${formatNumber(map.scaleRadiusMeters / 1_000, 2)} км · точек ${map.entries.length} · путей ${map.tracks.length}`;
+}
+
+/** @param {readonly {x: number, y: number}[]} points */
+function knowledgeMapPoints(points) {
+  return points.map((point) => `${point.x},${point.y}`).join(" ");
 }
 
 /**

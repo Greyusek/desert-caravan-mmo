@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 28 — GAME-014: implemented and covered by automated tests.**
+**Checkpoint 29 — GAME-015: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -45,10 +45,11 @@ Also implemented:
 - GAME-012 — a selected ledger entry prepares a new expedition from its first-observation city using only the confirmed relative bearing and distance, without exposing absolute coordinates.
 - GAME-013 — confirmed ledger entries render on a player-facing north-up session knowledge map derived only from first-observation bearings and distances; independent city anchors are never joined through hidden coordinates.
 - GAME-014 — each expedition adds only its actually travelled bearing/distance prefix to the matching local session chart; future route legs stay hidden and prior progress cannot be erased by rewinding the DEV clock.
+- GAME-015 — a physically scaled 300 m visibility radius around those travelled tracks cuts the first session fog-of-war corridor; map scale changes pixels, never the underlying survey distance.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
-Not implemented yet (intentionally): several simultaneous patrol contacts, pursuit route replanning, cross-session/server-persisted player knowledge, rewards and expedition persistence, production physical player map and fog of war, server/database, tactical combat, and autonomous neural NPC / City / Species agents.
+Not implemented yet (intentionally): reached-city personal landmarks, several simultaneous patrol contacts, pursuit route replanning, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, and autonomous neural NPC / City / Species agents.
 
 ## Requirements
 
@@ -83,17 +84,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 28:
+Expected for Checkpoint 29:
 
 ```text
-# tests 262
-# pass 262
+# tests 265
+# pass 265
 # fail 0
 ```
 
-This total contains 257 simulation/UI tests and 5 tooling regression tests.
+This total contains 260 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_28.md` for GAME-014 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_29.md` for GAME-015 details.
 
 ## Developer debug map
 
@@ -103,7 +104,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The world map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, a persistent supply forecast, a deterministic event timeline, the local rumor-search scenario, discovery and contact doctrines, expedition outcomes and authoritative Power/FLEE resolution. Select `STOP`, choose the stop duration, press `DEV: маршрут к цели`, and advance time: the separate player-facing map grows only along the distance the caravan has actually travelled and stops at the authoritative boundary. Planned future legs are never drawn. Moving the DEV time slider backwards does not erase retained travel; replacing a route after movement starts a new expedition instead of rewriting the old corridor. The same map records the confirmed mine from its first-observation bearing and distance; if knowledge originates in different cities, use the origin selector rather than joining charts through server coordinates. Press **Подготовить поход к объекту** to start the next expedition at T+0 and fill the route editor from that personal record; the known target is reobserved without executing STOP again or moving its original marker. Discoveries and travelled tracks live only in the current tab and reset on a different seed, page reload or the explicit clear button. `DEV: патруль к стоянке`, `DEV: маршрут в город` and `DEV: маршрут на перехват` remain available for the existing idle-contact, arrival and Power/FLEE checks. Use Play/Pause and x1, x10, x100 or x1000 to run without dragging the time slider. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The world map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, supplies, timeline, doctrines, outcomes and Power/FLEE resolution. The separate player-facing map now starts as unexplored darkness. Select `STOP`, press `DEV: маршрут к цели`, and advance time: only the actually travelled path cuts a transparent corridor with a physical radius of 300 m. Planned future legs are never drawn, moving the DEV slider backwards does not erase retained visibility, and earlier expedition corridors remain. The center line and confirmed knowledge markers stay visible above the fog. Independent origin cities still use separate charts. Reaching another city does not yet create its personal landmark; that accepted gap is the explicit `GAME-016` checkpoint. Discoveries, tracks and session fog reset together on a different seed, page reload or the clear button. Existing arrival, idle-contact and Power/FLEE DEV presets remain available. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -118,4 +119,4 @@ Then open `http://127.0.0.1:4173`. The world map is intentionally a developer ov
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next functional checkpoint is `GAME-015`: reveal a physically scaled 300 m player-visibility corridor around actually travelled tracks as the first session fog-of-war slice, still without server persistence or production physical-map ownership.
+The next functional checkpoint is `GAME-016`: after an authoritative arrival, record the reached city as a confirmed relative landmark on the matching personal chart without exposing or globally joining server coordinates.

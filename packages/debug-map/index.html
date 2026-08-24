@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 28 · GAME-014</p>
+          <p class="eyebrow">Checkpoint 29 · GAME-015</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -166,7 +166,7 @@
       <section class="knowledge-panel" aria-labelledby="knowledge-title">
         <div class="knowledge-heading">
           <div>
-            <p class="section-kicker">GAME-014 · Travelled corridors</p>
+            <p class="section-kicker">GAME-015 · Session fog of war</p>
             <h2 id="knowledge-title">Журнал знаний игрока</h2>
           </div>
           <div class="knowledge-counters">
@@ -178,7 +178,7 @@
         <article class="knowledge-map-card" aria-labelledby="knowledge-map-title">
           <div class="knowledge-map-heading">
             <div>
-              <p class="section-kicker">Coordinate-free · North-up</p>
+              <p class="section-kicker">Coordinate-free · 300 m visibility</p>
               <h3 id="knowledge-map-title">Личная карта знаний и путей</h3>
             </div>
             <label>
@@ -197,13 +197,16 @@
             ></svg>
           </div>
           <div class="knowledge-map-meta">
-            <span aria-label="Север сверху">↑ N</span>
+            <span aria-label="Север сверху">
+              ↑ N · <output id="knowledge-map-visibility">Обзор 300 м</output>
+            </span>
             <output id="knowledge-map-scale">Масштаб появится после движения</output>
           </div>
           <p id="knowledge-map-note" class="knowledge-map-note">
-            Независимые городские привязки не склеиваются скрытыми координатами.
-            Маркеры и коридоры вычисляются только из личных азимутов и
-            фактически пройденных расстояний; будущий маршрут не показывается.
+            Тёмное поле ещё не исследовано. Прозрачный коридор имеет физический
+            радиус 300 м от фактически пройденного пути; будущий маршрут не
+            показывается, а город отмечается только отдельным подтверждённым
+            наблюдением.
           </p>
         </article>
         <p id="knowledge-empty" class="knowledge-empty">

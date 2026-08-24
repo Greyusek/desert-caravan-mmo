@@ -264,4 +264,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-012` — prepare a return expedition from a selected known-object entry using relative navigation data.
 - [x] `GAME-013` — render confirmed entries on a coordinate-free north-up session knowledge map.
 - [x] `GAME-014` — retain executed expedition tracks and actually travelled corridors on the session knowledge map.
-- [ ] `GAME-015` — reveal a 300 m player-visibility corridor around travelled tracks as session fog of war.
+- [x] `GAME-015` — reveal a 300 m player-visibility corridor around travelled tracks as session fog of war.
+- [ ] `GAME-016` — confirm an authoritatively reached city as a relative personal-map landmark.
