@@ -2,7 +2,7 @@
 
 ## Unreleased — Design consolidation
 
-- Adopted autonomous «Искины» as a long-term design pillar while keeping `GAME-013` as the immediate functional checkpoint.
+- Adopted autonomous «Искины» as a long-term design pillar without moving it ahead of the functional checkpoint sequence.
 - Canonized `AI decides; simulation resolves`, subject-limited perception, validated Action API boundaries and model/provider independence.
 - Added NPC / AI Player, City AI, Species AI, separated memory/learning layers and Cognitive LOD to GDD v0.5.
 - Added gated `AI-001..AI-005` experiments to the roadmap without introducing neural dependencies into MVP-0.
@@ -11,6 +11,17 @@
 - Published GDD v0.4 as the cross-document entry point and preserved GDD v0.2/v0.3 as archives.
 - Resolved the old System 256 wording: the architecture is canonical, while numeric coefficients and implementation remain deferred.
 - Added information provenance, permanent simulated creatures and emergent legendary monsters to the long-term design contract.
+
+## 0.0.28 — Checkpoint 28
+
+- Added `GAME-014`: every expedition retains its actually travelled route prefix in coordinate-free session knowledge.
+- Stored only normalized bearing/distance legs up to authoritative movement progress; untravelled future legs never enter the player ledger.
+- Made repeated rendering idempotent and kept maximum reached progress when the DEV clock is moved backwards.
+- Prevented later route edits from rewriting an already executed corridor and started a distinct expedition when replacing a route after movement.
+- Drew prior corridors, current-expedition progress and exact travelled endpoints on the matching local city chart.
+- Kept tracks from different origin cities separate and reset them together with the existing seed-bound session knowledge.
+- Added eight GAME-014 regressions; repository verification now runs 262 tests.
+- Designated `GAME-015`, a 300 m player-visibility fog corridor around actually travelled tracks, as the next checkpoint.
 
 ## 0.0.27 — Checkpoint 27
 

@@ -323,6 +323,7 @@ input[type="range"] {
 .knowledge-counters {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -403,6 +404,34 @@ input[type="range"] {
 .knowledge-map-axis {
   stroke: rgba(180, 214, 204, 0.14);
   stroke-width: 1;
+}
+
+.knowledge-map-corridor,
+.knowledge-map-track {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.knowledge-map-corridor {
+  stroke: rgba(88, 199, 180, 0.12);
+  stroke-width: 10;
+}
+
+.knowledge-map-track {
+  stroke: rgba(123, 211, 194, 0.72);
+  stroke-width: 2.2;
+}
+
+.knowledge-map-track[data-current="true"] {
+  stroke: #f4b860;
+  stroke-width: 2.8;
+}
+
+.knowledge-map-track-end {
+  fill: #8de2d3;
+  stroke: #10251f;
+  stroke-width: 1.3;
 }
 
 .knowledge-map-bearing {
@@ -492,6 +521,12 @@ input[type="range"] {
   color: #17120d;
   background: var(--accent-strong);
   text-align: center;
+}
+
+#knowledge-track-count {
+  color: #9fe6da;
+  border-color: rgba(88, 199, 180, 0.35);
+  background: rgba(29, 76, 68, 0.3);
 }
 
 .knowledge-empty {

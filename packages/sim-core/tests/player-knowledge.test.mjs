@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   createKnownObjectReturnNavigation,
   createPlayerDiscoveryLedger,
+  createPlayerTravelLedger,
   recordDirectDiscoveryObservation,
+  recordExpeditionTravelProgress,
   wasObjectKnownBeforeExpedition,
 } from "../dist/src/index.js";
 
@@ -216,5 +218,144 @@ test("GAME-012: return navigation rejects an unknown selection", () => {
         "unknown-object",
       ),
     /known ledger entry/,
+  );
+});
+
+test("GAME-014: zero movement does not invent a travelled corridor", () => {
+  const ledger = createPlayerTravelLedger("session-world");
+  const result = recordExpeditionTravelProgress(ledger, {
+    expeditionNumber: 1,
+    originCityId: "city-01",
+    routeCommands: [{ bearingDeg: 0, distanceMeters: 10_000 }],
+    traveledDistanceMeters: 0,
+  });
+
+  assert.equal(result.status, "no-progress");
+  assert.equal(result.ledger, ledger);
+  assert.equal(result.track, null);
+  assert.deepEqual(result.ledger.tracks, []);
+});
+
+test("GAME-014: only the executed route prefix enters session knowledge", () => {
+  const result = recordExpeditionTravelProgress(
+    createPlayerTravelLedger("session-world"),
+    {
+      expeditionNumber: 1,
+      originCityId: "city-01",
+      routeCommands: [
+        { bearingDeg: 0, distanceMeters: 10_000 },
+        { bearingDeg: 90, distanceMeters: 20_000 },
+        { bearingDeg: 180, distanceMeters: 30_000 },
+      ],
+      traveledDistanceMeters: 15_000,
+    },
+  );
+
+  assert.equal(result.status, "first-progress");
+  assert.deepEqual(result.track, {
+    expeditionNumber: 1,
+    originCityId: "city-01",
+    legs: [
+      { bearingDeg: 0, distanceMeters: 10_000 },
+      { bearingDeg: 90, distanceMeters: 5_000 },
+    ],
+    traveledDistanceMeters: 15_000,
+  });
+  assert.equal(JSON.stringify(result.track).includes("30000"), false);
+  assert.equal(JSON.stringify(result.track).includes("latitude"), false);
+  assert.equal(JSON.stringify(result.track).includes("longitude"), false);
+});
+
+test("GAME-014: repeated renders and clock rewind retain maximum progress", () => {
+  const input = {
+    expeditionNumber: 1,
+    originCityId: "city-01",
+    routeCommands: [
+      { bearingDeg: 0, distanceMeters: 10_000 },
+      { bearingDeg: 90, distanceMeters: 10_000 },
+    ],
+    traveledDistanceMeters: 5_000,
+  };
+  const first = recordExpeditionTravelProgress(
+    createPlayerTravelLedger("session-world"),
+    input,
+  );
+  const duplicate = recordExpeditionTravelProgress(first.ledger, input);
+  const progressed = recordExpeditionTravelProgress(duplicate.ledger, {
+    ...input,
+    traveledDistanceMeters: 12_000,
+  });
+  const rewound = recordExpeditionTravelProgress(progressed.ledger, {
+    ...input,
+    traveledDistanceMeters: 7_000,
+  });
+
+  assert.equal(duplicate.status, "unchanged");
+  assert.equal(duplicate.ledger, first.ledger);
+  assert.equal(progressed.status, "progressed");
+  assert.equal(progressed.track?.traveledDistanceMeters, 12_000);
+  assert.deepEqual(progressed.track?.legs, [
+    { bearingDeg: 0, distanceMeters: 10_000 },
+    { bearingDeg: 90, distanceMeters: 2_000 },
+  ]);
+  assert.equal(rewound.status, "unchanged");
+  assert.equal(rewound.ledger, progressed.ledger);
+  assert.equal(rewound.track?.traveledDistanceMeters, 12_000);
+});
+
+test("GAME-014: extending progress cannot rewrite an executed bearing", () => {
+  const first = recordExpeditionTravelProgress(
+    createPlayerTravelLedger("session-world"),
+    {
+      expeditionNumber: 1,
+      originCityId: "city-01",
+      routeCommands: [{ bearingDeg: -10, distanceMeters: 10_000 }],
+      traveledDistanceMeters: 5_000,
+    },
+  );
+
+  assert.equal(first.track?.legs[0]?.bearingDeg, 350);
+  assert.throws(
+    () =>
+      recordExpeditionTravelProgress(first.ledger, {
+        expeditionNumber: 1,
+        originCityId: "city-01",
+        routeCommands: [{ bearingDeg: 20, distanceMeters: 10_000 }],
+        traveledDistanceMeters: 6_000,
+      }),
+    /preserve recorded travel/,
+  );
+});
+
+test("GAME-014: expeditions from different cities remain separate tracks", () => {
+  const first = recordExpeditionTravelProgress(
+    createPlayerTravelLedger("session-world"),
+    {
+      expeditionNumber: 1,
+      originCityId: "city-01",
+      routeCommands: [{ bearingDeg: 45, distanceMeters: 8_000 }],
+      traveledDistanceMeters: 8_000,
+    },
+  );
+  const second = recordExpeditionTravelProgress(first.ledger, {
+    expeditionNumber: 2,
+    originCityId: "city-07",
+    routeCommands: [{ bearingDeg: 225, distanceMeters: 9_000 }],
+    traveledDistanceMeters: 9_000,
+  });
+
+  assert.deepEqual(
+    second.ledger.tracks.map((track) => track.originCityId),
+    ["city-01", "city-07"],
+  );
+  assert.throws(
+    () =>
+      recordExpeditionTravelProgress(second.ledger, {
+        expeditionNumber: 1,
+        originCityId: "city-02",
+        routeCommands: [{ bearingDeg: 45, distanceMeters: 10_000 }],
+        traveledDistanceMeters: 10_000,
+      }),
+    /originCityId/,
   );
 });
