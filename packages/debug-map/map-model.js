@@ -6,6 +6,7 @@ import {
   DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
   DEFAULT_PLAYER_POWER,
   createRoutePlan,
+  createKnownObjectReturnNavigation,
   createRumorSearchScenario,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
@@ -656,6 +657,35 @@ export function createCityArrivalRoutePreset(
       {
         bearingDeg: initialBearingDegrees(start, destinationCity.position),
         distanceKilometers: distanceToDestinationMeters / 1_000,
+      },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+  };
+}
+
+/**
+ * GAME-012 converts one selected coordinate-free ledger fix into the four
+ * route-editor commands used by the debug map. The preset deliberately carries
+ * no world position and always starts at the first-observation city.
+ * @param {import("../sim-core/dist/src/index.js").PlayerDiscoveryLedger} ledger
+ * @param {string} objectId
+ */
+export function createKnownObjectReturnRoutePreset(ledger, objectId) {
+  const navigation = createKnownObjectReturnNavigation(ledger, objectId);
+  return {
+    kind: /** @type {const} */ ("known-object-return"),
+    objectId: navigation.objectId,
+    objectKind: navigation.objectKind,
+    originCityId: navigation.originCityId,
+    source: navigation.source,
+    confidence: navigation.confidence,
+    firstObservedInExpedition: navigation.firstObservedInExpedition,
+    commands: [
+      {
+        bearingDeg: navigation.command.bearingDeg,
+        distanceKilometers: navigation.command.distanceMeters / 1_000,
       },
       { bearingDeg: 0, distanceKilometers: 0 },
       { bearingDeg: 0, distanceKilometers: 0 },

@@ -2,6 +2,7 @@ import {
   DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
+  createKnownObjectReturnNavigation,
   createPlayerDiscoveryLedger,
   createRumorSearchScenario,
   createRoutePlan,
@@ -41,7 +42,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 25 demo");
+console.log("Desert Caravan MMO — Checkpoint 26 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -210,6 +211,8 @@ if (rumorOrigin) {
         observedAtSeconds: rumorDiscovery.elapsedSeconds,
         segmentIndex: rumorDiscovery.segmentIndex,
         routeDistanceMeters: rumorDiscovery.routeDistanceMeters,
+        originBearingDeg: rumorScenario.serverTruth.exactBearingDeg,
+        originDistanceMeters: rumorScenario.serverTruth.exactDistanceMeters,
       },
     );
     const secondLedgerRecord = recordDirectDiscoveryObservation(
@@ -223,10 +226,19 @@ if (rumorOrigin) {
         observedAtSeconds: rumorDiscovery.elapsedSeconds,
         segmentIndex: rumorDiscovery.segmentIndex,
         routeDistanceMeters: rumorDiscovery.routeDistanceMeters,
+        originBearingDeg: rumorScenario.serverTruth.exactBearingDeg,
+        originDistanceMeters: rumorScenario.serverTruth.exactDistanceMeters,
       },
+    );
+    const returnNavigation = createKnownObjectReturnNavigation(
+      secondLedgerRecord.ledger,
+      rumorDiscovery.object.id,
     );
     console.log(
       `GAME-011 session knowledge: first=${firstLedgerRecord.status}, repeat=${secondLedgerRecord.status}, observations=${secondLedgerRecord.entry.observationCount}, coordinates-stored=false`,
+    );
+    console.log(
+      `GAME-012 known-object return: origin=${returnNavigation.originCityId}, bearing=${returnNavigation.command.bearingDeg.toFixed(6)}°, distance=${(returnNavigation.command.distanceMeters / 1_000).toFixed(6)} km`,
     );
   }
 }
@@ -403,5 +415,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 25 session discovery ledger: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 26 known-object return navigation: npm run debug-map -> http://127.0.0.1:4173",
 );

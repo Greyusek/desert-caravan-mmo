@@ -31,12 +31,13 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-009`: model explicit time spent at a discovery STOP with SIM-006 idle consumption before resume.
 - [x] `GAME-010`: resolve cyclic-patrol contact with a stationary caravan during the discovery-STOP interval.
 - [x] `GAME-011`: retain discovered-object knowledge in an in-session player expedition ledger without database persistence.
+- [x] `GAME-012`: prepare a return expedition from a selected known-object ledger entry using relative navigation data.
 - [x] `DESIGN-001`: consolidate GDD v0.3 and MVP_SPEC v0.3 around production world scale and the physical map/library information economy.
 - [x] `DESIGN-002`: integrate the world bible, magic, bestiary, ecology, System 256 and presentation canon into GDD v0.4 without changing the GAME-005 implementation.
 
 ## Next
 
-- [ ] `GAME-012`: prepare a return expedition from a selected known-object ledger entry using relative navigation data, still without database persistence.
+- [ ] `GAME-013`: render confirmed ledger entries on a coordinate-free north-up session knowledge map, still without production physical-map ownership or database persistence.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors
