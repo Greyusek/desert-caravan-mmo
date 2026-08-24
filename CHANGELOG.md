@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.31 — Checkpoint 31
+
+- Added `CITY-001`: every seeded city now has finite food and water stocks.
+- Generated safe-integer stocks in the inclusive 10,000–50,000 unit range.
+- Isolated every city's stock PRNG stream from city positions, other cities, static objects and wandering monsters.
+- Exposed city stocks in the DEV map detail panel without adding trading, purchases, NPC consumption or persistence.
+- Added three CITY-001 regressions; repository verification now runs 270 tests.
+
 ## 0.0.30 — Checkpoint 30
 
 - Added `GAME-016`: a city enters personal session knowledge only after the expedition completes at its authoritative arrival boundary.

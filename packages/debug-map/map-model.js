@@ -240,6 +240,7 @@ export function createDebugMapSnapshot(
       name: city.name,
       position: city.position,
       point: projectCoordinate(city.position),
+      stocks: world.cityStocks.find((stocks) => stocks.cityId === city.id),
     })),
     staticObjects: world.staticObjects.map((object) => ({
       id: object.id,

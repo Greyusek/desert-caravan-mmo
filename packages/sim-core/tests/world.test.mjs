@@ -60,6 +60,45 @@ test("WORLD-001 regression: checkpoint-04 cities remain byte-for-byte unchanged"
   ]);
 });
 
+test("CITY-001: every city has finite food and water stocks", () => {
+  const world = generateSeededWorld("city-stocks");
+
+  assert.equal(world.cityStocks.length, world.cities.length);
+  assert.deepEqual(
+    world.cityStocks.map(({ cityId }) => cityId),
+    world.cities.map(({ id }) => id),
+  );
+  for (const stocks of world.cityStocks) {
+    assert.ok(Number.isSafeInteger(stocks.foodUnits));
+    assert.ok(Number.isSafeInteger(stocks.waterUnits));
+    assert.ok(stocks.foodUnits >= 10_000 && stocks.foodUnits <= 50_000);
+    assert.ok(stocks.waterUnits >= 10_000 && stocks.waterUnits <= 50_000);
+  }
+});
+
+test("CITY-001: the same seed reproduces city stocks and another seed changes them", () => {
+  const first = generateSeededWorld("repeatable-city-stocks").cityStocks;
+  assert.deepEqual(
+    first,
+    generateSeededWorld("repeatable-city-stocks").cityStocks,
+  );
+  assert.notDeepEqual(
+    first,
+    generateSeededWorld("other-city-stocks").cityStocks,
+  );
+});
+
+test("CITY-001: changing city count does not perturb existing city stocks", () => {
+  const small = generateSeededWorld("stable-city-stocks", {
+    cityCount: 3,
+  }).cityStocks;
+  const large = generateSeededWorld("stable-city-stocks", {
+    cityCount: 20,
+  }).cityStocks;
+
+  assert.deepEqual(small, large.slice(0, 3));
+});
+
 test("WORLD-002: the default world contains one object of every kind in fixed order", () => {
   const objects = generateSeededWorld("mvp-world").staticObjects;
   assert.equal(objects.length, 4);

@@ -18,9 +18,16 @@ export interface City {
   readonly position: WorldCoordinate;
 }
 
+export interface CityStocks {
+  readonly cityId: string;
+  readonly foodUnits: number;
+  readonly waterUnits: number;
+}
+
 export interface SeededWorld {
   readonly seed: string;
   readonly cities: readonly City[];
+  readonly cityStocks: readonly CityStocks[];
   readonly staticObjects: readonly StaticWorldObject[];
   readonly wanderingMonsters: readonly WanderingMonster[];
 }
@@ -50,6 +57,8 @@ const DEFAULT_STATIC_OBJECT_COUNT = 1;
 const DEFAULT_WANDERING_MONSTER_COUNT = 1;
 const WANDERING_MONSTER_MINIMUM_LEG_METERS = 4_000;
 const WANDERING_MONSTER_MAXIMUM_LEG_METERS = 12_000;
+const CITY_MINIMUM_STOCK_UNITS = 10_000;
+const CITY_MAXIMUM_STOCK_UNITS = 50_000;
 
 /**
  * WORLD-001 — creates the first reproducible world layer.
@@ -79,6 +88,22 @@ export function generateSeededWorld(
       randomInRange(random, -180, 180),
     ),
   }));
+  const cityStocks = cities.map((city): CityStocks => {
+    const stockRandom = mulberry32(hashSeed(`${seed}:city-stocks:${city.id}`));
+    return {
+      cityId: city.id,
+      foodUnits: randomSafeIntegerInRange(
+        stockRandom,
+        CITY_MINIMUM_STOCK_UNITS,
+        CITY_MAXIMUM_STOCK_UNITS,
+      ),
+      waterUnits: randomSafeIntegerInRange(
+        stockRandom,
+        CITY_MINIMUM_STOCK_UNITS,
+        CITY_MAXIMUM_STOCK_UNITS,
+      ),
+    };
+  });
 
   const staticObjects = STATIC_OBJECT_KINDS.flatMap((kind) => {
     const count = options.staticObjectCounts?.[kind] ?? DEFAULT_STATIC_OBJECT_COUNT;
@@ -106,7 +131,7 @@ export function generateSeededWorld(
     (_, index): WanderingMonster => createWanderingMonster(seed, index),
   );
 
-  return { seed, cities, staticObjects, wanderingMonsters };
+  return { seed, cities, cityStocks, staticObjects, wanderingMonsters };
 }
 
 function assertStaticObjectCount(count: number, kind: StaticWorldObjectKind): void {
@@ -213,4 +238,12 @@ function mulberry32(seed: number): () => number {
 
 function randomInRange(random: () => number, minimum: number, maximum: number): number {
   return minimum + random() * (maximum - minimum);
+}
+
+function randomSafeIntegerInRange(
+  random: () => number,
+  minimum: number,
+  maximum: number,
+): number {
+  return Math.floor(randomInRange(random, minimum, maximum + 1));
 }

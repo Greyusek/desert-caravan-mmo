@@ -42,7 +42,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 30 demo");
+console.log("Desert Caravan MMO — Checkpoint 31 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -126,6 +126,12 @@ console.log(`\nWORLD-001 seed=${world.seed}: ${world.cities.length} cities`);
 for (const city of world.cities) {
   console.log(
     `  ${city.id} ${city.name}: ${city.position.latitudeDeg.toFixed(6)}, ${city.position.longitudeDeg.toFixed(6)}`,
+  );
+}
+console.log("CITY-001 finite city stocks:");
+for (const stocks of world.cityStocks) {
+  console.log(
+    `  ${stocks.cityId}: food=${stocks.foodUnits}, water=${stocks.waterUnits}`,
   );
 }
 console.log(`WORLD-002 hidden static objects: ${world.staticObjects.length}`);
@@ -415,5 +421,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 30 reached-city landmarks: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 31 finite city stocks: npm run debug-map -> http://127.0.0.1:4173",
 );
