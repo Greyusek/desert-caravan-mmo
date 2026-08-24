@@ -1767,6 +1767,13 @@ input[type="range"] {
   white-space: nowrap;
 }
 
+.supply-doctrine-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .supply-settings {
   margin-top: 11px;
   border-top: 1px solid rgba(236, 203, 148, 0.1);
@@ -2843,6 +2850,10 @@ input[type="range"] {
   .supply-doctrine-actions {
     min-width: 0;
     text-align: left;
+  }
+
+  .supply-doctrine-buttons {
+    justify-content: flex-start;
   }
 
   .route-form {

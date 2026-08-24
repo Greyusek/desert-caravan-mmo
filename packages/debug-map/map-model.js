@@ -23,6 +23,7 @@ import {
   kilometers,
   positionAtTime,
   planEmergencySupplyReturn,
+  planEmergencySupplyReturnDuringIdleStop,
   projectCitySettlementAtTime,
   projectMixedActivitySupplies,
   resolveMonsterPowerContact,
@@ -142,7 +143,7 @@ export function advanceSimulationClock(
  * @property {number} [relativeSpeedMetersPerSecond]
  * @property {number | null} [secondsToSafeSeparation]
  * @property {import("../sim-core/dist/src/index.js").CaravanActivity} [caravanActivity]
- * @property {"scheduled" | "monster-contact"} [resumeReason]
+ * @property {"scheduled" | "monster-contact" | "supply-emergency"} [resumeReason]
  * @property {string} [cityId]
  * @property {string} [cityName]
  * @property {number} [cityRadiusMeters]
@@ -151,6 +152,7 @@ export function advanceSimulationClock(
  * @property {number} [idleDurationSeconds]
  * @property {import("../sim-core/dist/src/index.js").CaravanActivity | null} [failureActivity]
  * @property {import("../sim-core/dist/src/index.js").SupplyEmergencyDoctrine} [supplyEmergencyDoctrine]
+ * @property {import("../sim-core/dist/src/index.js").CaravanActivity} [supplyEmergencyActivity]
  * @property {number} [remainingFraction]
  * @property {number} [returnDistanceKilometers]
  */
@@ -1050,14 +1052,16 @@ export function createRoutePlanSnapshot(route, elapsedSeconds = 0) {
 }
 
 /**
- * GAME-017 prepares one uninterrupted emergency-return route. A discovery STOP
- * that occurs first keeps priority; idle-threshold composition remains a later
- * explicit checkpoint instead of silently changing GAME-009 semantics.
+ * GAME-017/018 prepares one deterministic emergency route across uninterrupted
+ * movement or a scheduled discovery STOP. An earlier route-changing monster
+ * boundary may still keep priority over the idle decision.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {SupplyStock} initialSupplies
  * @param {ConsumptionProfile} consumptionProfile
  * @param {import("../sim-core/dist/src/index.js").SupplyEmergencyDoctrine} doctrine
  * @param {number | null} [pauseAtRouteSeconds]
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
+ * @param {number | null} [blockingExpeditionAtSeconds]
  */
 export function createEmergencySupplyDoctrineSnapshot(
   route,
@@ -1065,68 +1069,149 @@ export function createEmergencySupplyDoctrineSnapshot(
   consumptionProfile,
   doctrine,
   pauseAtRouteSeconds = null,
+  stopLifecycle = null,
+  blockingExpeditionAtSeconds = null,
 ) {
-  const plan = planEmergencySupplyReturn(
+  const movingPlan = planEmergencySupplyReturn(
     route.authoritativeRoute,
     initialSupplies,
     consumptionProfile,
     doctrine,
   );
-  const triggerAtSeconds = plan.triggersBeforeRouteEnd
-    ? plan.threshold?.atSeconds ?? null
+  const movingTriggerAtSeconds = movingPlan.triggersBeforeRouteEnd
+    ? movingPlan.threshold?.atSeconds ?? null
     : null;
+  const movingTriggersBeforePause =
+    movingTriggerAtSeconds !== null &&
+    (pauseAtRouteSeconds === null ||
+      movingTriggerAtSeconds <
+        pauseAtRouteSeconds - EVENT_TIME_EPSILON_SECONDS);
+  const idlePlan = stopLifecycle
+    ? planEmergencySupplyReturnDuringIdleStop(
+        route.authoritativeRoute,
+        initialSupplies,
+        consumptionProfile,
+        doctrine,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+      )
+    : null;
+  const idleTriggerAtSeconds = idlePlan?.triggersDuringIdleStop
+    ? idlePlan.threshold?.atSeconds ?? null
+    : null;
+  const usesIdleStop =
+    !movingTriggersBeforePause && idleTriggerAtSeconds !== null;
+  const triggerAtSeconds = usesIdleStop
+    ? idleTriggerAtSeconds
+    : movingTriggerAtSeconds;
+  const triggerAtRouteSeconds = usesIdleStop
+    ? idlePlan?.threshold?.routeAtSeconds ?? null
+    : movingTriggerAtSeconds;
   const blockedByEarlierPause =
+    !usesIdleStop &&
     triggerAtSeconds !== null &&
     pauseAtRouteSeconds !== null &&
     pauseAtRouteSeconds <= triggerAtSeconds + EVENT_TIME_EPSILON_SECONDS;
+  const blockedByEarlierBoundary =
+    usesIdleStop &&
+    triggerAtSeconds !== null &&
+    blockingExpeditionAtSeconds !== null &&
+    blockingExpeditionAtSeconds <=
+      triggerAtSeconds + EVENT_TIME_EPSILON_SECONDS;
+  const returnSegmentIndex = usesIdleStop
+    ? idlePlan?.returnSegmentIndex ?? null
+    : movingPlan.returnSegmentIndex;
   const appliesReturn =
     doctrine === "RETURN_TO_ORIGIN" &&
-    plan.returnSegmentIndex !== null &&
-    !blockedByEarlierPause;
+    returnSegmentIndex !== null &&
+    !blockedByEarlierPause &&
+    !blockedByEarlierBoundary;
+  const interruptsIdleStop = Boolean(
+    appliesReturn && usesIdleStop && idlePlan?.interruptsIdleStop,
+  );
+  const scheduledIdleDurationSeconds = stopLifecycle?.idleDurationSeconds ?? 0;
+  const effectiveIdleDurationSeconds = interruptsIdleStop
+    ? idlePlan?.effectiveIdleDurationSeconds ?? scheduledIdleDurationSeconds
+    : scheduledIdleDurationSeconds;
+  const evaluatedAtSeconds = stopLifecycle?.evaluatedAtSeconds ??
+    route.position.elapsedSeconds;
+  const effectivePlan = usesIdleStop ? idlePlan : movingPlan;
+  const effectiveRouteAtSeconds = appliesReturn
+    ? usesIdleStop && stopLifecycle
+      ? expeditionTimeToRouteTime(
+          evaluatedAtSeconds,
+          stopLifecycle.stopAtRouteSeconds,
+          effectiveIdleDurationSeconds,
+          true,
+        )
+      : evaluatedAtSeconds
+    : route.position.elapsedSeconds;
   const effectiveRoute = appliesReturn
     ? createRoutePlanSnapshot(
-        plan.effectiveRoute,
-        route.position.elapsedSeconds,
+        effectivePlan?.effectiveRoute ?? route.authoritativeRoute,
+        effectiveRouteAtSeconds,
       )
     : route;
-  const evaluatedAtSeconds = route.position.elapsedSeconds;
   const decisionOccurred =
     triggerAtSeconds !== null &&
     evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >= triggerAtSeconds;
+  const returnToOriginAtRouteSeconds = usesIdleStop
+    ? idlePlan?.returnToOriginAtRouteSeconds ?? null
+    : movingPlan.returnToOriginAtSeconds;
+  const returnToOriginAtSeconds = usesIdleStop
+    ? idlePlan?.returnToOriginAtExpeditionSeconds ?? null
+    : movingPlan.returnToOriginAtSeconds;
   const status = triggerAtSeconds === null
     ? /** @type {const} */ ("not-triggered")
-    : blockedByEarlierPause
+    : blockedByEarlierBoundary
+      ? /** @type {const} */ ("blocked-by-earlier-boundary")
+      : blockedByEarlierPause
       ? /** @type {const} */ ("blocked-by-earlier-pause")
       : !decisionOccurred
         ? /** @type {const} */ ("pending")
         : doctrine === "CONTINUE"
           ? /** @type {const} */ ("continued")
           : evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
-              (plan.returnToOriginAtSeconds ?? Number.POSITIVE_INFINITY)
+              (returnToOriginAtSeconds ?? Number.POSITIVE_INFINITY)
             ? /** @type {const} */ ("returned")
             : /** @type {const} */ ("returning");
 
   return {
     doctrine,
     status,
-    threshold: plan.threshold,
+    threshold: effectivePlan?.threshold ?? null,
+    triggerActivity: triggerAtSeconds === null
+      ? null
+      : usesIdleStop
+        ? /** @type {const} */ ("idle")
+        : /** @type {const} */ ("moving"),
     triggerAtSeconds,
-    triggerSegmentIndex: plan.triggerSegmentIndex,
+    triggerAtRouteSeconds,
+    triggerSegmentIndex: effectivePlan?.triggerSegmentIndex ?? null,
     triggerRouteDistanceKilometers:
-      plan.triggerRouteDistanceMeters === null
+      effectivePlan?.triggerRouteDistanceMeters === null ||
+      effectivePlan?.triggerRouteDistanceMeters === undefined
         ? null
-        : plan.triggerRouteDistanceMeters / 1_000,
+        : effectivePlan.triggerRouteDistanceMeters / 1_000,
     blockedByEarlierPause,
+    blockedByEarlierBoundary,
+    blockingExpeditionAtSeconds,
     appliesReturn,
-    returnSegmentIndex: appliesReturn ? plan.returnSegmentIndex : null,
-    returnBearingDeg: appliesReturn ? plan.returnBearingDeg : null,
-    returnDistanceKilometers:
-      appliesReturn && plan.returnDistanceMeters !== null
-        ? plan.returnDistanceMeters / 1_000
-        : null,
-    returnToOriginAtSeconds: appliesReturn
-      ? plan.returnToOriginAtSeconds
+    interruptsIdleStop,
+    scheduledIdleDurationSeconds,
+    effectiveIdleDurationSeconds,
+    returnSegmentIndex: appliesReturn ? returnSegmentIndex : null,
+    returnBearingDeg: appliesReturn
+      ? effectivePlan?.returnBearingDeg ?? null
       : null,
+    returnDistanceKilometers:
+      appliesReturn && effectivePlan?.returnDistanceMeters !== null &&
+        effectivePlan?.returnDistanceMeters !== undefined
+        ? effectivePlan.returnDistanceMeters / 1_000
+        : null,
+    returnToOriginAtRouteSeconds:
+      appliesReturn ? returnToOriginAtRouteSeconds : null,
+    returnToOriginAtSeconds: appliesReturn ? returnToOriginAtSeconds : null,
     effectiveRoute,
   };
 }
@@ -1444,6 +1529,7 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
  * @param {number} [fleeSpeedMetersPerSecond]
  * @param {ReturnType<typeof createCityArrivalSnapshot> | null} [cityDestination]
  * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
+ * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot> | null} [supplyEmergency]
  */
 export function createExpeditionOutcomeSnapshot(
   route,
@@ -1455,6 +1541,7 @@ export function createExpeditionOutcomeSnapshot(
   fleeSpeedMetersPerSecond = route.authoritativeRoute.speedMetersPerSecond,
   cityDestination = null,
   stopLifecycle = null,
+  supplyEmergency = null,
 ) {
   const doctrinePauseAtSeconds =
     doctrine?.status === "stopped"
@@ -1633,7 +1720,10 @@ export function createExpeditionOutcomeSnapshot(
         ? effectiveStopLifecycle?.phase ??
           /** @type {const} */ ("moving-to-stop")
         : /** @type {const} */ ("ended"),
-    scheduledIdleDurationSeconds: stopLifecycle?.idleDurationSeconds ?? 0,
+    scheduledIdleDurationSeconds:
+      supplyEmergency?.scheduledIdleDurationSeconds ??
+      stopLifecycle?.idleDurationSeconds ??
+      0,
     idleDurationSeconds: effectiveStopLifecycle?.idleDurationSeconds ?? 0,
     idleElapsedSeconds,
     resumeAtSeconds: effectiveStopLifecycle?.resumeAtSeconds ?? null,
@@ -1647,6 +1737,10 @@ export function createExpeditionOutcomeSnapshot(
     supplies,
     stopLifecycle: effectiveStopLifecycle,
     stopInterruptedByContact,
+    stopInterruptedBySupplyEmergency: Boolean(
+      supplyEmergency?.appliesReturn &&
+      supplyEmergency.interruptsIdleStop,
+    ),
     interruptionCause,
     destinationCity: cityDestination?.city ?? null,
     cityArrivalRadiusMeters: cityDestination?.radiusMeters ?? null,
@@ -1924,12 +2018,14 @@ export function createExpeditionEventLogSnapshot(
     expeditionDurationSeconds,
     stopLifecycle,
     outcome,
+    supplyEmergency,
   );
 
   if (
     supplyEmergency?.triggerAtSeconds !== null &&
     supplyEmergency?.triggerAtSeconds !== undefined &&
-    !supplyEmergency.blockedByEarlierPause
+    !supplyEmergency.blockedByEarlierPause &&
+    !supplyEmergency.blockedByEarlierBoundary
   ) {
     events.push({
       id: "supplies-emergency-doctrine",
@@ -1940,6 +2036,8 @@ export function createExpeditionEventLogSnapshot(
       distanceKilometers:
         supplyEmergency.triggerRouteDistanceKilometers,
       supplyEmergencyDoctrine: supplyEmergency.doctrine,
+      supplyEmergencyActivity:
+        supplyEmergency.triggerActivity ?? undefined,
       remainingFraction:
         supplyEmergency.threshold?.remainingFraction ?? undefined,
       returnDistanceKilometers:
@@ -2126,6 +2224,7 @@ export function createExpeditionEventLogSnapshot(
     idleDurationSeconds: event.idleDurationSeconds ?? null,
     failureActivity: event.failureActivity ?? null,
     supplyEmergencyDoctrine: event.supplyEmergencyDoctrine ?? null,
+    supplyEmergencyActivity: event.supplyEmergencyActivity ?? null,
     remainingFraction: event.remainingFraction ?? null,
     returnDistanceKilometers: event.returnDistanceKilometers ?? null,
     distanceKilometers: event.distanceKilometers,
@@ -2158,6 +2257,7 @@ export function createExpeditionEventLogSnapshot(
  * @param {number} routeDurationSeconds
  * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} stopLifecycle
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} outcome
+ * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot> | null} supplyEmergency
  */
 function addRumorSearchEvent(
   events,
@@ -2167,6 +2267,7 @@ function addRumorSearchEvent(
   routeDurationSeconds,
   stopLifecycle,
   outcome,
+  supplyEmergency,
 ) {
   if (!rumorSearch) return;
 
@@ -2216,6 +2317,13 @@ function addRumorSearchEvent(
     );
     if (resume?.resumeDecision && resumeExecutes && resumeAtSeconds !== null) {
       const contactResume = Boolean(outcome?.stopInterruptedByContact);
+      const supplyEmergencyResume = Boolean(
+        outcome?.stopInterruptedBySupplyEmergency &&
+        supplyEmergency?.triggerAtSeconds !== null &&
+        supplyEmergency?.triggerAtSeconds !== undefined &&
+        Math.abs(resumeAtSeconds - supplyEmergency.triggerAtSeconds) <=
+          EVENT_TIME_EPSILON_SECONDS,
+      );
       events.push({
         id: "discovery-route-resumed",
         kind: "route-resumed",
@@ -2227,8 +2335,12 @@ function addRumorSearchEvent(
         objectId: resume.resumeDecision.objectId,
         objectKind: resume.resumeDecision.objectKind,
         idleDurationSeconds: stopLifecycle?.idleDurationSeconds ?? 0,
-        resumeReason: contactResume ? "monster-contact" : "scheduled",
-        order: contactResume ? 19 : 17,
+        resumeReason: contactResume
+          ? "monster-contact"
+          : supplyEmergencyResume
+            ? "supply-emergency"
+            : "scheduled",
+        order: contactResume ? 19 : supplyEmergencyResume ? 18 : 17,
       });
     }
     return;

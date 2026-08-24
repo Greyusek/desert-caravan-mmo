@@ -37,6 +37,7 @@ import {
 import {
   createPlayerDiscoveryLedger,
   createPlayerTravelLedger,
+  evaluateDiscoveryStopLifecycle,
   recordDirectDiscoveryObservation,
   recordExpeditionTravelProgress,
   recordReachedCityLandmark,
@@ -182,6 +183,263 @@ test("GAME-017: an earlier discovery pause keeps priority over emergency return"
   assert.equal(emergency.status, "blocked-by-earlier-pause");
   assert.equal(emergency.appliesReturn, false);
   assert.equal(emergency.effectiveRoute, route);
+});
+
+test("GAME-018: DEV snapshot leaves STOP at the exact idle 50% boundary", () => {
+  const initialSupplies = { foodUnits: 100, waterUnits: 1_000 };
+  const profile = {
+    moving: { foodUnitsPerHour: 18, waterUnitsPerHour: 0 },
+    idle: { foodUnitsPerHour: 20, waterUnitsPerHour: 0 },
+  };
+  const stopAtSeconds = 2_000;
+  const idleDurationSeconds = 3 * 3_600;
+  const triggerAtSeconds = stopAtSeconds + 2 * 3_600;
+  const evaluatedAtSeconds = triggerAtSeconds + 1_000;
+  const plannedRoute = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    [
+      { bearingDeg: 90, distanceKilometers: 100 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+    36,
+    stopAtSeconds,
+  );
+  const stopLifecycle = evaluateDiscoveryStopLifecycle(
+    plannedRoute.authoritativeRoute,
+    initialSupplies,
+    profile,
+    evaluatedAtSeconds,
+    stopAtSeconds,
+    idleDurationSeconds,
+  );
+  const emergency = createEmergencySupplyDoctrineSnapshot(
+    plannedRoute,
+    initialSupplies,
+    profile,
+    "RETURN_TO_ORIGIN",
+    stopAtSeconds,
+    stopLifecycle,
+  );
+
+  assert.equal(emergency.triggerActivity, "idle");
+  assert.equal(emergency.triggerAtSeconds, triggerAtSeconds);
+  assert.equal(emergency.triggerAtRouteSeconds, stopAtSeconds);
+  assert.equal(emergency.effectiveIdleDurationSeconds, 2 * 3_600);
+  assert.equal(emergency.interruptsIdleStop, true);
+  assert.equal(emergency.status, "returning");
+  assert.equal(emergency.effectiveRoute.segments.length, 2);
+  approx(emergency.triggerRouteDistanceKilometers, 20, 1e-7);
+  approx(emergency.returnDistanceKilometers, 20, 1e-7);
+  approx(emergency.effectiveRoute.position.elapsedSeconds, 3_000, 1e-7);
+  approx(
+    emergency.effectiveRoute.position.traveledDistanceMeters,
+    30_000,
+    1e-7,
+  );
+});
+
+test("GAME-018: effective outcome and log preserve the truncated STOP", () => {
+  const seed = "checkpoint-04";
+  const world = createDebugMapSnapshot(seed, 0, 2);
+  const origin = world.cities[0];
+  assert.ok(origin);
+  const initialSupplies = { foodUnits: 100, waterUnits: 100 };
+  const profile = {
+    moving: { foodUnitsPerHour: 0, waterUnitsPerHour: 0 },
+    idle: { foodUnitsPerHour: 25, waterUnitsPerHour: 25 },
+  };
+  const probeRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    [
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+    5,
+  );
+  const probeSearch = createRumorSearchSnapshot(seed, origin, probeRoute);
+  const commands = [
+    {
+      bearingDeg: probeSearch.serverTruth.exactBearingDeg,
+      distanceKilometers: probeSearch.serverTruth.exactDistanceKilometers,
+    },
+    { bearingDeg: 0, distanceKilometers: 0 },
+    { bearingDeg: 0, distanceKilometers: 0 },
+    { bearingDeg: 0, distanceKilometers: 0 },
+  ];
+  const baseRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+  );
+  const baseSearch = createRumorSearchSnapshot(seed, origin, baseRoute);
+  const stopAtSeconds = baseSearch.serverTruth.plannedDiscoveryAtSeconds;
+  assert.notEqual(stopAtSeconds, null);
+  const idleDurationSeconds = 6 * 3_600;
+  const triggerAtSeconds = (stopAtSeconds ?? 0) + 2 * 3_600;
+  const evaluatedAtSeconds = triggerAtSeconds + 60;
+  const stopRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    stopAtSeconds ?? 0,
+  );
+  const stopSearch = createRumorSearchSnapshot(seed, origin, stopRoute);
+  const stoppedDoctrine = createDiscoveryDoctrineSnapshot(
+    stopRoute,
+    stopSearch,
+    "STOP",
+  );
+  const scheduledResume = createDiscoveryResumeSnapshot(
+    stoppedDoctrine,
+    stopSearch.serverTruth.target.id,
+  );
+  assert.ok(scheduledResume);
+  const scheduledLifecycle = createDiscoveryStopLifecycleSnapshot(
+    baseRoute,
+    initialSupplies,
+    profile,
+    scheduledResume,
+    idleDurationSeconds,
+    evaluatedAtSeconds,
+  );
+  assert.ok(scheduledLifecycle);
+  const plannedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    scheduledLifecycle.movementElapsedSeconds,
+  );
+  const emergency = createEmergencySupplyDoctrineSnapshot(
+    plannedRoute,
+    initialSupplies,
+    profile,
+    "RETURN_TO_ORIGIN",
+    stopAtSeconds,
+    scheduledLifecycle,
+  );
+  const executionSearch = createRumorSearchSnapshot(
+    seed,
+    origin,
+    emergency.effectiveRoute,
+  );
+  const executionDoctrine = createDiscoveryDoctrineSnapshot(
+    emergency.effectiveRoute,
+    executionSearch,
+    "STOP",
+  );
+  const executionResume = createDiscoveryResumeSnapshot(
+    executionDoctrine,
+    executionSearch.serverTruth.target.id,
+  );
+  assert.ok(executionResume);
+  const destination = createCityArrivalSnapshot(
+    emergency.effectiveRoute,
+    origin,
+  );
+  const effectiveLifecycle = createDiscoveryStopLifecycleSnapshot(
+    emergency.effectiveRoute,
+    initialSupplies,
+    profile,
+    executionResume,
+    emergency.effectiveIdleDurationSeconds,
+    evaluatedAtSeconds,
+    destination,
+  );
+  assert.ok(effectiveLifecycle);
+  const outcome = createExpeditionOutcomeSnapshot(
+    emergency.effectiveRoute,
+    initialSupplies,
+    profile,
+    executionResume,
+    null,
+    "FLEE",
+    5 / 3.6,
+    destination,
+    effectiveLifecycle,
+    emergency,
+  );
+  const route = applyExpeditionOutcomeToRoute(
+    emergency.effectiveRoute,
+    outcome,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    route,
+    initialSupplies,
+    profile,
+    executionSearch,
+    executionDoctrine,
+    outcome,
+    executionResume,
+    effectiveLifecycle,
+    emergency,
+  );
+
+  assert.equal(outcome.stopInterruptedBySupplyEmergency, true);
+  assert.equal(outcome.scheduledIdleDurationSeconds, idleDurationSeconds);
+  assert.equal(outcome.idleDurationSeconds, 2 * 3_600);
+  assert.equal(outcome.resumeAtSeconds, triggerAtSeconds);
+  const emergencyIndex = log.events.findIndex(
+    (event) => event.kind === "supplies-emergency-doctrine",
+  );
+  const resumeIndex = log.events.findIndex(
+    (event) => event.kind === "route-resumed",
+  );
+  assert.ok(emergencyIndex >= 0);
+  assert.ok(resumeIndex > emergencyIndex);
+  assert.equal(log.events[emergencyIndex]?.supplyEmergencyActivity, "idle");
+  assert.equal(log.events[resumeIndex]?.resumeReason, "supply-emergency");
+  assert.equal(
+    log.events[resumeIndex]?.idleDurationSeconds,
+    2 * 3_600,
+  );
+});
+
+test("GAME-018: an earlier route-changing contact blocks idle return", () => {
+  const initialSupplies = { foodUnits: 100, waterUnits: 1_000 };
+  const profile = {
+    moving: { foodUnitsPerHour: 18, waterUnitsPerHour: 0 },
+    idle: { foodUnitsPerHour: 20, waterUnitsPerHour: 0 },
+  };
+  const stopAtSeconds = 2_000;
+  const idleDurationSeconds = 3 * 3_600;
+  const plannedRoute = createFourSegmentRouteSnapshot(
+    { latitudeDeg: 0, longitudeDeg: 0 },
+    [
+      { bearingDeg: 90, distanceKilometers: 100 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+      { bearingDeg: 0, distanceKilometers: 0 },
+    ],
+    36,
+    stopAtSeconds,
+  );
+  const stopLifecycle = evaluateDiscoveryStopLifecycle(
+    plannedRoute.authoritativeRoute,
+    initialSupplies,
+    profile,
+    stopAtSeconds + idleDurationSeconds,
+    stopAtSeconds,
+    idleDurationSeconds,
+  );
+  const emergency = createEmergencySupplyDoctrineSnapshot(
+    plannedRoute,
+    initialSupplies,
+    profile,
+    "RETURN_TO_ORIGIN",
+    stopAtSeconds,
+    stopLifecycle,
+    stopAtSeconds + 2 * 3_600 - 1,
+  );
+
+  assert.equal(emergency.triggerActivity, "idle");
+  assert.equal(emergency.status, "blocked-by-earlier-boundary");
+  assert.equal(emergency.blockedByEarlierBoundary, true);
+  assert.equal(emergency.appliesReturn, false);
+  assert.equal(emergency.effectiveRoute, plannedRoute);
 });
 
 test("UI-005: clock inputs and speed choices are validated", () => {
