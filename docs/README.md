@@ -52,6 +52,7 @@
 - `CHECKPOINT_27.md` — coordinate-free north-up карта сессионных знаний из подтверждённых относительных фиксов.
 - `CHECKPOINT_28.md` — исполненные префиксы экспедиций и реально пройденные коридоры на сессионной карте.
 - `CHECKPOINT_29.md` — физический 300-метровый радиус обзора и первый fog-mask поверх пройденных коридоров.
+- `CHECKPOINT_30.md` — достигнутый город как подтверждённый относительный ориентир личной карты после authoritative arrival.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006` и `GAME-001..GAME-015` покрыты 260 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 265 тестов в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006` и `GAME-001..GAME-016` покрыты 262 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 267 тестов в pull request.
