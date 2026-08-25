@@ -50,22 +50,23 @@ next slice is deterministic warning arbitration across several patrols.
 - Local debug server: PASS; Checkpoint 38 HTML, the STOP QA control, browser
   integration and compiled sim-core entry are served successfully.
 - Git tree and `git diff --check`: PASS at the functional commit.
-- GitHub Actions remains the merge gate; this local feature commit has not yet
-  been published or merged.
+- GitHub Actions remains the merge gate. If this file is read from `main`, the
+  Checkpoint 38 PR passed that gate before merge.
 
 ## Current task
 
-Checkpoint 38 is complete on `feature/game-021-danger-stop`. Publication,
-CI-gated merge and the user's Windows acceptance are still pending.
+Checkpoint 38 is complete. On `feature/game-021-danger-stop`, publication and
+CI-gated merge are pending. On `main`, only the user's Windows acceptance is
+pending.
 
 ## Next action
 
-After explicit publication authorization, push the branch, open its PR and
-merge only after `CI / verify` succeeds. Then run `npm run accept:main` on the
-user's Windows checkout. After a PASS, start GAME-022 as a new small task:
-select the earliest 1000 m warning across several patrols with stable
-time/monster-id tie-breaking, without implementing multi-patrol avoidance
-clearance in the same slice.
+If still on the feature branch and publication is authorized, publish it,
+open its PR and merge only after `CI / verify` succeeds. Then run
+`npm run accept:main` on the user's Windows checkout. After a PASS, start
+GAME-022 as a new small task: select the earliest 1000 m warning across several
+patrols with stable time/monster-id tie-breaking, without implementing
+multi-patrol avoidance clearance in the same slice.
 
 ## Known issues
 
