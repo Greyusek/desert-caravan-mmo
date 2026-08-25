@@ -160,7 +160,8 @@ Production-time пока не фиксируем окончательно. Ра�
 - строго более быстрый караван открывает разрыв со скоростью `caravanSpeed - monsterSpeed`, достигает безопасной дистанции за `(safeSeparation - contactSeparation) / relativeSpeed` и продолжает исходный маршрут;
 - равная или меньшая скорость означает терминальное поражение на границе контакта; случайности, бонуса от Power и tactical rounds нет.
 - те же правила действуют, если циклический патруль входит в радиус неподвижного каравана во время discovery `STOP`: слабая угроза не отменяет ожидание, успешный `FLEE` досрочно возобновляет маршрут, а истощение сохраняет приоритет при точном совпадении времени.
-- GAME-019 отделяет раннее предупреждение от контакта: движущийся патруль сначала создаёт server-truth событие на 1000 м, а при сохранённом курсе позже входит в 500 м; если экспедиция уже стартовала внутри 500 м, обе границы совпадают и приоритет имеет контакт. `AVOID` в этом checkpoint маршрут не меняет.
+- GAME-019 отделяет раннее предупреждение от контакта: движущийся патруль сначала создаёт server-truth событие на 1000 м, а при сохранённом курсе позже входит в 500 м; если экспедиция уже стартовала внутри 500 м, обе границы совпадают и приоритет имеет контакт.
+- GAME-020 исполняет `AVOID | CONTINUE` на этой границе во время непрерывного движения. `CONTINUE` сохраняет исходный маршрут без изменений. `AVOID` сохраняет исполненный префикс, вставляет один детерминированный waypoint, возвращается к концу прерванного сегмента и сохраняет поздний суффикс; новый маршрут принимается только после непрерывной проверки отсутствия входа в 500 м выбранного патруля.
 
 Затаившийся монстр использует уменьшенный базовый радиус обнаружения (150 м). Блуждающий монстр движется по собственному маршруту, поэтому геометрическое пересечение путей без совпадения во времени встречу не создаёт.
 
@@ -276,4 +277,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-017` — execute `RETURN_TO_ORIGIN | CONTINUE` when food or water reaches 50% during uninterrupted movement.
 - [x] `GAME-018` — compose the 50% emergency boundary with discovery-STOP idle consumption and depart from the exact stop coordinate.
 - [x] `GAME-019` — establish the first detected-danger boundary and its ordering relative to contact before adding `AVOID | CONTINUE` route replanning.
-- [ ] `GAME-020` — execute `AVOID | CONTINUE` at that warning boundary and keep the avoidance geometry outside the 500 m contact radius.
+- [x] `GAME-020` — execute `AVOID | CONTINUE` at that warning boundary and keep the avoidance geometry outside the 500 m contact radius.
+- [ ] `GAME-021` — compose the warning and danger doctrine with a scheduled discovery STOP, preserving exact world/route time and first-boundary priority.

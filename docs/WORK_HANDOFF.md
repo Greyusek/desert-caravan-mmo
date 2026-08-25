@@ -8,64 +8,74 @@ diary. Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-0 doctrine and survival, transitioning from the stable GAME-019 warning
-boundary to the first `AVOID | CONTINUE` route decision.
+MVP-0 doctrine and survival, transitioning from the stable uninterrupted
+moving `AVOID | CONTINUE` execution to the same decision during discovery
+`STOP`.
 
 ## Completed
 
-- Checkpoint 36 / GAME-019 / version `0.0.36` adds the first moving-patrol
-  server-truth danger warning at 1000 m, reusing the GAME-006 safe separation.
-- A normal approach is detected strictly before the existing 500 m contact;
-  an expedition already inside contact records an exact tie with contact
-  priority, and invalid non-outer warning radii are rejected.
-- The warning preserves world/route/patrol time, exact positions and planned
-  contact lead; a near pass may be detected without producing contact.
-- The DEV journal, world marker and concentric 1000/500 m contact inset expose
-  the boundary without changing the route or implementing avoidance geometry.
+- Checkpoint 37 / GAME-020 / version `0.0.37` executes the first danger
+  doctrine at the authoritative GAME-019 1000 m warning boundary.
+- `CONTINUE` returns the original route object and contact unchanged.
+- `AVOID` preserves the exact executed prefix, inserts one deterministic
+  left/right waypoint, rejoins the interrupted segment and preserves its later
+  command suffix.
+- The nearest configured clearance ring is accepted only when the complete
+  resolved timed route has no continuous 500 m contact with the selected
+  patrol; an unsafe or unavailable detour is never claimed as successful.
+- Contact keeps priority for an at-contact warning tie. Warning-only near
+  passes, delayed world time and both doctrine paths remain deterministic.
+- The DEV selector, three-step intercept flow and journal expose the decision;
+  AVOID removes the later contact from outcome/log execution while CONTINUE
+  retains it.
 
 ## Last known good commit
 
-- `37a4c52b879f57a51607b8078c4afb27d3c01f74` — remote functional commit for
-  Checkpoint 36 / version `0.0.36`; tree
-  `b5ae4e809775c6ffd7029591f3522f4e7171f859` exactly matches the locally
-  verified feature tree.
-- `1bde0e1f2b55fed9a37dfcb7c01a92bd690965b2` — merged main immediately before
-  Checkpoint 36 (Checkpoint 35 merge).
+- `a86a2b67072d17c1eec8fb4b0199432108d60ade` — local functional commit for
+  Checkpoint 37 / version `0.0.37`; tree
+  `3d7d746bc69d85258d2baf8b446377f77d5b37e1`.
+- `97d898f4d50b3fa0d5f2a48c713fce74e40cae98` — merged main immediately before
+  Checkpoint 37 (Checkpoint 36 merge).
 
 ## Verification
 
 - Clean `npm ci` with the workspace cache: PASS.
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Automated suite: `313/313` PASS, zero failures (`308` simulation/UI plus `5`
+- Automated suite: `325/325` PASS, zero failures (`320` simulation/UI plus `5`
   tooling regressions).
-- Compiled Checkpoint 36 demo: PASS; warning at 1000 m / `T=29.289322 s`,
-  contact at 500 m after `35.355339 s`, order `before-contact`.
-- Git tree equality and `git diff --check`: PASS.
+- Compiled Checkpoint 37 demo: PASS; AVOID selects the deterministic right
+  detour, adds 5.667 km and reports `contact-after=none`.
+- Local debug server: PASS; Checkpoint 37 HTML and the doctrine integration are
+  served with the expected browser assets.
+- Git tree and `git diff --check`: PASS at the functional commit.
 - GitHub Actions remains the merge gate. If this file is read from `main`, the
-  Checkpoint 36 PR passed that gate before merge.
+  Checkpoint 37 PR passed that gate before merge.
 
 ## Current task
 
-Checkpoint 36 is complete. No GAME-020 production code has started. If the
+Checkpoint 37 is complete. No GAME-021 production code has started. If the
 checkpoint is already on `main`, only the user's Windows acceptance remains.
 
 ## Next action
 
 Run `npm run accept:main` on the user's Windows checkout. After a PASS, start
-GAME-020 as a new small task: at the first 1000 m warning execute
-`AVOID | CONTINUE`. `CONTINUE` must preserve the route byte-for-byte; `AVOID`
-must preserve the executed prefix and replace only future movement with one
-deterministic detour whose resolved path stays outside the 500 m contact
-boundary. Keep idle-STOP composition and several patrols outside that slice.
+GAME-021 as a new small task: detect the selected moving patrol at 1000 m
+during a scheduled discovery `STOP`, execute `AVOID | CONTINUE` at exact world
+time, preserve contact/earlier-boundary priority, and let AVOID cancel only the
+remaining wait before departing from the exact stop coordinate. Keep several
+patrols outside that slice.
 
 ## Known issues
 
-- GAME-019 warning composition covers uninterrupted moving execution only; it
-  does not yet span a discovery STOP.
+- GAME-020 danger doctrine covers uninterrupted movement only; it does not yet
+  span a discovery STOP.
+- Avoidance checks deterministic one-waypoint candidates on finite clearance
+  rings and returns `detour-unavailable` if none is safe; pursuit and arbitrary
+  pathfinding remain outside the slice.
 - Expedition composition still selects only the first patrol contact; several
   simultaneous patrols remain outside the slice.
-- `AVOID`, automatic resupply, money/cargo transfer, selection among known
-  cities and persistence are not implemented.
+- Automatic resupply, money/cargo transfer, selection among known cities,
+  persistence and production sensor calibration are not implemented.
 
 ## Resume instruction
 

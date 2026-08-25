@@ -906,6 +906,16 @@ input[type="range"] {
   line-height: 1.4;
 }
 
+.contact-actions .danger-doctrine-result {
+  margin: 0 0 10px;
+  padding: 8px 9px;
+  border: 1px solid rgba(88, 199, 180, 0.18);
+  border-radius: 9px;
+  color: #a9d9cf;
+  background: rgba(29, 76, 68, 0.16);
+  text-align: left;
+}
+
 .contact-zoom-card {
   min-width: 0;
   padding-top: 18px;
@@ -2289,12 +2299,15 @@ input[type="range"] {
 }
 
 .event-log-item[data-kind="doctrine-decision"] .event-log-marker,
+.event-log-item[data-kind="danger-doctrine-decision"] .event-log-marker,
 .event-log-item[data-kind="route-resumed"] .event-log-marker {
   border-color: var(--accent);
 }
 
 .event-log-item[data-kind="doctrine-decision"][data-state="occurred"] .event-log-marker,
 .event-log-item[data-kind="doctrine-decision"][data-state="active"] .event-log-marker,
+.event-log-item[data-kind="danger-doctrine-decision"][data-state="occurred"] .event-log-marker,
+.event-log-item[data-kind="danger-doctrine-decision"][data-state="active"] .event-log-marker,
 .event-log-item[data-kind="route-resumed"][data-state="occurred"] .event-log-marker,
 .event-log-item[data-kind="route-resumed"][data-state="active"] .event-log-marker {
   background: var(--accent);
@@ -2302,6 +2315,7 @@ input[type="range"] {
 }
 
 .event-log-item[data-kind="doctrine-decision"] .event-log-content strong,
+.event-log-item[data-kind="danger-doctrine-decision"] .event-log-content strong,
 .event-log-item[data-kind="route-resumed"] .event-log-content strong {
   color: var(--accent-strong);
 }

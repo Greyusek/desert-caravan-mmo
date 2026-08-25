@@ -18,3 +18,4 @@ export * from "./player-knowledge.js";
 export * from "./city-resources.js";
 export * from "./emergency-return.js";
 export * from "./danger-detection.js";
+export * from "./danger-avoidance.js";

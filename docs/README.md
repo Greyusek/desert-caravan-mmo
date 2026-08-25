@@ -59,7 +59,8 @@
 - `CHECKPOINT_34.md` — аварийная доктрина возврата при 50% критического ресурса во время непрерывного движения.
 - `CHECKPOINT_35.md` — аварийный возврат из discovery STOP на точной 50%-границе idle-расхода.
 - `CHECKPOINT_36.md` — первая server-truth граница обнаруженной движущейся опасности на 1000 м перед контактом 500 м.
+- `CHECKPOINT_37.md` — исполнение `AVOID | CONTINUE` на границе 1000 м с одним детерминированным обходным waypoint вне контакта 500 м.
 - `WORK_HANDOFF.md` — короткая актуальная точка восстановления автономной Work-серии.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006`, `GAME-001..GAME-019` и `CITY-001..CITY-003` покрыты 308 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 313 тестов в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006`, `GAME-001..GAME-020` и `CITY-001..CITY-003` покрыты 320 simulation/UI-тестами; вместе с 5 tooling-регрессиями GitHub Actions запускает 325 тестов в pull request.
