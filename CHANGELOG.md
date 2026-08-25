@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.36 — Checkpoint 36
+
+- Added `GAME-019`: an uninterrupted moving expedition now receives its first deterministic server-truth danger warning at 1000 m from a wandering patrol.
+- Reused the established GAME-006 safe separation (`2 × 500 m`) as the technical warning boundary while keeping optical visibility 300 m and concealed detection 150 m as separate future sensor layers.
+- Required the warning radius to be strictly larger than the monster's interaction radius; a route starting already inside contact records an exact tie with contact priority.
+- Preserved absolute world time, expedition route time, patrol time, exact coordinates and the planned lead to a later contact in the warning record.
+- Added a `danger-detected` journal event, a DEV world marker and concentric 1000/500 m circles in the contact inset without implementing `AVOID` geometry or changing route execution.
+- Added ten GAME-019 regressions; repository verification now runs 313 tests.
+
 ## 0.0.35 — Checkpoint 35
 
 - Added `GAME-018`: the original-expedition 50% food/water boundary now remains active during a scheduled discovery `STOP` and uses the idle consumption profile.

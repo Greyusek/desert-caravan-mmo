@@ -3,6 +3,7 @@
 import {
   DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
+  DEFAULT_DANGER_DETECTION_RADIUS_METERS,
   DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
   DEFAULT_PLAYER_POWER,
   DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
@@ -16,6 +17,7 @@ import {
   evaluateStaticObjectDiscoveryDoctrine,
   expeditionTimeToRouteTime,
   findFirstCityArrival,
+  findFirstExpeditionMonsterDangerDetection,
   findFirstExpeditionMonsterContact,
   findFirstExpeditionMonsterContactWithIdleStop,
   generateSeededWorld,
@@ -115,7 +117,7 @@ export function advanceSimulationClock(
 }
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-emergency-doctrine" | "supplies-low" | "supplies-depleted" | "target-discovered" | "known-target-observed" | "doctrine-decision" | "route-resumed" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-emergency-doctrine" | "supplies-low" | "supplies-depleted" | "target-discovered" | "known-target-observed" | "doctrine-decision" | "route-resumed" | "danger-detected" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -133,6 +135,10 @@ export function advanceSimulationClock(
  * @property {string} [monsterId]
  * @property {number} [monsterPower]
  * @property {number} [separationMeters]
+ * @property {number} [detectionRadiusMeters]
+ * @property {number} [interactionRadiusMeters]
+ * @property {import("../sim-core/dist/src/index.js").DangerContactOrder} [dangerContactOrder]
+ * @property {number | null} [secondsUntilContact]
  * @property {number} [playerPower]
  * @property {number} [powerDelta]
  * @property {import("../sim-core/dist/src/index.js").PowerContactResolutionStatus} [powerResolutionStatus]
@@ -285,6 +291,8 @@ export function createDebugMapSnapshot(
         id: monster.id,
         power: monster.power,
         visionRadiusMeters: monster.visionRadiusMeters,
+        dangerDetectionRadiusMeters:
+          DEFAULT_DANGER_DETECTION_RADIUS_METERS,
         interactionRadiusMeters: monster.interactionRadiusMeters,
         periodSeconds: monster.patrolRoute.totalDurationSeconds,
         cycleIndex: evaluated.cycleIndex,
@@ -295,6 +303,56 @@ export function createDebugMapSnapshot(
         authoritativeMonster: monster,
       };
     }),
+  };
+}
+
+/**
+ * GAME-019 exposes the first technical warning-radius entry without applying
+ * AVOID geometry. The core also classifies whether a later 500 m contact is
+ * planned or whether both boundaries coincide because execution starts
+ * already unsafe.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
+ */
+export function createDangerDetectionSnapshot(route, monster) {
+  const detection = findFirstExpeditionMonsterDangerDetection(
+    route.authoritativeRoute,
+    monster.authoritativeMonster,
+    0,
+    monster.dangerDetectionRadiusMeters,
+  );
+  const evaluatedAtSeconds = Math.min(
+    route.position.elapsedSeconds,
+    route.totalDurationSeconds,
+  );
+
+  if (!detection) {
+    return {
+      status: /** @type {const} */ ("clear"),
+      evaluatedAtSeconds,
+      detection: null,
+    };
+  }
+
+  const routePosition = positionAtTime(
+    route.authoritativeRoute,
+    detection.routeElapsedSeconds,
+  );
+  return {
+    status:
+      evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
+      detection.expeditionElapsedSeconds
+        ? /** @type {const} */ ("detected")
+        : /** @type {const} */ ("forecast"),
+    evaluatedAtSeconds,
+    detection: {
+      ...detection,
+      segmentIndex: routePosition.segmentIndex,
+      routeDistanceKilometers:
+        routePosition.traveledDistanceMeters / 1_000,
+      caravanPoint: projectCoordinate(detection.caravanPosition),
+      monsterPoint: projectCoordinate(detection.monsterPosition),
+    },
   };
 }
 
@@ -458,6 +516,9 @@ export function createContactZoomSnapshot(
       monster.authoritativeMonster.interactionRadiusMeters,
     interactionRadiusPixels:
       monster.authoritativeMonster.interactionRadiusMeters / metersPerPixel,
+    dangerDetectionRadiusMeters: monster.dangerDetectionRadiusMeters,
+    dangerDetectionRadiusPixels:
+      monster.dangerDetectionRadiusMeters / metersPerPixel,
     caravanPath: sampleTimes.map((atSeconds) => {
       const routeAtSeconds = stopLifecycle
         ? expeditionTimeToRouteTime(
@@ -1922,6 +1983,7 @@ export function createCaravanStatusSnapshot(
  * @param {ReturnType<typeof createDiscoveryResumeSnapshot> | null} [resume]
  * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
  * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot> | null} [supplyEmergency]
+ * @param {ReturnType<typeof createDangerDetectionSnapshot> | null} [dangerDetection]
  */
 export function createExpeditionEventLogSnapshot(
   route,
@@ -1933,6 +1995,7 @@ export function createExpeditionEventLogSnapshot(
   resume = null,
   stopLifecycle = null,
   supplyEmergency = null,
+  dangerDetection = null,
 ) {
   /** @param {number} routeElapsedSeconds */
   const routeToExpeditionTime = (routeElapsedSeconds) =>
@@ -2043,6 +2106,26 @@ export function createExpeditionEventLogSnapshot(
       returnDistanceKilometers:
         supplyEmergency.returnDistanceKilometers ?? undefined,
       order: 11,
+    });
+  }
+
+  if (dangerDetection?.detection) {
+    const detection = dangerDetection.detection;
+    events.push({
+      id: `danger-detected-${detection.monsterId}`,
+      kind: "danger-detected",
+      atSeconds: detection.expeditionElapsedSeconds,
+      segmentIndex: detection.segmentIndex,
+      cause: null,
+      distanceKilometers: detection.routeDistanceKilometers,
+      monsterId: detection.monsterId,
+      monsterPower: detection.monsterPower,
+      separationMeters: detection.separationMeters,
+      detectionRadiusMeters: detection.detectionRadiusMeters,
+      interactionRadiusMeters: detection.interactionRadiusMeters,
+      dangerContactOrder: detection.contactOrder,
+      secondsUntilContact: detection.secondsUntilContact,
+      order: detection.contactOrder === "at-contact" ? 19 : 17,
     });
   }
 
@@ -2203,6 +2286,10 @@ export function createExpeditionEventLogSnapshot(
     monsterId: event.monsterId ?? null,
     monsterPower: event.monsterPower ?? null,
     separationMeters: event.separationMeters ?? null,
+    detectionRadiusMeters: event.detectionRadiusMeters ?? null,
+    interactionRadiusMeters: event.interactionRadiusMeters ?? null,
+    dangerContactOrder: event.dangerContactOrder ?? null,
+    secondsUntilContact: event.secondsUntilContact ?? null,
     playerPower: event.playerPower ?? null,
     powerDelta: event.powerDelta ?? null,
     powerResolutionStatus: event.powerResolutionStatus ?? null,

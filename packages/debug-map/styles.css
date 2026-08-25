@@ -998,6 +998,7 @@ input[type="range"] {
 
 .contact-zoom-caravan-path,
 .contact-zoom-monster-path,
+.contact-zoom-danger-detection-radius,
 .contact-zoom-interaction-radius {
   fill: none;
   vector-effect: non-scaling-stroke;
@@ -1018,6 +1019,12 @@ input[type="range"] {
   stroke: rgba(239, 111, 94, 0.72);
   stroke-width: 1.5;
   stroke-dasharray: 3 3;
+}
+
+.contact-zoom-danger-detection-radius {
+  stroke: rgba(88, 199, 180, 0.8);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 4;
 }
 
 .contact-zoom-caravan-marker {
@@ -1081,6 +1088,11 @@ input[type="range"] {
 .contact-zoom-key--radius {
   height: 0;
   border-top: 1px dashed var(--danger);
+}
+
+.contact-zoom-key--detection {
+  height: 0;
+  border-top: 1px dashed var(--teal);
 }
 
 .contact-zoom-caption {
@@ -2294,6 +2306,20 @@ input[type="range"] {
   color: var(--accent-strong);
 }
 
+.event-log-item[data-kind="danger-detected"] .event-log-marker {
+  border-color: rgba(88, 199, 180, 0.8);
+}
+
+.event-log-item[data-kind="danger-detected"][data-state="occurred"] .event-log-marker,
+.event-log-item[data-kind="danger-detected"][data-state="active"] .event-log-marker {
+  background: var(--teal);
+  box-shadow: 0 0 10px rgba(88, 199, 180, 0.72);
+}
+
+.event-log-item[data-kind="danger-detected"] .event-log-content strong {
+  color: #8ce2d3;
+}
+
 .event-log-item[data-kind="monster-contact"] .event-log-marker {
   border-color: rgba(239, 111, 94, 0.7);
 }
@@ -2515,6 +2541,25 @@ input[type="range"] {
 .contact-world-label {
   pointer-events: none;
   fill: #ff9f91;
+  stroke: #1d1711;
+  stroke-width: 4px;
+  paint-order: stroke;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.danger-detection-world-marker {
+  fill: rgba(88, 199, 180, 0.1);
+  stroke: var(--teal);
+  stroke-width: 2;
+  stroke-dasharray: 7 4;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 7px rgba(88, 199, 180, 0.65));
+}
+
+.danger-detection-world-label {
+  pointer-events: none;
+  fill: #8ce2d3;
   stroke: #1d1711;
   stroke-width: 4px;
   paint-order: stroke;

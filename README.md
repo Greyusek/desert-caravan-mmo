@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 35 — GAME-018: implemented and covered by automated tests.**
+**Checkpoint 36 — GAME-019: implemented and covered by automated tests.**
 
 Implemented and covered by the automated test suite:
 
@@ -49,6 +49,7 @@ Also implemented:
 - GAME-016 — an authoritatively reached city becomes a confirmed relative landmark on the matching origin-city chart; planned routes and unsuccessful journeys reveal nothing, and the player record contains no absolute coordinates.
 - GAME-017 — when food or water reaches 50% during uninterrupted movement, `RETURN_TO_ORIGIN` preserves the travelled prefix and replaces every future leg with a direct great-circle return; `CONTINUE` records the same decision boundary without changing the route.
 - GAME-018 — the same original-stock 50% boundary remains active during discovery `STOP`: idle consumption advances in world time, `RETURN_TO_ORIGIN` cancels the remaining wait and departs from the exact stop coordinate, while `CONTINUE` preserves the scheduled wait.
+- GAME-019 — the first moving-patrol danger warning is authoritative at 1000 m, strictly outside the existing 500 m contact boundary; the warning records its exact lead to contact but does not replan the route yet.
 - CITY-001 — every seeded city has deterministic finite food and water stocks exposed in DEV details, without trading or consumption yet.
 - CITY-002 — deterministic aggregate NPC populations consume those stocks from authoritative world time at explicit provisional per-person rates; exact depletion is visible in DEV details.
 - CITY-003 — the first food or water shortage reduces aggregate population by a deterministic 1% per game day; declining population also slows later consumption of any remaining stock.
@@ -90,17 +91,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 35:
+Expected for Checkpoint 36:
 
 ```text
-# tests 303
-# pass 303
+# tests 313
+# pass 313
 # fail 0
 ```
 
-This total contains 298 simulation/UI tests and 5 tooling regression tests.
+This total contains 308 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_35.md` for GAME-018 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_36.md` for GAME-019 details.
 
 ## Developer debug map
 
@@ -110,7 +111,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The world map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, supplies, timeline, doctrines, outcomes and Power/FLEE resolution. The separate player-facing map starts as unexplored darkness. Select `STOP`, press `DEV: маршрут к цели`, and advance time: only the actually travelled path cuts a transparent corridor with a physical radius of 300 m. Planned future legs are never drawn, moving the DEV slider backwards does not erase retained visibility, and earlier expedition corridors remain. The center line and confirmed knowledge markers stay visible above the fog. Independent origin cities still use separate charts. After an authoritative city arrival, the reached city appears as a confirmed relative landmark only on the expedition's origin-city chart. `DEV: возврат в пути` prepares GAME-017; two more clicks advance to the moving 50% decision and successful origin-city re-entry. `DEV: возврат из STOP` prepares GAME-018 with a six-hour discovery wait and idle-only consumption; its next two clicks advance to the two-hour 50% boundary and then the same authoritative return. Discoveries, tracks, city landmarks and session fog reset together on a different seed, page reload or the clear button. Existing arrival, idle-contact and Power/FLEE DEV presets remain available. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The world map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, supplies, timeline, doctrines, outcomes and Power/FLEE resolution. The separate player-facing map starts as unexplored darkness. Select `STOP`, press `DEV: маршрут к цели`, and advance time: only the actually travelled path cuts a transparent corridor with a physical radius of 300 m. Planned future legs are never drawn, moving the DEV slider backwards does not erase retained visibility, and earlier expedition corridors remain. The center line and confirmed knowledge markers stay visible above the fog. Independent origin cities still use separate charts. After an authoritative city arrival, the reached city appears as a confirmed relative landmark only on the expedition's origin-city chart. `DEV: возврат в пути` prepares GAME-017; two more clicks advance to the moving 50% decision and successful origin-city re-entry. `DEV: возврат из STOP` prepares GAME-018 with a six-hour discovery wait and idle-only consumption; its next two clicks advance to the two-hour 50% boundary and then the same authoritative return. For GAME-019, press `DEV: маршрут на перехват`: the journal forecasts `danger-detected` at 1000 m before the 500 m contact, and the local contact inset draws both concentric server-truth boundaries. The warning does not alter the route. Discoveries, tracks, city landmarks and session fog reset together on a different seed, page reload or the clear button. Existing arrival, idle-contact and Power/FLEE DEV presets remain available. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -125,4 +126,4 @@ Then open `http://127.0.0.1:4173`. The world map is intentionally a developer ov
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The next small checkpoint is GAME-019: define the first detected-danger boundary and validate its ordering relative to the 500 m contact boundary before implementing `AVOID | CONTINUE` route changes.
+The next small checkpoint is GAME-020: execute `AVOID | CONTINUE` at the stable 1000 m warning boundary, preserving `CONTINUE` and replacing only the future route with a deterministic 500 m-clearance detour for `AVOID`.

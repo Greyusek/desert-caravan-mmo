@@ -18,6 +18,7 @@ import {
   createCityArrivalSnapshot,
   createContactZoomSnapshot,
   createDebugMapSnapshot,
+  createDangerDetectionSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
   createDiscoveryStopLifecycleSnapshot,
@@ -507,6 +508,9 @@ test("UI-001: the default debug snapshot contains every authoritative world laye
   assert.ok((snapshot.cities[0]?.stocks?.waterUnits ?? 0) >= 10_000);
   assert.equal(snapshot.staticObjects.length, 4);
   assert.equal(snapshot.monsters.length, 1);
+  assert.equal(snapshot.monsters[0]?.visionRadiusMeters, 300);
+  assert.equal(snapshot.monsters[0]?.dangerDetectionRadiusMeters, 1_000);
+  assert.equal(snapshot.monsters[0]?.interactionRadiusMeters, 500);
   assert.deepEqual(
     snapshot.staticObjects.map(({ id, kind }) => ({ id, kind })),
     [
@@ -1592,9 +1596,29 @@ function monsterInterceptAt(elapsedSeconds = 0, monsterIndex = 0) {
     city: selected.city,
     preset: selected.preset,
     route,
+    danger: createDangerDetectionSnapshot(route, monster),
     contact: createMonsterContactSnapshot(route, monster),
   };
 }
+
+test("GAME-019: debug warning precedes the exact contact forecast", () => {
+  const planned = monsterInterceptAt();
+  const detection = planned.danger.detection;
+  const contact = planned.contact.contact;
+
+  assert.ok(detection);
+  assert.ok(contact);
+  assert.equal(planned.danger.status, "forecast");
+  assert.equal(detection.detectionRadiusMeters, 1_000);
+  assert.equal(detection.interactionRadiusMeters, 500);
+  assert.equal(detection.contactOrder, "before-contact");
+  assert.equal(detection.plannedContactAtSeconds, contact.atSeconds);
+  assert.ok(detection.atSeconds < contact.atSeconds);
+  assert.ok(detection.routeDistanceKilometers < contact.routeDistanceKilometers);
+
+  const reached = monsterInterceptAt(detection.atSeconds);
+  assert.equal(reached.danger.status, "detected");
+});
 
 test("UI-006: planned contact becomes the exact local focus", () => {
   const planned = monsterInterceptAt();
@@ -1622,6 +1646,13 @@ test("UI-006: planned contact becomes the exact local focus", () => {
   approx(
     zoom.interactionRadiusPixels * zoom.metersPerPixel,
     contact.interactionRadiusMeters,
+  );
+  approx(
+    zoom.dangerDetectionRadiusPixels * zoom.metersPerPixel,
+    1_000,
+  );
+  assert.ok(
+    zoom.dangerDetectionRadiusPixels > zoom.interactionRadiusPixels,
   );
   assert.equal(zoom.caravanPath.length, 65);
   assert.equal(zoom.monsterPath.length, 65);
@@ -1782,6 +1813,52 @@ test("GAME-004: QA intercept preset is deterministic and guarantees contact", ()
       first.route.totalDurationSeconds,
   );
   assert.equal(first.contact.contact.monsterSpeedMetersPerSecond, 1.5);
+});
+
+test("GAME-019: expedition log records warning before contact without replanning", () => {
+  const planned = monsterInterceptAt();
+  const contactAt = planned.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const selected = monsterInterceptAt(contactAt + 1);
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    searchSupplies,
+    searchConsumption,
+    null,
+    selected.contact,
+  );
+  const executed = applyExpeditionOutcomeToRoute(selected.route, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    executed,
+    searchSupplies,
+    searchConsumption,
+    null,
+    null,
+    outcome,
+    null,
+    null,
+    null,
+    selected.danger,
+  );
+  const detectionIndex = log.events.findIndex(
+    (event) => event.kind === "danger-detected",
+  );
+  const contactIndex = log.events.findIndex(
+    (event) => event.kind === "monster-contact",
+  );
+  const detection = log.events[detectionIndex];
+
+  assert.ok(detectionIndex >= 0);
+  assert.ok(contactIndex > detectionIndex);
+  assert.equal(detection?.occurred, true);
+  assert.equal(detection?.detectionRadiusMeters, 1_000);
+  assert.equal(detection?.interactionRadiusMeters, 500);
+  assert.equal(detection?.dangerContactOrder, "before-contact");
+  assert.ok((detection?.secondsUntilContact ?? 0) > 0);
+  assert.equal(
+    executed.authoritativeRoute,
+    selected.route.authoritativeRoute,
+  );
 });
 
 test("GAME-005: weak contact defeats the monster and route execution continues", () => {
