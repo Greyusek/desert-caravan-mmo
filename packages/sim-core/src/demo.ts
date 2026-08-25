@@ -13,6 +13,7 @@ import {
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
   findFirstCityArrival,
+  findFirstExpeditionMonsterDangerDetection,
   findFirstExpeditionMonsterContact,
   findFirstExpeditionMonsterContactWithIdleStop,
   findFirstMovingEncounter,
@@ -47,7 +48,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 35 demo");
+console.log("Desert Caravan MMO — Checkpoint 36 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -354,16 +355,27 @@ console.log(
   `  same paths with 100 s delay: ${delayedEncounter === null ? "no encounter" : "encounter"}`,
 );
 
+const demoMonster = {
+  id: "demo-monster",
+  kind: "wandering-monster" as const,
+  power: 90,
+  visionRadiusMeters: 300,
+  interactionRadiusMeters: 500,
+  patrolRoute: encounterPatrol,
+};
+const dangerDetection = findFirstExpeditionMonsterDangerDetection(
+  encounterCaravan,
+  demoMonster,
+);
 const expeditionContact = findFirstExpeditionMonsterContact(
   encounterCaravan,
-  {
-    id: "demo-monster",
-    kind: "wandering-monster",
-    power: 90,
-    visionRadiusMeters: 300,
-    interactionRadiusMeters: 500,
-    patrolRoute: encounterPatrol,
-  },
+  demoMonster,
+);
+console.log("\nGAME-019 detected danger:");
+console.log(
+  dangerDetection
+    ? `  ${dangerDetection.monsterId}: detected at ${dangerDetection.detectionRadiusMeters.toFixed(0)} m / T=${dangerDetection.expeditionElapsedSeconds.toFixed(6)} s; contact=${dangerDetection.interactionRadiusMeters.toFixed(0)} m in ${(dangerDetection.secondsUntilContact ?? 0).toFixed(6)} s; order=${dangerDetection.contactOrder}`
+    : "  no danger detected",
 );
 console.log("\nGAME-004 expedition contact:");
 console.log(
@@ -499,5 +511,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 35 STOP emergency return: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 36 danger detection: npm run debug-map -> http://127.0.0.1:4173",
 );

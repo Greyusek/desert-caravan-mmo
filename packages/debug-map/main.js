@@ -15,6 +15,7 @@ import {
   createCityArrivalSnapshot,
   createContactZoomSnapshot,
   createDebugMapSnapshot,
+  createDangerDetectionSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
   createDiscoveryStopLifecycleSnapshot,
@@ -872,6 +873,9 @@ function render() {
           executionStopLifecycle,
         )
       : null;
+    const dangerDetection = selectedMonster && !executionStopLifecycle
+      ? createDangerDetectionSnapshot(executionRoute, selectedMonster)
+      : null;
     const outcome = createExpeditionOutcomeSnapshot(
       executionRoute,
       supplySettings.initial,
@@ -960,6 +964,7 @@ function render() {
       resume ?? lifecycleResume,
       effectiveStopLifecycle,
       supplyEmergency,
+      dangerDetection,
     );
     const maximumElapsedSeconds = outcome.planned.atSeconds;
 
@@ -1007,6 +1012,7 @@ function render() {
       effectiveDoctrine,
       outcome,
       monsterContact,
+      dangerDetection,
     );
   } catch (error) {
     activeRumorSearch = null;
@@ -1250,7 +1256,23 @@ function renderContactZoom(route, monster, contact, stopLifecycle) {
   interactionRadius.append(
     svgTitle(`Interaction radius ${snapshot.interactionRadiusMeters} м`),
   );
-  contactZoomMap.append(caravanPath, monsterPath, interactionRadius);
+  const dangerDetectionRadius = svgElement("circle", {
+    class: "contact-zoom-danger-detection-radius",
+    cx: snapshot.focusMonster.point.x,
+    cy: snapshot.focusMonster.point.y,
+    r: snapshot.dangerDetectionRadiusPixels,
+  });
+  dangerDetectionRadius.append(
+    svgTitle(
+      `Danger detection radius ${snapshot.dangerDetectionRadiusMeters} м`,
+    ),
+  );
+  contactZoomMap.append(
+    caravanPath,
+    monsterPath,
+    dangerDetectionRadius,
+    interactionRadius,
+  );
 
   const caravanMarker = svgElement("circle", {
     class: "contact-zoom-caravan-marker",
@@ -1529,6 +1551,9 @@ function eventTitle(event) {
         ? "Аварийный возврат прервал стоянку"
         : "Маршрут возобновлён";
   }
+  if (event.kind === "danger-detected") {
+    return `Обнаружена опасность: ${event.monsterId ?? "монстр"}`;
+  }
   if (event.kind === "monster-contact") {
     if (event.powerResolutionStatus === "monster-defeated") {
       return `Победа над ${event.monsterId ?? "монстром"}`;
@@ -1599,6 +1624,15 @@ function eventDetail(event, route) {
       : event.resumeReason === "supply-emergency"
         ? `50% критического ресурса после ${formatDuration(event.idleDurationSeconds ?? 0)} стоянки · курс на город старта`
         : `${event.idleDurationSeconds ? `Стоянка ${formatDuration(event.idleDurationSeconds)} завершена · ` : ""}${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
+  }
+  if (event.kind === "danger-detected") {
+    if (event.dangerContactOrder === "at-contact") {
+      return `${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м · караван уже внутри ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м, приоритет у контакта`;
+    }
+    if (event.dangerContactOrder === "no-contact") {
+      return `${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м · патруль обнаружен, но контакт ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м не рассчитан`;
+    }
+    return `${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м → контакт ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м через ${formatDuration(event.secondsUntilContact ?? 0)} · маршрут пока не изменён`;
   }
   if (event.kind === "monster-contact") {
     const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
@@ -2703,6 +2737,7 @@ function readStrongMonsterDoctrine() {
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | NonNullable<ReturnType<typeof createDiscoveryResumeSnapshot>>} doctrine
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
  * @param {ReturnType<typeof createMonsterContactSnapshot> | null} monsterContact
+ * @param {ReturnType<typeof createDangerDetectionSnapshot> | null} dangerDetection
  */
 function drawSnapshot(
   snapshot,
@@ -2711,6 +2746,7 @@ function drawSnapshot(
   doctrine,
   outcome,
   monsterContact,
+  dangerDetection,
 ) {
   worldMap.replaceChildren();
   drawGrid();
@@ -2870,6 +2906,41 @@ function drawSnapshot(
   rumorTargetLabel.textContent = "RUMOR TARGET";
   worldMap.append(rumorTargetMarker, rumorTargetLabel);
 
+  if (dangerDetection?.detection) {
+    const detection = dangerDetection.detection;
+    const marker = svgElement("circle", {
+      class: "danger-detection-world-marker",
+      cx: detection.caravanPoint.x,
+      cy: detection.caravanPoint.y,
+      r: 10,
+      "data-detail-title": `Опасность обнаружена · ${detection.monsterId}`,
+      "data-detail-rows": JSON.stringify([
+        ["Время", formatElapsed(detection.atSeconds)],
+        ["Монстр", detection.monsterId],
+        ["Power", String(detection.monsterPower)],
+        ["Граница обнаружения", `${detection.detectionRadiusMeters} м`],
+        ["Граница контакта", `${detection.interactionRadiusMeters} м`],
+        [
+          "До контакта",
+          detection.secondsUntilContact === null
+            ? "Контакт не рассчитан"
+            : formatDuration(detection.secondsUntilContact),
+        ],
+        ["Путь", `${detection.routeDistanceKilometers.toFixed(1)} км`],
+      ]),
+    });
+    marker.append(
+      svgTitle(`DETECTED: ${detection.monsterId} на ${detection.detectionRadiusMeters} м`),
+    );
+    const label = svgElement("text", {
+      class: "danger-detection-world-label",
+      x: detection.caravanPoint.x + 13,
+      y: detection.caravanPoint.y + 18,
+    });
+    label.textContent = "DETECTED";
+    worldMap.append(marker, label);
+  }
+
   if (monsterContact?.contact) {
     const contact = monsterContact.contact;
     const contactResolution =
@@ -2945,6 +3016,7 @@ function drawSnapshot(
         ["Цикл", String(monster.cycleIndex)],
         ["Сегмент", String(monster.segmentIndex + 1)],
         ["Обзор", `${monster.visionRadiusMeters} м`],
+        ["Обнаружение опасности", `${monster.dangerDetectionRadiusMeters} м`],
         ["Контакт", `${monster.interactionRadiusMeters} м`],
         ["Широта", monster.position.latitudeDeg.toFixed(6)],
         ["Долгота", monster.position.longitudeDeg.toFixed(6)],

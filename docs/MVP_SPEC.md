@@ -28,6 +28,7 @@
 - абсолютные координаты игроку не показываются;
 - базовый обзор видимой цели: **300 м**;
 - базовое обнаружение скрытого/затаившегося объекта: **150 м**;
+- техническая граница раннего предупреждения об обнаруженной движущейся опасности GAME-019: **1000 м** — уже принятая безопасная дистанция FLEE и строго внешняя граница относительно контакта 500 м; это не оптический обзор и не раскрытие скрытой цели;
 - текущая техническая граница encounter: **500 м** — это параметр прототипа, а не окончательная дистанция визуального контакта или удара; до production её нужно развести с обзором 300 м и скрытым обнаружением 150 м, кроме явно смоделированной засады;
 - текущий технический радиус прибытия в город: **500 м** — отдельная семантическая граница GAME-007, не означающая размер городской застройки или encounter distance;
 - сила игрока в заглушке боя: **100**;
@@ -159,6 +160,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - строго более быстрый караван открывает разрыв со скоростью `caravanSpeed - monsterSpeed`, достигает безопасной дистанции за `(safeSeparation - contactSeparation) / relativeSpeed` и продолжает исходный маршрут;
 - равная или меньшая скорость означает терминальное поражение на границе контакта; случайности, бонуса от Power и tactical rounds нет.
 - те же правила действуют, если циклический патруль входит в радиус неподвижного каравана во время discovery `STOP`: слабая угроза не отменяет ожидание, успешный `FLEE` досрочно возобновляет маршрут, а истощение сохраняет приоритет при точном совпадении времени.
+- GAME-019 отделяет раннее предупреждение от контакта: движущийся патруль сначала создаёт server-truth событие на 1000 м, а при сохранённом курсе позже входит в 500 м; если экспедиция уже стартовала внутри 500 м, обе границы совпадают и приоритет имеет контакт. `AVOID` в этом checkpoint маршрут не меняет.
 
 Затаившийся монстр использует уменьшенный базовый радиус обнаружения (150 м). Блуждающий монстр движется по собственному маршруту, поэтому геометрическое пересечение путей без совпадения во времени встречу не создаёт.
 
@@ -273,4 +275,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `CITY-003` — first shortage deterministically reduces population and later consumption.
 - [x] `GAME-017` — execute `RETURN_TO_ORIGIN | CONTINUE` when food or water reaches 50% during uninterrupted movement.
 - [x] `GAME-018` — compose the 50% emergency boundary with discovery-STOP idle consumption and depart from the exact stop coordinate.
-- [ ] `GAME-019` — establish the first detected-danger boundary and its ordering relative to contact before adding `AVOID | CONTINUE` route replanning.
+- [x] `GAME-019` — establish the first detected-danger boundary and its ordering relative to contact before adding `AVOID | CONTINUE` route replanning.
+- [ ] `GAME-020` — execute `AVOID | CONTINUE` at that warning boundary and keep the avoidance geometry outside the 500 m contact radius.

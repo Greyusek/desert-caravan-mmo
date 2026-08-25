@@ -47,7 +47,8 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `CITY-003`: reduce aggregate population deterministically after the first food or water shortage and slow remaining consumption as the city shrinks.
 - [x] `GAME-017`: at the 50% food/water boundary during uninterrupted movement, execute `RETURN_TO_ORIGIN | CONTINUE` and replace only the future route when returning.
 - [x] `GAME-018`: if the 50% boundary occurs during a discovery STOP, let emergency return cancel the remaining idle wait and depart from the exact stop coordinate.
-- [ ] `GAME-019`: define the first detected-danger boundary and validate its radius/order relative to the 500 m contact boundary before implementing `AVOID | CONTINUE` route changes.
+- [x] `GAME-019`: define the first detected-danger boundary and validate its radius/order relative to the 500 m contact boundary before implementing `AVOID | CONTINUE` route changes.
+- [ ] `GAME-020`: at the first 1000 m detected-danger boundary, execute `AVOID | CONTINUE`; preserve the route for `CONTINUE` and replace only its future prefix with one deterministic 500 m-clearance detour for `AVOID`.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors
