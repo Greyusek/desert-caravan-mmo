@@ -1,6 +1,6 @@
 # Work handoff
 
-Updated: 24 August 2026
+Updated: 25 August 2026
 
 This is the short operational recovery point for an autonomous Work series.
 Replace stale details after every completed task; do not append a development
@@ -8,61 +8,64 @@ diary. Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-0 doctrine and survival, transitioning from the completed GAME-018 supply
-composition to the detected-danger prerequisite for `AVOID | CONTINUE`.
+MVP-0 doctrine and survival, transitioning from the stable GAME-019 warning
+boundary to the first `AVOID | CONTINUE` route decision.
 
 ## Completed
 
-- Checkpoint 35 / GAME-018 / version `0.0.35` composes the original-stock 50%
-  boundary with discovery-STOP idle consumption.
-- `RETURN_TO_ORIGIN` truncates only the unelapsed wait and departs from the
-  exact stop coordinate; `CONTINUE` preserves the full stop and route.
-- Earlier or tied route-changing stationary contacts and monster defeats keep
-  priority, while the event log records idle supply decisions and
-  `supply-emergency` resume provenance.
-- A dedicated `DEV: возврат из STOP` preset, checkpoint document and nine new
-  regressions are included.
+- Checkpoint 36 / GAME-019 / version `0.0.36` adds the first moving-patrol
+  server-truth danger warning at 1000 m, reusing the GAME-006 safe separation.
+- A normal approach is detected strictly before the existing 500 m contact;
+  an expedition already inside contact records an exact tie with contact
+  priority, and invalid non-outer warning radii are rejected.
+- The warning preserves world/route/patrol time, exact positions and planned
+  contact lead; a near pass may be detected without producing contact.
+- The DEV journal, world marker and concentric 1000/500 m contact inset expose
+  the boundary without changing the route or implementing avoidance geometry.
 
 ## Last known good commit
 
-- `98ac8c0c5d4b850c0247dc11ce8376e3e2ad8262` — remote functional commit for
-  Checkpoint 35 / version `0.0.35`; tree
-  `2d78b4396e80b712ac76698ab637cde9c9f361fb` exactly matches the locally
+- `37a4c52b879f57a51607b8078c4afb27d3c01f74` — remote functional commit for
+  Checkpoint 36 / version `0.0.36`; tree
+  `b5ae4e809775c6ffd7029591f3522f4e7171f859` exactly matches the locally
   verified feature tree.
-- `62c3f05a6c378a941411d879ba2a4eb8202b7c87` — merged main immediately before
-  Checkpoint 35 (DEVX-003 handoff checkpoint).
+- `1bde0e1f2b55fed9a37dfcb7c01a92bd690965b2` — merged main immediately before
+  Checkpoint 36 (Checkpoint 35 merge).
 
 ## Verification
 
+- Clean `npm ci` with the workspace cache: PASS.
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Automated suite: `303/303` PASS, zero failures (`298` simulation/UI plus `5`
+- Automated suite: `313/313` PASS, zero failures (`308` simulation/UI plus `5`
   tooling regressions).
-- Compiled Checkpoint 35 demo: PASS; idle threshold at world `T=4 h`, effective
-  wait `2/6 h`, exact 10 km return and origin at world `T=6 h`.
+- Compiled Checkpoint 36 demo: PASS; warning at 1000 m / `T=29.289322 s`,
+  contact at 500 m after `35.355339 s`, order `before-contact`.
 - Git tree equality and `git diff --check`: PASS.
 - GitHub Actions remains the merge gate. If this file is read from `main`, the
-  Checkpoint 35 PR passed that gate before merge.
+  Checkpoint 36 PR passed that gate before merge.
 
 ## Current task
 
-Checkpoint 35 is complete. No GAME-019 production code has started. If the
+Checkpoint 36 is complete. No GAME-020 production code has started. If the
 checkpoint is already on `main`, only the user's Windows acceptance remains.
 
 ## Next action
 
 Run `npm run accept:main` on the user's Windows checkout. After a PASS, start
-GAME-019 as a new small task: first define and test the server-truth
-detected-danger boundary and its ordering relative to the 500 m contact
-boundary. Do not implement avoidance geometry until that contract is stable.
+GAME-020 as a new small task: at the first 1000 m warning execute
+`AVOID | CONTINUE`. `CONTINUE` must preserve the route byte-for-byte; `AVOID`
+must preserve the executed prefix and replace only future movement with one
+deterministic detour whose resolved path stays outside the 500 m contact
+boundary. Keep idle-STOP composition and several patrols outside that slice.
 
 ## Known issues
 
-- GAME-018 covers a 50% boundary during one discovery STOP; it does not yet
-  recompute a new mixed-activity emergency boundary after a completed stop.
+- GAME-019 warning composition covers uninterrupted moving execution only; it
+  does not yet span a discovery STOP.
 - Expedition composition still selects only the first patrol contact; several
   simultaneous patrols remain outside the slice.
-- Detected-danger `AVOID`, automatic resupply, money/cargo transfer, selection
-  among known cities and persistence are not implemented.
+- `AVOID`, automatic resupply, money/cargo transfer, selection among known
+  cities and persistence are not implemented.
 
 ## Resume instruction
 
