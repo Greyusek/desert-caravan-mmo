@@ -22,6 +22,7 @@ import {
   kilometers,
   meters,
   planExpeditionMonsterDangerResponse,
+  planExpeditionMonsterDangerResponseDuringIdleStop,
   planEmergencySupplyReturn,
   planEmergencySupplyReturnDuringIdleStop,
   positionAtTime,
@@ -49,7 +50,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 37 demo");
+console.log("Desert Caravan MMO — Checkpoint 38 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -429,6 +430,40 @@ console.log(
     : "  no stationary contact",
 );
 
+const idleDangerPatrolStart = destinationPoint(
+  encounterPoint,
+  270,
+  meters(2_400),
+);
+const idleDangerPatrolRoute = createRoutePlan(
+  idleDangerPatrolStart,
+  [
+    { bearingDeg: 90, distanceMeters: meters(4_800) },
+    { bearingDeg: 270, distanceMeters: meters(4_800) },
+  ],
+  10,
+);
+const idleDangerAvoidance = planExpeditionMonsterDangerResponseDuringIdleStop(
+  encounterCaravan,
+  {
+    id: "idle-danger-demo-monster",
+    kind: "wandering-monster",
+    power: 110,
+    visionRadiusMeters: 300,
+    interactionRadiusMeters: 500,
+    patrolRoute: idleDangerPatrolRoute,
+  },
+  "AVOID",
+  100,
+  200,
+);
+console.log("\nGAME-021 danger doctrine during discovery STOP:");
+console.log(
+  idleDangerAvoidance.detection
+    ? `  ${idleDangerAvoidance.status.toUpperCase()}: warning at world T=${idleDangerAvoidance.detection.expeditionElapsedSeconds.toFixed(6)} s / route T=${idleDangerAvoidance.detection.routeElapsedSeconds.toFixed(6)} s; idle=${idleDangerAvoidance.effectiveIdleDurationSeconds.toFixed(6)} / ${idleDangerAvoidance.scheduledIdleDurationSeconds.toFixed(6)} s; contact-after=${idleDangerAvoidance.effectiveContact === null ? "none" : "unsafe"}`
+    : "  no danger detected during STOP",
+);
+
 console.log("\nGAME-005 Power contact resolution:");
 for (const [monsterPower, doctrine] of [
   [90, "FLEE"],
@@ -523,5 +558,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 37 danger avoidance: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 38 STOP danger avoidance: npm run debug-map -> http://127.0.0.1:4173",
 );

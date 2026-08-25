@@ -18,6 +18,7 @@ import {
   expeditionTimeToRouteTime,
   findFirstCityArrival,
   findFirstExpeditionMonsterDangerDetection,
+  findFirstExpeditionMonsterDangerDetectionDuringIdleStop,
   findFirstExpeditionMonsterContact,
   findFirstExpeditionMonsterContactWithIdleStop,
   generateSeededWorld,
@@ -25,6 +26,7 @@ import {
   kilometers,
   positionAtTime,
   planExpeditionMonsterDangerResponse,
+  planExpeditionMonsterDangerResponseDuringIdleStop,
   planEmergencySupplyReturn,
   planEmergencySupplyReturnDuringIdleStop,
   projectCitySettlementAtTime,
@@ -153,7 +155,7 @@ export function advanceSimulationClock(
  * @property {number} [relativeSpeedMetersPerSecond]
  * @property {number | null} [secondsToSafeSeparation]
  * @property {import("../sim-core/dist/src/index.js").CaravanActivity} [caravanActivity]
- * @property {"scheduled" | "monster-contact" | "supply-emergency"} [resumeReason]
+ * @property {"scheduled" | "monster-contact" | "supply-emergency" | "danger-avoidance"} [resumeReason]
  * @property {string} [cityId]
  * @property {string} [cityName]
  * @property {number} [cityRadiusMeters]
@@ -317,17 +319,31 @@ export function createDebugMapSnapshot(
  * already unsafe.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
  */
-export function createDangerDetectionSnapshot(route, monster) {
-  const detection = findFirstExpeditionMonsterDangerDetection(
-    route.authoritativeRoute,
-    monster.authoritativeMonster,
-    0,
-    monster.dangerDetectionRadiusMeters,
-  );
+export function createDangerDetectionSnapshot(
+  route,
+  monster,
+  stopLifecycle = null,
+) {
+  const detection = stopLifecycle && stopLifecycle.resumeAtSeconds !== null
+    ? findFirstExpeditionMonsterDangerDetectionDuringIdleStop(
+        route.authoritativeRoute,
+        monster.authoritativeMonster,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+        0,
+        monster.dangerDetectionRadiusMeters,
+      )
+    : findFirstExpeditionMonsterDangerDetection(
+        route.authoritativeRoute,
+        monster.authoritativeMonster,
+        0,
+        monster.dangerDetectionRadiusMeters,
+      );
   const evaluatedAtSeconds = Math.min(
-    route.position.elapsedSeconds,
-    route.totalDurationSeconds,
+    stopLifecycle?.evaluatedAtSeconds ?? route.position.elapsedSeconds,
+    route.totalDurationSeconds + (stopLifecycle?.idleDurationSeconds ?? 0),
   );
 
   if (!detection) {
@@ -367,32 +383,68 @@ export function createDangerDetectionSnapshot(route, monster) {
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
  * @param {import("../sim-core/dist/src/index.js").DangerAvoidanceDoctrine} doctrine
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
+ * @param {number | null} [blockingExpeditionAtSeconds]
  */
 export function createDangerAvoidanceDoctrineSnapshot(
   route,
   monster,
   doctrine,
+  stopLifecycle = null,
+  blockingExpeditionAtSeconds = null,
 ) {
-  const plan = planExpeditionMonsterDangerResponse(
-    route.authoritativeRoute,
-    monster.authoritativeMonster,
-    doctrine,
-    0,
-    monster.dangerDetectionRadiusMeters,
+  const usesIdleStop = Boolean(
+    stopLifecycle && stopLifecycle.resumeAtSeconds !== null,
   );
-  const evaluatedAtSeconds = route.position.elapsedSeconds;
+  const idlePlan = usesIdleStop && stopLifecycle
+    ? planExpeditionMonsterDangerResponseDuringIdleStop(
+        route.authoritativeRoute,
+        monster.authoritativeMonster,
+        doctrine,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+        0,
+        monster.dangerDetectionRadiusMeters,
+        blockingExpeditionAtSeconds,
+      )
+    : null;
+  const plan = idlePlan ?? planExpeditionMonsterDangerResponse(
+        route.authoritativeRoute,
+        monster.authoritativeMonster,
+        doctrine,
+        0,
+        monster.dangerDetectionRadiusMeters,
+      );
+  const evaluatedAtSeconds = stopLifecycle?.evaluatedAtSeconds ??
+    route.position.elapsedSeconds;
   const decisionOccurred =
     plan.decisionAtSeconds !== null &&
     evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >= plan.decisionAtSeconds;
   const appliesAvoidance = plan.status === "avoided";
+  const scheduledIdleDurationSeconds =
+    idlePlan?.scheduledIdleDurationSeconds ?? 0;
+  const effectiveIdleDurationSeconds =
+    idlePlan?.effectiveIdleDurationSeconds ?? 0;
+  const effectiveRouteAtSeconds = appliesAvoidance && usesIdleStop &&
+      stopLifecycle
+    ? expeditionTimeToRouteTime(
+        evaluatedAtSeconds,
+        stopLifecycle.stopAtRouteSeconds,
+        effectiveIdleDurationSeconds,
+        true,
+      )
+    : evaluatedAtSeconds;
   const effectiveRoute = appliesAvoidance
-    ? createRoutePlanSnapshot(plan.effectiveRoute, evaluatedAtSeconds)
+    ? createRoutePlanSnapshot(plan.effectiveRoute, effectiveRouteAtSeconds)
     : route;
+  const completionAtExpeditionSeconds =
+    idlePlan?.completionAtExpeditionSeconds ??
+    plan.effectiveRoute.totalDurationSeconds;
   const status = plan.status === "avoided"
     ? !decisionOccurred
       ? /** @type {const} */ ("pending")
       : evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
-          plan.effectiveRoute.totalDurationSeconds
+          (completionAtExpeditionSeconds ?? Number.POSITIVE_INFINITY)
         ? /** @type {const} */ ("avoided")
         : /** @type {const} */ ("avoiding")
     : plan.status === "continued" && !decisionOccurred
@@ -406,6 +458,16 @@ export function createDangerAvoidanceDoctrineSnapshot(
     evaluatedAtSeconds,
     decisionOccurred,
     appliesAvoidance,
+    triggerActivity: plan.detection?.caravanActivity ?? null,
+    triggersDuringIdleStop: idlePlan?.triggersDuringIdleStop ?? false,
+    scheduledIdleDurationSeconds,
+    effectiveIdleDurationSeconds,
+    interruptsIdleStop: idlePlan?.interruptsIdleStop ?? false,
+    blockedByEarlierBoundary:
+      plan.status === "blocked-by-earlier-boundary",
+    blockingExpeditionAtSeconds:
+      idlePlan?.blockingExpeditionAtSeconds ?? null,
+    completionAtExpeditionSeconds,
     detection: plan.detection,
     decisionAtSeconds: plan.decisionAtSeconds,
     decisionRouteElapsedSeconds: plan.decisionRouteElapsedSeconds,
@@ -1661,7 +1723,7 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
 }
 
 /**
- * GAME-006/007/010 composes route ETA, supplies, discovery STOP and the first
+ * GAME-006/007/010/021 composes route ETA, supplies, discovery STOP and the first
  * moving or stationary contact with Power plus an explicit movement-based
  * FLEE resolution. Successful FLEE during an idle STOP cancels its remainder
  * and resumes the original route at the exact contact time.
@@ -1675,6 +1737,7 @@ export function applyDiscoveryDoctrineToRoute(route, doctrine) {
  * @param {ReturnType<typeof createCityArrivalSnapshot> | null} [cityDestination]
  * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
  * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot> | null} [supplyEmergency]
+ * @param {ReturnType<typeof createDangerAvoidanceDoctrineSnapshot> | null} [dangerAvoidance]
  */
 export function createExpeditionOutcomeSnapshot(
   route,
@@ -1687,6 +1750,7 @@ export function createExpeditionOutcomeSnapshot(
   cityDestination = null,
   stopLifecycle = null,
   supplyEmergency = null,
+  dangerAvoidance = null,
 ) {
   const doctrinePauseAtSeconds =
     doctrine?.status === "stopped"
@@ -1866,7 +1930,9 @@ export function createExpeditionOutcomeSnapshot(
           /** @type {const} */ ("moving-to-stop")
         : /** @type {const} */ ("ended"),
     scheduledIdleDurationSeconds:
-      supplyEmergency?.scheduledIdleDurationSeconds ??
+      (dangerAvoidance?.interruptsIdleStop
+        ? dangerAvoidance.scheduledIdleDurationSeconds
+        : null) ?? supplyEmergency?.scheduledIdleDurationSeconds ??
       stopLifecycle?.idleDurationSeconds ??
       0,
     idleDurationSeconds: effectiveStopLifecycle?.idleDurationSeconds ?? 0,
@@ -1885,6 +1951,10 @@ export function createExpeditionOutcomeSnapshot(
     stopInterruptedBySupplyEmergency: Boolean(
       supplyEmergency?.appliesReturn &&
       supplyEmergency.interruptsIdleStop,
+    ),
+    stopInterruptedByDangerAvoidance: Boolean(
+      dangerAvoidance?.appliesAvoidance &&
+      dangerAvoidance.interruptsIdleStop,
     ),
     interruptionCause,
     destinationCity: cityDestination?.city ?? null,
@@ -2168,6 +2238,7 @@ export function createExpeditionEventLogSnapshot(
     stopLifecycle,
     outcome,
     supplyEmergency,
+    dangerAvoidance,
   );
 
   if (
@@ -2211,6 +2282,7 @@ export function createExpeditionEventLogSnapshot(
       interactionRadiusMeters: detection.interactionRadiusMeters,
       dangerContactOrder: detection.contactOrder,
       secondsUntilContact: detection.secondsUntilContact,
+      caravanActivity: detection.caravanActivity,
       order: detection.contactOrder === "at-contact" ? 19 : 17,
     });
   }
@@ -2239,6 +2311,7 @@ export function createExpeditionEventLogSnapshot(
       dangerAvoidanceSide: dangerAvoidance.detourSide,
       detourAddedDistanceKilometers:
         dangerAvoidance.addedDistanceKilometers,
+      caravanActivity: detection?.caravanActivity,
       order: 18,
     });
   }
@@ -2463,6 +2536,7 @@ export function createExpeditionEventLogSnapshot(
  * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} stopLifecycle
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot> | null} outcome
  * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot> | null} supplyEmergency
+ * @param {ReturnType<typeof createDangerAvoidanceDoctrineSnapshot> | null} dangerAvoidance
  */
 function addRumorSearchEvent(
   events,
@@ -2473,6 +2547,7 @@ function addRumorSearchEvent(
   stopLifecycle,
   outcome,
   supplyEmergency,
+  dangerAvoidance,
 ) {
   if (!rumorSearch) return;
 
@@ -2529,6 +2604,13 @@ function addRumorSearchEvent(
         Math.abs(resumeAtSeconds - supplyEmergency.triggerAtSeconds) <=
           EVENT_TIME_EPSILON_SECONDS,
       );
+      const dangerAvoidanceResume = Boolean(
+        outcome?.stopInterruptedByDangerAvoidance &&
+        dangerAvoidance?.decisionAtSeconds !== null &&
+        dangerAvoidance?.decisionAtSeconds !== undefined &&
+        Math.abs(resumeAtSeconds - dangerAvoidance.decisionAtSeconds) <=
+          EVENT_TIME_EPSILON_SECONDS,
+      );
       events.push({
         id: "discovery-route-resumed",
         kind: "route-resumed",
@@ -2544,8 +2626,15 @@ function addRumorSearchEvent(
           ? "monster-contact"
           : supplyEmergencyResume
             ? "supply-emergency"
+            : dangerAvoidanceResume
+              ? "danger-avoidance"
             : "scheduled",
-        order: contactResume ? 19 : supplyEmergencyResume ? 18 : 17,
+        order:
+          contactResume || dangerAvoidanceResume
+            ? 19
+            : supplyEmergencyResume
+              ? 18
+              : 17,
       });
     }
     return;

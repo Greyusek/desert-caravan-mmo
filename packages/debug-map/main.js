@@ -452,6 +452,7 @@ rumorDevRoute.addEventListener("click", () => {
 contactDevRoute.addEventListener("click", () => {
   pauseSimulationClock();
   if (
+    activeDangerAvoidance?.triggerActivity === "moving" &&
     activeDangerAvoidance?.decisionAtSeconds !== null &&
     activeDangerAvoidance?.decisionAtSeconds !== undefined &&
     elapsedSeconds + 1e-9 < activeDangerAvoidance.decisionAtSeconds
@@ -463,6 +464,7 @@ contactDevRoute.addEventListener("click", () => {
   }
   if (
     activeDangerAvoidance &&
+    activeDangerAvoidance.triggerActivity === "moving" &&
     (activeDangerAvoidance.status === "avoiding" ||
       activeDangerAvoidance.status === "continued") &&
     activeOutcome &&
@@ -509,6 +511,29 @@ contactDevRoute.addEventListener("click", () => {
 });
 
 contactStopDevRoute.addEventListener("click", () => {
+  pauseSimulationClock();
+  if (
+    activeDangerAvoidance?.triggerActivity === "idle" &&
+    activeDangerAvoidance.decisionAtSeconds !== null &&
+    elapsedSeconds + 1e-9 < activeDangerAvoidance.decisionAtSeconds
+  ) {
+    elapsedSeconds = activeDangerAvoidance.decisionAtSeconds;
+    timeSlider.value = String(elapsedSeconds);
+    render();
+    return;
+  }
+  if (
+    activeDangerAvoidance?.triggerActivity === "idle" &&
+    (activeDangerAvoidance.status === "avoiding" ||
+      activeDangerAvoidance.status === "continued") &&
+    activeOutcome &&
+    elapsedSeconds + 1e-9 < activeOutcome.planned.atSeconds
+  ) {
+    elapsedSeconds = activeOutcome.planned.atSeconds;
+    timeSlider.value = String(elapsedSeconds);
+    render();
+    return;
+  }
   if (!activeRumorSearch) return;
 
   beginNewExpeditionIfTravelled();
@@ -523,8 +548,16 @@ contactStopDevRoute.addEventListener("click", () => {
   });
   doctrineStop.checked = true;
   stopIdleHours.value = "6";
+  initialFood.value = "100";
+  initialWater.value = "100";
+  movingFoodRate.value = "1";
+  movingWaterRate.value = "1";
+  idleFoodRate.value = "1";
+  idleWaterRate.value = "1";
+  supplySettings = readSupplySettings();
   stationaryStopQaEnabled = true;
   resetSimulationClock();
+  resumedDiscoveryObjectId = activeRumorSearch.serverTruth.target.id;
   render();
 });
 
@@ -852,11 +885,36 @@ function render() {
       cityTimelineDestination,
       stopLifecycle,
     );
-    const blockingExpeditionAtSeconds =
+    const contactBlockingExpeditionAtSeconds =
       preEmergencyOutcome.stopInterruptedByContact ||
         preEmergencyOutcome.failureReason === "monster"
         ? preEmergencyOutcome.monsterContact?.expeditionElapsedSeconds ?? null
         : null;
+    const preliminaryDangerAvoidance = selectedMonster && stopLifecycle
+      ? createDangerAvoidanceDoctrineSnapshot(
+          plannedRoute,
+          selectedMonster,
+          readDangerAvoidanceDoctrine(),
+          stopLifecycle,
+          preEmergencyOutcome.planned.atSeconds,
+        )
+      : null;
+    const dangerBlockingExpeditionAtSeconds =
+      preliminaryDangerAvoidance?.appliesAvoidance
+        ? preliminaryDangerAvoidance.decisionAtSeconds
+        : null;
+    const blockingExpeditionAtSeconds = [
+      contactBlockingExpeditionAtSeconds,
+      dangerBlockingExpeditionAtSeconds,
+    ].reduce(
+      (earliest, candidate) =>
+        candidate === null || candidate === undefined
+          ? earliest
+          : earliest === null
+            ? candidate
+            : Math.min(earliest, candidate),
+      /** @type {number | null} */ (null),
+    );
     const pauseBeforeEmergencyAtSeconds = stopLifecycle?.stopAtRouteSeconds ??
       (preEmergencyDoctrine.status === "stopped"
         ? preEmergencyDoctrine.decision?.decidedAtSeconds ?? null
@@ -891,14 +949,23 @@ function render() {
           )
         : null
       : stopLifecycle;
-    const dangerDetection = selectedMonster && !executionStopLifecycle
-      ? createDangerDetectionSnapshot(supplyExecutionRoute, selectedMonster)
+    const finalDangerBlockingAtSeconds = supplyEmergency.appliesReturn
+      ? null
+      : preEmergencyOutcome.planned.atSeconds;
+    const dangerDetection = selectedMonster
+      ? createDangerDetectionSnapshot(
+          supplyExecutionRoute,
+          selectedMonster,
+          executionStopLifecycle,
+        )
       : null;
-    const dangerAvoidance = selectedMonster && !executionStopLifecycle
+    const dangerAvoidance = selectedMonster
       ? createDangerAvoidanceDoctrineSnapshot(
           supplyExecutionRoute,
           selectedMonster,
           readDangerAvoidanceDoctrine(),
+          executionStopLifecycle,
+          finalDangerBlockingAtSeconds,
         )
       : null;
     const executionRoute = dangerAvoidance?.effectiveRoute ??
@@ -907,6 +974,20 @@ function render() {
       executionRoute,
       effectiveDestinationCity,
     );
+    const dangerExecutionStopLifecycle =
+      dangerAvoidance?.appliesAvoidance &&
+        dangerAvoidance.triggerActivity === "idle" &&
+        lifecycleResume
+        ? createDiscoveryStopLifecycleSnapshot(
+            executionRoute,
+            supplySettings.initial,
+            supplySettings.profile,
+            lifecycleResume,
+            dangerAvoidance.effectiveIdleDurationSeconds,
+            elapsedSeconds,
+            cityDestination,
+          )
+        : executionStopLifecycle;
     const plannedRumorSearch = createRumorSearchSnapshot(
       snapshot.seed,
       startCity,
@@ -926,7 +1007,7 @@ function render() {
       ? createMonsterContactSnapshot(
           executionRoute,
           selectedMonster,
-          executionStopLifecycle,
+          dangerExecutionStopLifecycle,
         )
       : null;
     const outcome = createExpeditionOutcomeSnapshot(
@@ -938,11 +1019,12 @@ function render() {
       strongMonsterDoctrine,
       fleeSpeedMetersPerSecond,
       cityDestination,
-      executionStopLifecycle,
+      dangerExecutionStopLifecycle,
       supplyEmergency,
+      dangerAvoidance,
     );
     const effectiveStopLifecycle =
-      outcome.stopLifecycle ?? executionStopLifecycle;
+      outcome.stopLifecycle ?? dangerExecutionStopLifecycle;
     const route = applyExpeditionOutcomeToRoute(executionRoute, outcome);
     const recordedTravel = recordExpeditionTravelProgress(travelLedger, {
       expeditionNumber,
@@ -1042,6 +1124,7 @@ function render() {
       effectiveDoctrine,
       outcome,
       supplyEmergency,
+      dangerAvoidance,
     );
     renderDiscoveryLedger(discoveryLedger, travelLedger, snapshot);
     renderCaravanStatus(caravanStatus);
@@ -1515,19 +1598,27 @@ function renderMonsterContact(snapshot, outcome) {
  */
 function renderDangerAvoidanceDoctrine(snapshot) {
   contactDevRoute.textContent = "DEV: маршрут на перехват";
+  contactStopDevRoute.textContent = "DEV: опасность во время STOP";
   if (!snapshot) {
     dangerDoctrineResult.textContent =
-      "GAME-020 применяется только к непрерывному движению; discovery STOP пока сохраняет прежний порядок.";
+      "Выберите патруль для проверки доктрины опасности.";
     return;
   }
+  const idleTrigger = snapshot.triggerActivity === "idle";
+  const triggerButton = idleTrigger ? contactStopDevRoute : contactDevRoute;
   if (snapshot.status === "not-triggered") {
     dangerDoctrineResult.textContent =
-      "Выбранный патруль не входит в техническую границу обнаружения 1000 м.";
+      `Выбранный патруль не создаёт новую границу 1000 м${snapshot.scheduledIdleDurationSeconds > 0 ? " внутри запланированной стоянки" : " на маршруте"}.`;
     return;
   }
   if (snapshot.status === "blocked-by-contact") {
     dangerDoctrineResult.textContent =
       "Караван уже внутри 500 м: контакт имеет приоритет, AVOID не исполняется.";
+    return;
+  }
+  if (snapshot.status === "blocked-by-earlier-boundary") {
+    dangerDoctrineResult.textContent =
+      `Более ранняя граница на ${formatElapsed(snapshot.blockingExpeditionAtSeconds ?? 0)} меняет исполнение до предупреждения; маршрут и STOP сохранены.`;
     return;
   }
   if (snapshot.status === "detour-unavailable") {
@@ -1536,28 +1627,34 @@ function renderDangerAvoidanceDoctrine(snapshot) {
     return;
   }
   if (snapshot.status === "pending") {
-    contactDevRoute.textContent = "DEV: к решению 1000 м";
+    triggerButton.textContent = idleTrigger
+      ? "DEV: к решению в STOP"
+      : "DEV: к решению 1000 м";
     dangerDoctrineResult.textContent = snapshot.appliesAvoidance
-      ? `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)} будет выбран ${dangerSideLabel(snapshot.detourSide)} обход: +${formatNumber(snapshot.addedDistanceKilometers ?? 0, 2)} км; весь новый путь проверен вне 500 м.`
-      : `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)} CONTINUE сохранит маршрут без изменений.`;
+      ? `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)}${idleTrigger ? ` после ${formatDuration(snapshot.effectiveIdleDurationSeconds)} STOP` : ""} будет выбран ${dangerSideLabel(snapshot.detourSide)} обход: +${formatNumber(snapshot.addedDistanceKilometers ?? 0, 2)} км; весь новый путь проверен вне 500 м.`
+      : `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)} CONTINUE сохранит маршрут${idleTrigger ? " и полную стоянку" : ""} без изменений.`;
     return;
   }
   if (snapshot.status === "avoiding") {
-    contactDevRoute.textContent = "DEV: к финишу обхода";
+    triggerButton.textContent = "DEV: к финишу обхода";
     dangerDoctrineResult.textContent =
-      `AVOID исполнен: ${dangerSideLabel(snapshot.detourSide)} waypoint на ${formatNumber(snapshot.detourWaypointRadiusMeters ?? 0, 0)} м от позиции патруля; контакт 500 м исключён непрерывной проверкой.`;
+      `AVOID исполнен${idleTrigger ? ` из точной координаты STOP после ${formatDuration(snapshot.effectiveIdleDurationSeconds)}; остаток ${formatDuration(Math.max(0, snapshot.scheduledIdleDurationSeconds - snapshot.effectiveIdleDurationSeconds))} отменён` : ""}: ${dangerSideLabel(snapshot.detourSide)} waypoint на ${formatNumber(snapshot.detourWaypointRadiusMeters ?? 0, 0)} м от позиции патруля; контакт 500 м исключён непрерывной проверкой.`;
     return;
   }
   if (snapshot.status === "avoided") {
-    contactDevRoute.textContent = "DEV: новый перехват";
+    triggerButton.textContent = idleTrigger
+      ? "DEV: новый STOP-обход"
+      : "DEV: новый перехват";
     dangerDoctrineResult.textContent =
       "Детерминированный обход завершён без входа в 500 м; исходный маршрут продолжен после точки возврата.";
     return;
   }
 
-  contactDevRoute.textContent = "DEV: к исходу CONTINUE";
+  triggerButton.textContent = idleTrigger
+    ? "DEV: к контакту CONTINUE"
+    : "DEV: к исходу CONTINUE";
   dangerDoctrineResult.textContent =
-    "CONTINUE исполнен: исходный маршрут и рассчитанный контакт сохранены без изменений.";
+    `CONTINUE исполнен: исходный маршрут${idleTrigger ? ", полная стоянка" : ""} и рассчитанный контакт сохранены без изменений.`;
 }
 
 /**
@@ -1656,6 +1753,8 @@ function eventTitle(event) {
       ? "FLEE прервал стоянку"
       : event.resumeReason === "supply-emergency"
         ? "Аварийный возврат прервал стоянку"
+        : event.resumeReason === "danger-avoidance"
+          ? "AVOID прервал стоянку"
         : "Маршрут возобновлён";
   }
   if (event.kind === "danger-detected") {
@@ -1735,6 +1834,8 @@ function eventDetail(event, route) {
       ? `Патруль вынудил начать отход после ${formatDuration(event.idleDurationSeconds ?? 0)} стоянки · исходный маршрут открыт`
       : event.resumeReason === "supply-emergency"
         ? `50% критического ресурса после ${formatDuration(event.idleDurationSeconds ?? 0)} стоянки · курс на город старта`
+        : event.resumeReason === "danger-avoidance"
+          ? `Предупреждение 1000 м после ${formatDuration(event.idleDurationSeconds ?? 0)} стоянки · остаток STOP отменён, начат обход`
         : `${event.idleDurationSeconds ? `Стоянка ${formatDuration(event.idleDurationSeconds)} завершена · ` : ""}${event.objectId ?? "Цель"} уже отмечена · повторный STOP подавлен`;
   }
   if (event.kind === "danger-detected") {
@@ -1744,12 +1845,12 @@ function eventDetail(event, route) {
     if (event.dangerContactOrder === "no-contact") {
       return `${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м · патруль обнаружен, но контакт ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м не рассчитан`;
     }
-    return `${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м → контакт ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м через ${formatDuration(event.secondsUntilContact ?? 0)} · граница решения`;
+    return `${event.caravanActivity === "idle" ? "STOP · " : ""}${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м → контакт ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м через ${formatDuration(event.secondsUntilContact ?? 0)} · граница решения`;
   }
   if (event.kind === "danger-doctrine-decision") {
     return event.dangerAvoidanceDoctrine === "AVOID"
-      ? `${dangerSideLabel(event.dangerAvoidanceSide)} обход · +${formatNumber(event.detourAddedDistanceKilometers ?? 0, 2)} км · новый путь непрерывно проверен вне ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м`
-      : "CONTINUE · исходный маршрут сохранён byte-for-byte";
+      ? `${event.caravanActivity === "idle" ? "остаток STOP отменён · " : ""}${dangerSideLabel(event.dangerAvoidanceSide)} обход · +${formatNumber(event.detourAddedDistanceKilometers ?? 0, 2)} км · новый путь непрерывно проверен вне ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м`
+      : `CONTINUE · исходный маршрут${event.caravanActivity === "idle" ? " и полная стоянка" : ""} сохранён byte-for-byte`;
   }
   if (event.kind === "monster-contact") {
     const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
@@ -1788,8 +1889,15 @@ function eventDetail(event, route) {
  * @param {ReturnType<typeof createDiscoveryDoctrineSnapshot> | NonNullable<ReturnType<typeof createDiscoveryResumeSnapshot>>} doctrine
  * @param {ReturnType<typeof createExpeditionOutcomeSnapshot>} outcome
  * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot>} supplyEmergency
+ * @param {ReturnType<typeof createDangerAvoidanceDoctrineSnapshot> | null} dangerAvoidance
  */
-function renderRumorSearch(search, doctrine, outcome, supplyEmergency) {
+function renderRumorSearch(
+  search,
+  doctrine,
+  outcome,
+  supplyEmergency,
+  dangerAvoidance,
+) {
   const knownTarget = search.targetKnowledge === "known";
   const waiting = outcome.phase === "idle-at-stop";
   const idleFailure =
@@ -1799,6 +1907,7 @@ function renderRumorSearch(search, doctrine, outcome, supplyEmergency) {
     !waiting &&
     !idleFailure;
   const supplyInterrupted = outcome.stopInterruptedBySupplyEmergency;
+  const dangerInterrupted = outcome.stopInterruptedByDangerAvoidance;
   rumorPanel.dataset.state = search.status;
   rumorPanel.dataset.knowledge = search.targetKnowledge;
   if (search.status === "found") {
@@ -1811,6 +1920,8 @@ function renderRumorSearch(search, doctrine, outcome, supplyEmergency) {
           : resumed
             ? supplyInterrupted
               ? "Аварийный возврат из STOP"
+              : dangerInterrupted
+                ? "Обход из STOP"
               : "Маршрут возобновлён"
             : doctrine.status === "stopped"
               ? "Караван остановлен"
@@ -1840,6 +1951,8 @@ function renderRumorSearch(search, doctrine, outcome, supplyEmergency) {
           ? `STOP исполнена, но патруль вынудил досрочно начать FLEE; цель отмечена, исходный маршрут снова открыт.`
           : supplyInterrupted
             ? `STOP исполнена, но критический запас (${formatDepletionCause(supplyEmergency.threshold?.cause ?? null).toLocaleLowerCase("ru-RU")}) достиг 50% после ${formatDuration(outcome.idleDurationSeconds)}; остаток стоянки отменён, караван возвращается в город старта.`
+            : dangerInterrupted
+              ? `STOP исполнена, но патруль вошёл в границу 1000 м после ${formatDuration(outcome.idleDurationSeconds)}; остаток стоянки отменён, караван начал ${dangerSideLabel(dangerAvoidance?.detourSide ?? null)} обход из точной координаты остановки.`
             : `STOP исполнена и явно снята: цель уже отмечена, исходный маршрут снова открыт.`
         : doctrine.status === "stopped"
         ? `STOP выполнена: маршрут поставлен на паузу в точке обнаружения.`
@@ -2369,6 +2482,9 @@ function renderCaravanStatus(status) {
   const stopInterruptedBySupplyEmergency = Boolean(
     status.outcome?.stopInterruptedBySupplyEmergency,
   );
+  const stopInterruptedByDangerAvoidance = Boolean(
+    status.outcome?.stopInterruptedByDangerAvoidance,
+  );
   const doctrineContinues =
     status.doctrine?.status === "marked-and-continuing" ||
     status.doctrine?.status === "known-and-continuing";
@@ -2406,6 +2522,8 @@ function renderCaravanStatus(status) {
             ? "FLEE прервал стоянку · в пути"
             : stopInterruptedBySupplyEmergency
               ? "50% запасов · возврат в город"
+              : stopInterruptedByDangerAvoidance
+                ? "AVOID прервал стоянку · в пути"
               : "Цель отмечена · маршрут возобновлён"
         : doctrineContinues
           ? knownTargetContinues
@@ -2511,6 +2629,8 @@ function renderCaravanStatus(status) {
         ? "Патруль прервёт стоянку"
         : stopInterruptedBySupplyEmergency
           ? "50% запасов прервут стоянку"
+          : stopInterruptedByDangerAvoidance
+            ? "AVOID прервёт стоянку"
           : "Идёт стоянка у цели";
     forecastDetail.textContent = monsterWillDefeat
       ? `Контакт на ${formatElapsed(status.outcome?.planned.atSeconds ?? 0)} завершит экспедицию выбранной доктриной.`
@@ -2520,17 +2640,23 @@ function renderCaravanStatus(status) {
         ? `Успешный FLEE начнётся на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)} и отменит остаток ожидания.`
         : stopInterruptedBySupplyEmergency
           ? `RETURN_TO_ORIGIN сработает на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)} и отменит остаток ожидания.`
+          : stopInterruptedByDangerAvoidance
+            ? `AVOID сработает на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)} и начнёт проверенный обход из точной координаты STOP.`
           : `Маршрутное время заморожено; idle-расход действует до ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}.`;
   } else if (doctrineResumed) {
     forecastTitle.textContent = stopInterruptedByContact
       ? "Стоянка прервана патрулём"
       : stopInterruptedBySupplyEmergency
         ? "Стоянка прервана на пороге 50%"
+        : stopInterruptedByDangerAvoidance
+          ? "Стоянка прервана на границе 1000 м"
         : "Маршрут возобновлён";
     forecastDetail.textContent = stopInterruptedByContact
       ? `Успешный FLEE начался на ${formatElapsed(status.outcome?.resumeAtSeconds ?? 0)}; учтено только ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)} фактической стоянки.`
       : stopInterruptedBySupplyEmergency
         ? `Учтено ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)} фактической стоянки; караван возвращается в город старта.`
+        : stopInterruptedByDangerAvoidance
+          ? `Учтено ${formatDuration(status.outcome?.idleDurationSeconds ?? 0)} фактической стоянки; караван выполняет проверенный обход патруля.`
         : "Найденная цель уже отмечена и не создаст повторный STOP; следующие границы рассчитываются по исходному маршруту.";
   } else if (monsterVictoryOccurred) {
     forecastTitle.textContent = "Слабый патруль уничтожен";
@@ -2585,7 +2711,7 @@ function renderSupplyEmergencyDoctrine(emergency, startCity, outcome) {
   }
   if (emergency.status === "blocked-by-earlier-boundary") {
     supplyDoctrineResult.textContent =
-      `Контакт с опасным патрулём на ${formatElapsed(emergency.blockingExpeditionAtSeconds ?? 0)} меняет исполнение раньше idle-порога 50%.`;
+      `Более ранняя граница опасности на ${formatElapsed(emergency.blockingExpeditionAtSeconds ?? 0)} меняет исполнение раньше idle-порога 50%.`;
     return;
   }
   if (emergency.status === "pending") {
@@ -2632,6 +2758,8 @@ function renderExpeditionOutcome(outcome) {
       const monsterWillDefeat = outcome.failureReason === "monster";
       const supplyWillInterrupt =
         outcome.stopInterruptedBySupplyEmergency;
+      const dangerWillInterrupt =
+        outcome.stopInterruptedByDangerAvoidance;
       const fatalSupplyBeforeResume =
         !monsterWillDefeat &&
         outcome.resumeAtSeconds !== null &&
@@ -2647,6 +2775,8 @@ function renderExpeditionOutcome(outcome) {
           ? "Патруль прервёт стоянку"
         : supplyWillInterrupt
           ? "50% запасов прервут стоянку"
+          : dangerWillInterrupt
+            ? "AVOID прервёт стоянку"
           : "Караван ждёт у найденной цели";
       outcomeAction.textContent = monsterWillDefeat
         ? "DEV: к контакту"
@@ -2656,6 +2786,8 @@ function renderExpeditionOutcome(outcome) {
           ? "DEV: к контакту"
         : supplyWillInterrupt
           ? "DEV: к порогу 50%"
+          : dangerWillInterrupt
+            ? "DEV: к решению 1000 м"
           : "DEV: к возобновлению";
       outcomeDetail.textContent = monsterWillDefeat
         ? outcome.monsterContactResolution?.status === "flee-failed"
@@ -2667,6 +2799,8 @@ function renderExpeditionOutcome(outcome) {
           ? `Караван остаётся неподвижен до входа патруля в радиус; успешный FLEE отменит остаток запланированных ${formatDuration(outcome.scheduledIdleDurationSeconds)}.`
         : supplyWillInterrupt
           ? `RETURN_TO_ORIGIN отменит остаток запланированных ${formatDuration(outcome.scheduledIdleDurationSeconds)} на точном пороге 50%; до него SIM-005 остаётся в точке STOP.`
+          : dangerWillInterrupt
+            ? `AVOID отменит остаток запланированных ${formatDuration(outcome.scheduledIdleDurationSeconds)} на точной границе 1000 м; до неё SIM-005 остаётся в точке STOP.`
           : `Прошло ${formatDuration(outcome.idleElapsedSeconds)} из ${formatDuration(outcome.idleDurationSeconds)}; SIM-005 остаётся в точке STOP, SIM-006 расходует idle-запасы.`;
       outcomeCause.textContent = monsterWillDefeat
         ? `Монстр · ${formatElapsed(outcome.planned.atSeconds)}`
@@ -2676,6 +2810,8 @@ function renderExpeditionOutcome(outcome) {
           ? `Контакт и FLEE · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`
         : supplyWillInterrupt
           ? `50% и возврат · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`
+          : dangerWillInterrupt
+            ? `1000 м и AVOID · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`
           : `Возобновление · ${formatElapsed(outcome.resumeAtSeconds ?? 0)}`;
       return;
     }

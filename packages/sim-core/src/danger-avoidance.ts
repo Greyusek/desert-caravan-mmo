@@ -2,9 +2,12 @@ import {
   type ExpeditionMonsterDangerDetection,
   DEFAULT_DANGER_DETECTION_RADIUS_METERS,
   findFirstExpeditionMonsterDangerDetection,
+  findFirstExpeditionMonsterDangerDetectionDuringIdleStop,
 } from "./danger-detection.js";
+import { ENCOUNTER_TIME_TOLERANCE_SECONDS } from "./encounter.js";
 import {
   findFirstExpeditionMonsterContact,
+  findFirstExpeditionMonsterContactWithIdleStop,
   type ExpeditionMonsterContact,
 } from "./expedition-contact.js";
 import {
@@ -27,6 +30,7 @@ export type DangerAvoidanceSide = "left" | "right";
 export type DangerAvoidanceStatus =
   | "not-triggered"
   | "blocked-by-contact"
+  | "blocked-by-earlier-boundary"
   | "continued"
   | "avoided"
   | "detour-unavailable";
@@ -68,8 +72,21 @@ export interface ExpeditionMonsterDangerResponsePlan {
   readonly rejoinOriginalSegmentIndex: number | null;
 }
 
+export interface IdleStopExpeditionMonsterDangerResponsePlan
+  extends ExpeditionMonsterDangerResponsePlan {
+  readonly triggersDuringIdleStop: boolean;
+  readonly scheduledIdleDurationSeconds: DurationSeconds;
+  readonly effectiveIdleDurationSeconds: DurationSeconds;
+  readonly interruptsIdleStop: boolean;
+  /** Earlier non-warning expedition boundary supplied by the composer. */
+  readonly blockingExpeditionAtSeconds: DurationSeconds | null;
+  /** World time including elapsed idle time. */
+  readonly completionAtExpeditionSeconds: DurationSeconds | null;
+}
+
 interface SafeDetourCandidate {
   readonly route: RoutePlan;
+  readonly continuationRoute: RoutePlan;
   readonly waypoint: WorldCoordinate;
   readonly side: DangerAvoidanceSide;
   readonly waypointRadiusMeters: number;
@@ -164,10 +181,14 @@ export function planExpeditionMonsterDangerResponse(
 
   const candidate = findSafeDetourCandidate(
     expeditionRoute,
-    monster,
     detection,
-    expeditionStartsAtSeconds,
     decision.segmentIndex,
+    (candidateRoute) =>
+      findFirstExpeditionMonsterContact(
+        candidateRoute,
+        monster,
+        expeditionStartsAtSeconds,
+      ) !== null,
   );
   if (!candidate) {
     return unchangedPlan(
@@ -206,12 +227,200 @@ export function planExpeditionMonsterDangerResponse(
   };
 }
 
+/**
+ * GAME-021 — executes the same danger doctrine when the first 1000 m warning
+ * is raised while the caravan is stationary at a scheduled discovery STOP.
+ * CONTINUE preserves both the original route object and full idle duration.
+ * AVOID keeps the exact route prefix to STOP, cancels only the unelapsed wait,
+ * departs from that coordinate, and validates the post-decision route against
+ * the patrol at its real world time. A contact or caller-supplied boundary at
+ * the same or an earlier expedition instant keeps priority.
+ */
+export function planExpeditionMonsterDangerResponseDuringIdleStop(
+  expeditionRoute: RoutePlan,
+  monster: WanderingMonster,
+  doctrine: DangerAvoidanceDoctrine,
+  stopAtRouteSeconds: DurationSeconds,
+  idleDurationSeconds: DurationSeconds,
+  expeditionStartsAtSeconds: DurationSeconds = 0,
+  detectionRadiusMeters = DEFAULT_DANGER_DETECTION_RADIUS_METERS,
+  blockingExpeditionAtSeconds: DurationSeconds | null = null,
+): IdleStopExpeditionMonsterDangerResponsePlan {
+  assertDoctrine(doctrine);
+  assertRouteTime(
+    expeditionRoute,
+    stopAtRouteSeconds,
+    "stopAtRouteSeconds",
+  );
+  assertNonNegativeFinite(idleDurationSeconds, "idleDurationSeconds");
+  assertNonNegativeFinite(
+    expeditionStartsAtSeconds,
+    "expeditionStartsAtSeconds",
+  );
+  if (blockingExpeditionAtSeconds !== null) {
+    assertNonNegativeFinite(
+      blockingExpeditionAtSeconds,
+      "blockingExpeditionAtSeconds",
+    );
+  }
+
+  const detection =
+    findFirstExpeditionMonsterDangerDetectionDuringIdleStop(
+      expeditionRoute,
+      monster,
+      stopAtRouteSeconds,
+      idleDurationSeconds,
+      expeditionStartsAtSeconds,
+      detectionRadiusMeters,
+    );
+  const originalContact = findFirstExpeditionMonsterContactWithIdleStop(
+    expeditionRoute,
+    monster,
+    stopAtRouteSeconds,
+    idleDurationSeconds,
+    expeditionStartsAtSeconds,
+  );
+  if (!detection) {
+    return unchangedIdleStopPlan(
+      expeditionRoute,
+      doctrine,
+      "not-triggered",
+      null,
+      originalContact,
+      idleDurationSeconds,
+      blockingExpeditionAtSeconds,
+    );
+  }
+
+  if (
+    originalContact &&
+    originalContact.expeditionElapsedSeconds <=
+      detection.expeditionElapsedSeconds +
+        ENCOUNTER_TIME_TOLERANCE_SECONDS
+  ) {
+    return unchangedIdleStopPlan(
+      expeditionRoute,
+      doctrine,
+      "blocked-by-contact",
+      detection,
+      originalContact,
+      idleDurationSeconds,
+      blockingExpeditionAtSeconds,
+    );
+  }
+
+  if (
+    blockingExpeditionAtSeconds !== null &&
+    blockingExpeditionAtSeconds <=
+      detection.expeditionElapsedSeconds + TIME_EPSILON_SECONDS
+  ) {
+    return unchangedIdleStopPlan(
+      expeditionRoute,
+      doctrine,
+      "blocked-by-earlier-boundary",
+      detection,
+      originalContact,
+      idleDurationSeconds,
+      blockingExpeditionAtSeconds,
+    );
+  }
+
+  if (doctrine === "CONTINUE") {
+    return unchangedIdleStopPlan(
+      expeditionRoute,
+      doctrine,
+      "continued",
+      detection,
+      originalContact,
+      idleDurationSeconds,
+      blockingExpeditionAtSeconds,
+    );
+  }
+
+  const decision = positionAtTime(expeditionRoute, stopAtRouteSeconds);
+  if (decision.segmentIndex === null) {
+    return unchangedIdleStopPlan(
+      expeditionRoute,
+      doctrine,
+      "detour-unavailable",
+      detection,
+      originalContact,
+      idleDurationSeconds,
+      blockingExpeditionAtSeconds,
+    );
+  }
+
+  const candidate = findSafeDetourCandidate(
+    expeditionRoute,
+    detection,
+    decision.segmentIndex,
+    (_candidateRoute, continuationRoute) =>
+      findFirstExpeditionMonsterContact(
+        continuationRoute,
+        monster,
+        detection.atSeconds,
+      ) !== null,
+  );
+  if (!candidate) {
+    return unchangedIdleStopPlan(
+      expeditionRoute,
+      doctrine,
+      "detour-unavailable",
+      detection,
+      originalContact,
+      idleDurationSeconds,
+      blockingExpeditionAtSeconds,
+    );
+  }
+
+  const effectiveIdleDurationSeconds = Math.max(
+    0,
+    detection.expeditionElapsedSeconds - stopAtRouteSeconds,
+  );
+  return {
+    doctrine,
+    status: "avoided",
+    detection,
+    originalRoute: expeditionRoute,
+    effectiveRoute: candidate.route,
+    routeChanged: true,
+    originalContact,
+    effectiveContact: null,
+    decisionAtSeconds: detection.atSeconds,
+    decisionRouteElapsedSeconds: detection.routeElapsedSeconds,
+    decisionPosition: detection.caravanPosition,
+    decisionSegmentIndex: decision.segmentIndex,
+    decisionRouteDistanceMeters: decision.traveledDistanceMeters,
+    detourWaypoint: candidate.waypoint,
+    detourSide: candidate.side,
+    detourWaypointRadiusMeters: candidate.waypointRadiusMeters,
+    detourSegmentIndexes: candidate.segmentIndexes,
+    detourDistanceMeters: candidate.detourDistanceMeters,
+    addedDistanceMeters:
+      candidate.route.totalDistanceMeters -
+      expeditionRoute.totalDistanceMeters,
+    rejoinPosition: candidate.rejoinPosition,
+    rejoinOriginalSegmentIndex: candidate.rejoinOriginalSegmentIndex,
+    triggersDuringIdleStop: true,
+    scheduledIdleDurationSeconds: idleDurationSeconds,
+    effectiveIdleDurationSeconds,
+    interruptsIdleStop:
+      effectiveIdleDurationSeconds <
+      idleDurationSeconds - TIME_EPSILON_SECONDS,
+    blockingExpeditionAtSeconds,
+    completionAtExpeditionSeconds:
+      candidate.route.totalDurationSeconds + effectiveIdleDurationSeconds,
+  };
+}
+
 function findSafeDetourCandidate(
   route: RoutePlan,
-  monster: WanderingMonster,
   detection: ExpeditionMonsterDangerDetection,
-  expeditionStartsAtSeconds: DurationSeconds,
   decisionSegmentIndex: number,
+  candidateHasContact: (
+    route: RoutePlan,
+    continuationRoute: RoutePlan,
+  ) => boolean,
 ): SafeDetourCandidate | null {
   const interruptedSegment = route.segments[decisionSegmentIndex];
   if (!interruptedSegment) return null;
@@ -276,15 +485,17 @@ function findSafeDetourCandidate(
         route.speedMetersPerSecond,
         route.planetRadiusMeters,
       );
-      const contact = findFirstExpeditionMonsterContact(
-        candidateRoute,
-        monster,
-        expeditionStartsAtSeconds,
+      const continuationRoute = createRoutePlan(
+        detection.caravanPosition,
+        commands.slice(prefix.length),
+        route.speedMetersPerSecond,
+        route.planetRadiusMeters,
       );
-      if (contact) continue;
+      if (candidateHasContact(candidateRoute, continuationRoute)) continue;
 
       safeAtThisRadius.push({
         route: candidateRoute,
+        continuationRoute,
         waypoint,
         side,
         waypointRadiusMeters,
@@ -342,6 +553,27 @@ function unchangedPlan(
   };
 }
 
+function unchangedIdleStopPlan(
+  route: RoutePlan,
+  doctrine: DangerAvoidanceDoctrine,
+  status: Exclude<DangerAvoidanceStatus, "avoided">,
+  detection: ExpeditionMonsterDangerDetection | null,
+  contact: ExpeditionMonsterContact | null,
+  idleDurationSeconds: DurationSeconds,
+  blockingExpeditionAtSeconds: DurationSeconds | null,
+): IdleStopExpeditionMonsterDangerResponsePlan {
+  return {
+    ...unchangedPlan(route, doctrine, status, detection, contact),
+    triggersDuringIdleStop: detection !== null,
+    scheduledIdleDurationSeconds: idleDurationSeconds,
+    effectiveIdleDurationSeconds: idleDurationSeconds,
+    interruptsIdleStop: false,
+    blockingExpeditionAtSeconds,
+    completionAtExpeditionSeconds:
+      route.totalDurationSeconds + idleDurationSeconds,
+  };
+}
+
 function routePrefixCommands(
   route: RoutePlan,
   elapsedSeconds: DurationSeconds,
@@ -393,5 +625,22 @@ function assertDoctrine(
 ): asserts doctrine is DangerAvoidanceDoctrine {
   if (doctrine !== "AVOID" && doctrine !== "CONTINUE") {
     throw new RangeError("doctrine must be AVOID or CONTINUE");
+  }
+}
+
+function assertRouteTime(
+  route: RoutePlan,
+  value: number,
+  name: string,
+): void {
+  assertNonNegativeFinite(value, name);
+  if (value > route.totalDurationSeconds + TIME_EPSILON_SECONDS) {
+    throw new RangeError(`${name} must not exceed route total duration`);
+  }
+}
+
+function assertNonNegativeFinite(value: number, name: string): void {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new RangeError(`${name} must be a non-negative finite number`);
   }
 }
