@@ -21,6 +21,7 @@ import {
   generateSeededWorld,
   kilometers,
   meters,
+  planExpeditionMonsterDangerResponse,
   planEmergencySupplyReturn,
   planEmergencySupplyReturnDuringIdleStop,
   positionAtTime,
@@ -48,7 +49,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 36 demo");
+console.log("Desert Caravan MMO — Checkpoint 37 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -371,11 +372,22 @@ const expeditionContact = findFirstExpeditionMonsterContact(
   encounterCaravan,
   demoMonster,
 );
+const dangerAvoidance = planExpeditionMonsterDangerResponse(
+  encounterCaravan,
+  demoMonster,
+  "AVOID",
+);
 console.log("\nGAME-019 detected danger:");
 console.log(
   dangerDetection
     ? `  ${dangerDetection.monsterId}: detected at ${dangerDetection.detectionRadiusMeters.toFixed(0)} m / T=${dangerDetection.expeditionElapsedSeconds.toFixed(6)} s; contact=${dangerDetection.interactionRadiusMeters.toFixed(0)} m in ${(dangerDetection.secondsUntilContact ?? 0).toFixed(6)} s; order=${dangerDetection.contactOrder}`
     : "  no danger detected",
+);
+console.log("\nGAME-020 danger doctrine:");
+console.log(
+  dangerAvoidance.status === "avoided"
+    ? `  AVOID: side=${dangerAvoidance.detourSide}; extra=${((dangerAvoidance.addedDistanceMeters ?? 0) / 1_000).toFixed(3)} km; contact-after=${dangerAvoidance.effectiveContact === null ? "none" : "unsafe"}`
+    : `  AVOID: ${dangerAvoidance.status}`,
 );
 console.log("\nGAME-004 expedition contact:");
 console.log(
@@ -511,5 +523,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 36 danger detection: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 37 danger avoidance: npm run debug-map -> http://127.0.0.1:4173",
 );

@@ -15,6 +15,7 @@ import {
   createCityArrivalSnapshot,
   createContactZoomSnapshot,
   createDebugMapSnapshot,
+  createDangerAvoidanceDoctrineSnapshot,
   createDangerDetectionSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
@@ -198,6 +199,18 @@ const contactPowerComparison = requireElement(
 );
 const contactMonsterSpeed = requireElement("contact-monster-speed", HTMLElement);
 const contactFleeResult = requireElement("contact-flee-result", HTMLElement);
+const dangerDoctrineAvoid = requireElement(
+  "danger-doctrine-avoid",
+  HTMLInputElement,
+);
+const dangerDoctrineContinue = requireElement(
+  "danger-doctrine-continue",
+  HTMLInputElement,
+);
+const dangerDoctrineResult = requireElement(
+  "danger-doctrine-result",
+  HTMLParagraphElement,
+);
 const contactMonsterSelect = requireElement(
   "contact-monster-select",
   HTMLSelectElement,
@@ -257,6 +270,8 @@ let activeDoctrine = null;
 let activeOutcome = null;
 /** @type {ReturnType<typeof createEmergencySupplyDoctrineSnapshot> | null} */
 let activeSupplyEmergency = null;
+/** @type {ReturnType<typeof createDangerAvoidanceDoctrineSnapshot> | null} */
+let activeDangerAvoidance = null;
 /** @type {ReturnType<typeof createDebugMapSnapshot> | null} */
 let activeSnapshot = null;
 
@@ -335,6 +350,8 @@ contactMonsterSelect.addEventListener("change", () => {
   resetSimulationClock();
   render();
 });
+dangerDoctrineAvoid.addEventListener("change", pauseClockAndRender);
+dangerDoctrineContinue.addEventListener("change", pauseClockAndRender);
 contactDoctrineFlee.addEventListener("change", pauseClockAndRender);
 contactDoctrineFight.addEventListener("change", pauseClockAndRender);
 contactFleeSpeed.addEventListener("change", pauseClockAndRender);
@@ -433,6 +450,29 @@ rumorDevRoute.addEventListener("click", () => {
 });
 
 contactDevRoute.addEventListener("click", () => {
+  pauseSimulationClock();
+  if (
+    activeDangerAvoidance?.decisionAtSeconds !== null &&
+    activeDangerAvoidance?.decisionAtSeconds !== undefined &&
+    elapsedSeconds + 1e-9 < activeDangerAvoidance.decisionAtSeconds
+  ) {
+    elapsedSeconds = activeDangerAvoidance.decisionAtSeconds;
+    timeSlider.value = String(elapsedSeconds);
+    render();
+    return;
+  }
+  if (
+    activeDangerAvoidance &&
+    (activeDangerAvoidance.status === "avoiding" ||
+      activeDangerAvoidance.status === "continued") &&
+    activeOutcome &&
+    elapsedSeconds + 1e-9 < activeOutcome.planned.atSeconds
+  ) {
+    elapsedSeconds = activeOutcome.planned.atSeconds;
+    timeSlider.value = String(elapsedSeconds);
+    render();
+    return;
+  }
   const monster = activeSnapshot?.monsters.find(
     (candidate) => candidate.id === contactMonsterSelect.value,
   );
@@ -830,27 +870,43 @@ function render() {
       stopLifecycle,
       blockingExpeditionAtSeconds,
     );
-    const executionRoute = supplyEmergency.effectiveRoute;
+    const supplyExecutionRoute = supplyEmergency.effectiveRoute;
     const effectiveDestinationCity = supplyEmergency.appliesReturn
       ? startCity
       : destinationCity;
-    const cityDestination = createCityArrivalSnapshot(
-      executionRoute,
+    const provisionalCityDestination = createCityArrivalSnapshot(
+      supplyExecutionRoute,
       effectiveDestinationCity,
     );
     const executionStopLifecycle = supplyEmergency.appliesReturn
       ? supplyEmergency.triggerActivity === "idle" && lifecycleResume
         ? createDiscoveryStopLifecycleSnapshot(
-            executionRoute,
+            supplyExecutionRoute,
             supplySettings.initial,
             supplySettings.profile,
             lifecycleResume,
             supplyEmergency.effectiveIdleDurationSeconds,
             elapsedSeconds,
-            cityDestination,
+            provisionalCityDestination,
           )
         : null
       : stopLifecycle;
+    const dangerDetection = selectedMonster && !executionStopLifecycle
+      ? createDangerDetectionSnapshot(supplyExecutionRoute, selectedMonster)
+      : null;
+    const dangerAvoidance = selectedMonster && !executionStopLifecycle
+      ? createDangerAvoidanceDoctrineSnapshot(
+          supplyExecutionRoute,
+          selectedMonster,
+          readDangerAvoidanceDoctrine(),
+        )
+      : null;
+    const executionRoute = dangerAvoidance?.effectiveRoute ??
+      supplyExecutionRoute;
+    const cityDestination = createCityArrivalSnapshot(
+      executionRoute,
+      effectiveDestinationCity,
+    );
     const plannedRumorSearch = createRumorSearchSnapshot(
       snapshot.seed,
       startCity,
@@ -872,9 +928,6 @@ function render() {
           selectedMonster,
           executionStopLifecycle,
         )
-      : null;
-    const dangerDetection = selectedMonster && !executionStopLifecycle
-      ? createDangerDetectionSnapshot(executionRoute, selectedMonster)
       : null;
     const outcome = createExpeditionOutcomeSnapshot(
       executionRoute,
@@ -953,6 +1006,7 @@ function render() {
     activeDoctrine = doctrine;
     activeOutcome = outcome;
     activeSupplyEmergency = supplyEmergency;
+    activeDangerAvoidance = dangerAvoidance;
     activeSnapshot = snapshot;
     const eventLog = createExpeditionEventLogSnapshot(
       route,
@@ -965,6 +1019,7 @@ function render() {
       effectiveStopLifecycle,
       supplyEmergency,
       dangerDetection,
+      dangerAvoidance,
     );
     const maximumElapsedSeconds = outcome.planned.atSeconds;
 
@@ -991,6 +1046,7 @@ function render() {
     renderDiscoveryLedger(discoveryLedger, travelLedger, snapshot);
     renderCaravanStatus(caravanStatus);
     renderSupplyEmergencyDoctrine(supplyEmergency, startCity, outcome);
+    renderDangerAvoidanceDoctrine(dangerAvoidance);
     renderExpeditionOutcome(outcome);
     renderMonsterContact(monsterContact, outcome);
     renderContactZoom(
@@ -1019,6 +1075,7 @@ function render() {
     activeDoctrine = null;
     activeOutcome = null;
     activeSupplyEmergency = null;
+    activeDangerAvoidance = null;
     activeSnapshot = null;
     contactZoomMap.replaceChildren();
     contactZoomCaption.textContent = "Локальное окно недоступно.";
@@ -1454,6 +1511,56 @@ function renderMonsterContact(snapshot, outcome) {
 }
 
 /**
+ * @param {ReturnType<typeof createDangerAvoidanceDoctrineSnapshot> | null} snapshot
+ */
+function renderDangerAvoidanceDoctrine(snapshot) {
+  contactDevRoute.textContent = "DEV: маршрут на перехват";
+  if (!snapshot) {
+    dangerDoctrineResult.textContent =
+      "GAME-020 применяется только к непрерывному движению; discovery STOP пока сохраняет прежний порядок.";
+    return;
+  }
+  if (snapshot.status === "not-triggered") {
+    dangerDoctrineResult.textContent =
+      "Выбранный патруль не входит в техническую границу обнаружения 1000 м.";
+    return;
+  }
+  if (snapshot.status === "blocked-by-contact") {
+    dangerDoctrineResult.textContent =
+      "Караван уже внутри 500 м: контакт имеет приоритет, AVOID не исполняется.";
+    return;
+  }
+  if (snapshot.status === "detour-unavailable") {
+    dangerDoctrineResult.textContent =
+      "Один проверяемый обходной waypoint не найден; исходный маршрут сохранён.";
+    return;
+  }
+  if (snapshot.status === "pending") {
+    contactDevRoute.textContent = "DEV: к решению 1000 м";
+    dangerDoctrineResult.textContent = snapshot.appliesAvoidance
+      ? `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)} будет выбран ${dangerSideLabel(snapshot.detourSide)} обход: +${formatNumber(snapshot.addedDistanceKilometers ?? 0, 2)} км; весь новый путь проверен вне 500 м.`
+      : `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)} CONTINUE сохранит маршрут без изменений.`;
+    return;
+  }
+  if (snapshot.status === "avoiding") {
+    contactDevRoute.textContent = "DEV: к финишу обхода";
+    dangerDoctrineResult.textContent =
+      `AVOID исполнен: ${dangerSideLabel(snapshot.detourSide)} waypoint на ${formatNumber(snapshot.detourWaypointRadiusMeters ?? 0, 0)} м от позиции патруля; контакт 500 м исключён непрерывной проверкой.`;
+    return;
+  }
+  if (snapshot.status === "avoided") {
+    contactDevRoute.textContent = "DEV: новый перехват";
+    dangerDoctrineResult.textContent =
+      "Детерминированный обход завершён без входа в 500 м; исходный маршрут продолжен после точки возврата.";
+    return;
+  }
+
+  contactDevRoute.textContent = "DEV: к исходу CONTINUE";
+  dangerDoctrineResult.textContent =
+    "CONTINUE исполнен: исходный маршрут и рассчитанный контакт сохранены без изменений.";
+}
+
+/**
  * @param {ReturnType<typeof createExpeditionEventLogSnapshot>} log
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  */
@@ -1554,6 +1661,11 @@ function eventTitle(event) {
   if (event.kind === "danger-detected") {
     return `Обнаружена опасность: ${event.monsterId ?? "монстр"}`;
   }
+  if (event.kind === "danger-doctrine-decision") {
+    return event.dangerAvoidanceDoctrine === "AVOID"
+      ? "Доктрина опасности: обойти"
+      : "Доктрина опасности: продолжить";
+  }
   if (event.kind === "monster-contact") {
     if (event.powerResolutionStatus === "monster-defeated") {
       return `Победа над ${event.monsterId ?? "монстром"}`;
@@ -1632,7 +1744,12 @@ function eventDetail(event, route) {
     if (event.dangerContactOrder === "no-contact") {
       return `${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м · патруль обнаружен, но контакт ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м не рассчитан`;
     }
-    return `${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м → контакт ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м через ${formatDuration(event.secondsUntilContact ?? 0)} · маршрут пока не изменён`;
+    return `${formatNumber(event.detectionRadiusMeters ?? 0, 0)} м → контакт ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м через ${formatDuration(event.secondsUntilContact ?? 0)} · граница решения`;
+  }
+  if (event.kind === "danger-doctrine-decision") {
+    return event.dangerAvoidanceDoctrine === "AVOID"
+      ? `${dangerSideLabel(event.dangerAvoidanceSide)} обход · +${formatNumber(event.detourAddedDistanceKilometers ?? 0, 2)} км · новый путь непрерывно проверен вне ${formatNumber(event.interactionRadiusMeters ?? 0, 0)} м`
+      : "CONTINUE · исходный маршрут сохранён byte-for-byte";
   }
   if (event.kind === "monster-contact") {
     const comparison = `PWR ${event.playerPower ?? "—"} / ${event.monsterPower ?? "—"}`;
@@ -2725,9 +2842,19 @@ function readSupplyEmergencyDoctrine() {
   return supplyDoctrineContinue.checked ? "CONTINUE" : "RETURN_TO_ORIGIN";
 }
 
+/** @returns {import("../sim-core/dist/src/index.js").DangerAvoidanceDoctrine} */
+function readDangerAvoidanceDoctrine() {
+  return dangerDoctrineContinue.checked ? "CONTINUE" : "AVOID";
+}
+
 /** @returns {import("../sim-core/dist/src/index.js").StrongMonsterContactDoctrine} */
 function readStrongMonsterDoctrine() {
   return contactDoctrineFight.checked ? "ACCEPT_FIGHT" : "FLEE";
+}
+
+/** @param {import("../sim-core/dist/src/index.js").DangerAvoidanceSide | null} side */
+function dangerSideLabel(side) {
+  return side === "right" ? "правый" : "левый";
 }
 
 /**

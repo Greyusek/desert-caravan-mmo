@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.37 — Checkpoint 37
+
+- Added `GAME-020`: the first 1000 m moving-patrol warning now executes the explicit `AVOID | CONTINUE` doctrine.
+- Kept `CONTINUE` strictly non-mutating by returning the original `RoutePlan` object and preserving its previously forecast contact.
+- Made `AVOID` preserve every fully executed command plus the exact partial command to the warning, insert one deterministic left/right waypoint, rejoin the interrupted segment and preserve the later command suffix.
+- Selected the shortest safe side on the nearest configured clearance ring and accepted it only when the continuous time-aware solver proved the complete resolved route never entered the selected patrol's 500 m contact radius.
+- Preserved contact priority for a warning/contact tie, explicit no-warning and unavailable-detour states, deterministic delayed world time and avoidance of a warning-only near pass.
+- Added danger-doctrine controls, a same-time journal decision and a three-step DEV intercept flow; AVOID removes the later contact from authoritative outcome/log execution while CONTINUE leaves it intact.
+- Added twelve GAME-020 regressions; repository verification now runs 325 tests.
+
 ## 0.0.36 — Checkpoint 36
 
 - Added `GAME-019`: an uninterrupted moving expedition now receives its first deterministic server-truth danger warning at 1000 m from a wandering patrol.

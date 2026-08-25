@@ -18,6 +18,7 @@ import {
   createCityArrivalSnapshot,
   createContactZoomSnapshot,
   createDebugMapSnapshot,
+  createDangerAvoidanceDoctrineSnapshot,
   createDangerDetectionSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
@@ -1620,6 +1621,67 @@ test("GAME-019: debug warning precedes the exact contact forecast", () => {
   assert.equal(reached.danger.status, "detected");
 });
 
+test("GAME-020: AVOID snapshot applies one contact-free planned detour", () => {
+  const planned = monsterInterceptAt();
+  const avoidance = createDangerAvoidanceDoctrineSnapshot(
+    planned.route,
+    planned.monster,
+    "AVOID",
+  );
+  const avoidedContact = createMonsterContactSnapshot(
+    avoidance.effectiveRoute,
+    planned.monster,
+  );
+
+  assert.equal(avoidance.status, "pending");
+  assert.equal(avoidance.planStatus, "avoided");
+  assert.equal(avoidance.appliesAvoidance, true);
+  assert.equal(avoidance.decisionOccurred, false);
+  assert.notEqual(avoidance.effectiveRoute, planned.route);
+  assert.notEqual(
+    avoidance.effectiveRoute.authoritativeRoute,
+    planned.route.authoritativeRoute,
+  );
+  assert.ok(avoidance.detourWaypoint);
+  assert.ok(avoidance.detourWaypointPoint);
+  assert.ok(avoidance.addedDistanceKilometers > 0);
+  assert.equal(avoidance.originalContact?.monsterId, planned.monster.id);
+  assert.equal(avoidance.effectiveContact, null);
+  assert.equal(avoidedContact.contact, null);
+
+  const reached = monsterInterceptAt(avoidance.decisionAtSeconds);
+  const executed = createDangerAvoidanceDoctrineSnapshot(
+    reached.route,
+    reached.monster,
+    "AVOID",
+  );
+  assert.equal(executed.status, "avoiding");
+  assert.equal(executed.decisionOccurred, true);
+});
+
+test("GAME-020: CONTINUE snapshot keeps the exact route and contact", () => {
+  const planned = monsterInterceptAt();
+  const continued = createDangerAvoidanceDoctrineSnapshot(
+    planned.route,
+    planned.monster,
+    "CONTINUE",
+  );
+
+  assert.equal(continued.status, "pending");
+  assert.equal(continued.planStatus, "continued");
+  assert.equal(continued.appliesAvoidance, false);
+  assert.equal(continued.effectiveRoute, planned.route);
+  assert.equal(
+    continued.effectiveRoute.authoritativeRoute,
+    planned.route.authoritativeRoute,
+  );
+  assert.equal(
+    continued.effectiveContact?.atSeconds,
+    planned.contact.contact?.atSeconds,
+  );
+  assert.equal(continued.detourWaypoint, null);
+});
+
 test("UI-006: planned contact becomes the exact local focus", () => {
   const planned = monsterInterceptAt();
   const contact = planned.contact.contact;
@@ -1858,6 +1920,60 @@ test("GAME-019: expedition log records warning before contact without replanning
   assert.equal(
     executed.authoritativeRoute,
     selected.route.authoritativeRoute,
+  );
+});
+
+test("GAME-020: AVOID decision follows warning and removes contact from the log", () => {
+  const planned = monsterInterceptAt();
+  const decisionAtSeconds = planned.danger.detection?.atSeconds;
+  assert.ok(decisionAtSeconds);
+  const selected = monsterInterceptAt(decisionAtSeconds + 1);
+  const avoidance = createDangerAvoidanceDoctrineSnapshot(
+    selected.route,
+    selected.monster,
+    "AVOID",
+  );
+  const avoidedContact = createMonsterContactSnapshot(
+    avoidance.effectiveRoute,
+    selected.monster,
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    avoidance.effectiveRoute,
+    searchSupplies,
+    searchConsumption,
+    null,
+    avoidedContact,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    avoidance.effectiveRoute,
+    searchSupplies,
+    searchConsumption,
+    null,
+    null,
+    outcome,
+    null,
+    null,
+    null,
+    selected.danger,
+    avoidance,
+  );
+  const detectionIndex = log.events.findIndex(
+    (event) => event.kind === "danger-detected",
+  );
+  const decisionIndex = log.events.findIndex(
+    (event) => event.kind === "danger-doctrine-decision",
+  );
+  const decision = log.events[decisionIndex];
+
+  assert.ok(detectionIndex >= 0);
+  assert.equal(decisionIndex, detectionIndex + 1);
+  assert.equal(decision?.occurred, true);
+  assert.equal(decision?.dangerAvoidanceDoctrine, "AVOID");
+  assert.ok(["left", "right"].includes(decision?.dangerAvoidanceSide));
+  assert.ok((decision?.detourAddedDistanceKilometers ?? 0) > 0);
+  assert.equal(
+    log.events.some((event) => event.kind === "monster-contact"),
+    false,
   );
 });
 

@@ -24,6 +24,7 @@ import {
   greatCircleDistance,
   kilometers,
   positionAtTime,
+  planExpeditionMonsterDangerResponse,
   planEmergencySupplyReturn,
   planEmergencySupplyReturnDuringIdleStop,
   projectCitySettlementAtTime,
@@ -117,7 +118,7 @@ export function advanceSimulationClock(
 }
 
 /**
- * @typedef {"departure" | "segment-completed" | "supplies-emergency-doctrine" | "supplies-low" | "supplies-depleted" | "target-discovered" | "known-target-observed" | "doctrine-decision" | "route-resumed" | "danger-detected" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
+ * @typedef {"departure" | "segment-completed" | "supplies-emergency-doctrine" | "supplies-low" | "supplies-depleted" | "target-discovered" | "known-target-observed" | "doctrine-decision" | "route-resumed" | "danger-detected" | "danger-doctrine-decision" | "monster-contact" | "search-missed" | "route-ended" | "arrival"} ExpeditionEventKind
  */
 
 /**
@@ -139,6 +140,9 @@ export function advanceSimulationClock(
  * @property {number} [interactionRadiusMeters]
  * @property {import("../sim-core/dist/src/index.js").DangerContactOrder} [dangerContactOrder]
  * @property {number | null} [secondsUntilContact]
+ * @property {import("../sim-core/dist/src/index.js").DangerAvoidanceDoctrine} [dangerAvoidanceDoctrine]
+ * @property {import("../sim-core/dist/src/index.js").DangerAvoidanceSide | null} [dangerAvoidanceSide]
+ * @property {number | null} [detourAddedDistanceKilometers]
  * @property {number} [playerPower]
  * @property {number} [powerDelta]
  * @property {import("../sim-core/dist/src/index.js").PowerContactResolutionStatus} [powerResolutionStatus]
@@ -353,6 +357,86 @@ export function createDangerDetectionSnapshot(route, monster) {
       caravanPoint: projectCoordinate(detection.caravanPosition),
       monsterPoint: projectCoordinate(detection.monsterPosition),
     },
+  };
+}
+
+/**
+ * GAME-020 exposes one deterministic danger-doctrine execution. The planned
+ * AVOID route may be rendered before the warning, but its executed position is
+ * identical to the original route until the exact 1000 m decision boundary.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"][number]} monster
+ * @param {import("../sim-core/dist/src/index.js").DangerAvoidanceDoctrine} doctrine
+ */
+export function createDangerAvoidanceDoctrineSnapshot(
+  route,
+  monster,
+  doctrine,
+) {
+  const plan = planExpeditionMonsterDangerResponse(
+    route.authoritativeRoute,
+    monster.authoritativeMonster,
+    doctrine,
+    0,
+    monster.dangerDetectionRadiusMeters,
+  );
+  const evaluatedAtSeconds = route.position.elapsedSeconds;
+  const decisionOccurred =
+    plan.decisionAtSeconds !== null &&
+    evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >= plan.decisionAtSeconds;
+  const appliesAvoidance = plan.status === "avoided";
+  const effectiveRoute = appliesAvoidance
+    ? createRoutePlanSnapshot(plan.effectiveRoute, evaluatedAtSeconds)
+    : route;
+  const status = plan.status === "avoided"
+    ? !decisionOccurred
+      ? /** @type {const} */ ("pending")
+      : evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
+          plan.effectiveRoute.totalDurationSeconds
+        ? /** @type {const} */ ("avoided")
+        : /** @type {const} */ ("avoiding")
+    : plan.status === "continued" && !decisionOccurred
+      ? /** @type {const} */ ("pending")
+      : plan.status;
+
+  return {
+    doctrine,
+    status,
+    planStatus: plan.status,
+    evaluatedAtSeconds,
+    decisionOccurred,
+    appliesAvoidance,
+    detection: plan.detection,
+    decisionAtSeconds: plan.decisionAtSeconds,
+    decisionRouteElapsedSeconds: plan.decisionRouteElapsedSeconds,
+    decisionSegmentIndex: plan.decisionSegmentIndex,
+    decisionRouteDistanceKilometers:
+      plan.decisionRouteDistanceMeters === null
+        ? null
+        : plan.decisionRouteDistanceMeters / 1_000,
+    detourWaypoint: plan.detourWaypoint,
+    detourWaypointPoint: plan.detourWaypoint
+      ? projectCoordinate(plan.detourWaypoint)
+      : null,
+    detourSide: plan.detourSide,
+    detourWaypointRadiusMeters: plan.detourWaypointRadiusMeters,
+    detourSegmentIndexes: plan.detourSegmentIndexes,
+    detourDistanceKilometers:
+      plan.detourDistanceMeters === null
+        ? null
+        : plan.detourDistanceMeters / 1_000,
+    addedDistanceKilometers:
+      plan.addedDistanceMeters === null
+        ? null
+        : plan.addedDistanceMeters / 1_000,
+    rejoinPosition: plan.rejoinPosition,
+    rejoinPoint: plan.rejoinPosition
+      ? projectCoordinate(plan.rejoinPosition)
+      : null,
+    originalContact: plan.originalContact,
+    effectiveContact: plan.effectiveContact,
+    effectiveRoute,
+    authoritativePlan: plan,
   };
 }
 
@@ -1984,6 +2068,7 @@ export function createCaravanStatusSnapshot(
  * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
  * @param {ReturnType<typeof createEmergencySupplyDoctrineSnapshot> | null} [supplyEmergency]
  * @param {ReturnType<typeof createDangerDetectionSnapshot> | null} [dangerDetection]
+ * @param {ReturnType<typeof createDangerAvoidanceDoctrineSnapshot> | null} [dangerAvoidance]
  */
 export function createExpeditionEventLogSnapshot(
   route,
@@ -1996,6 +2081,7 @@ export function createExpeditionEventLogSnapshot(
   stopLifecycle = null,
   supplyEmergency = null,
   dangerDetection = null,
+  dangerAvoidance = null,
 ) {
   /** @param {number} routeElapsedSeconds */
   const routeToExpeditionTime = (routeElapsedSeconds) =>
@@ -2126,6 +2212,34 @@ export function createExpeditionEventLogSnapshot(
       dangerContactOrder: detection.contactOrder,
       secondsUntilContact: detection.secondsUntilContact,
       order: detection.contactOrder === "at-contact" ? 19 : 17,
+    });
+  }
+
+  if (
+    dangerAvoidance?.decisionAtSeconds !== null &&
+    dangerAvoidance?.decisionAtSeconds !== undefined &&
+    (dangerAvoidance.planStatus === "continued" ||
+      dangerAvoidance.planStatus === "avoided")
+  ) {
+    const detection = dangerAvoidance.detection;
+    events.push({
+      id: `danger-doctrine-${dangerAvoidance.doctrine.toLowerCase()}`,
+      kind: "danger-doctrine-decision",
+      atSeconds: dangerAvoidance.decisionAtSeconds,
+      segmentIndex: dangerAvoidance.decisionSegmentIndex,
+      cause: null,
+      distanceKilometers:
+        dangerAvoidance.decisionRouteDistanceKilometers,
+      monsterId: detection?.monsterId,
+      monsterPower: detection?.monsterPower,
+      separationMeters: detection?.separationMeters,
+      detectionRadiusMeters: detection?.detectionRadiusMeters,
+      interactionRadiusMeters: detection?.interactionRadiusMeters,
+      dangerAvoidanceDoctrine: dangerAvoidance.doctrine,
+      dangerAvoidanceSide: dangerAvoidance.detourSide,
+      detourAddedDistanceKilometers:
+        dangerAvoidance.addedDistanceKilometers,
+      order: 18,
     });
   }
 
@@ -2290,6 +2404,10 @@ export function createExpeditionEventLogSnapshot(
     interactionRadiusMeters: event.interactionRadiusMeters ?? null,
     dangerContactOrder: event.dangerContactOrder ?? null,
     secondsUntilContact: event.secondsUntilContact ?? null,
+    dangerAvoidanceDoctrine: event.dangerAvoidanceDoctrine ?? null,
+    dangerAvoidanceSide: event.dangerAvoidanceSide ?? null,
+    detourAddedDistanceKilometers:
+      event.detourAddedDistanceKilometers ?? null,
     playerPower: event.playerPower ?? null,
     powerDelta: event.powerDelta ?? null,
     powerResolutionStatus: event.powerResolutionStatus ?? null,
