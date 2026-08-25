@@ -3234,6 +3234,236 @@ test("GAME-010: idle depletion wins an exact tie with stationary contact", () =>
   );
 });
 
+function game021ScenarioAt(
+  expeditionElapsedSeconds,
+  { doctrine = "AVOID", monsterPower = 90 } = {},
+) {
+  const initialSupplies = { foodUnits: 100, waterUnits: 100 };
+  const profile = {
+    moving: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+    idle: { foodUnitsPerHour: 1, waterUnitsPerHour: 1 },
+  };
+  const idleDurationSeconds = 6 * 3_600;
+  const origin = rumorOrigin();
+  const commands = directRumorCommands();
+  const timelineRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    expeditionElapsedSeconds,
+  );
+  const timelineSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    timelineRoute,
+  );
+  const plannedStop = timelineSearch.serverTruth.plannedDiscovery;
+  assert.ok(plannedStop);
+  const stopRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    plannedStop.elapsedSeconds,
+  );
+  const stopSearch = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    stopRoute,
+  );
+  const stoppedDoctrine = createDiscoveryDoctrineSnapshot(
+    stopRoute,
+    stopSearch,
+    "STOP",
+  );
+  const scheduledResume = createDiscoveryResumeSnapshot(
+    stoppedDoctrine,
+    stopSearch.serverTruth.target.id,
+  );
+  assert.ok(scheduledResume);
+  const scheduledLifecycle = createDiscoveryStopLifecycleSnapshot(
+    timelineRoute,
+    initialSupplies,
+    profile,
+    scheduledResume,
+    idleDurationSeconds,
+    expeditionElapsedSeconds,
+  );
+  assert.ok(scheduledLifecycle);
+  const plannedRoute = createFourSegmentRouteSnapshot(
+    origin.position,
+    commands,
+    5,
+    scheduledLifecycle.movementElapsedSeconds,
+  );
+  const search = createRumorSearchSnapshot(
+    "checkpoint-04",
+    origin,
+    plannedRoute,
+  );
+  const discoveryDoctrine = createDiscoveryDoctrineSnapshot(
+    plannedRoute,
+    search,
+    "STOP",
+  );
+  const world = createDebugMapSnapshot(
+    "checkpoint-04",
+    expeditionElapsedSeconds,
+    2,
+  );
+  const sourceMonster = world.monsters.find(
+    (monster) => monster.power === monsterPower,
+  );
+  assert.ok(sourceMonster);
+  const plannedContactAtSeconds =
+    plannedStop.elapsedSeconds + idleDurationSeconds / 2;
+  const monster = createStationaryStopPatrolPreset(
+    plannedStop.caravanPosition,
+    plannedContactAtSeconds,
+    sourceMonster,
+    expeditionElapsedSeconds,
+  );
+  const dangerDetection = createDangerDetectionSnapshot(
+    plannedRoute,
+    monster,
+    scheduledLifecycle,
+  );
+  const danger = createDangerAvoidanceDoctrineSnapshot(
+    plannedRoute,
+    monster,
+    doctrine,
+    scheduledLifecycle,
+    scheduledLifecycle.planned.atSeconds,
+  );
+  const executionRoute = danger.effectiveRoute;
+  const effectiveLifecycle = danger.appliesAvoidance
+    ? createDiscoveryStopLifecycleSnapshot(
+        executionRoute,
+        initialSupplies,
+        profile,
+        scheduledResume,
+        danger.effectiveIdleDurationSeconds,
+        expeditionElapsedSeconds,
+      )
+    : scheduledLifecycle;
+  assert.ok(effectiveLifecycle);
+  const contact = createMonsterContactSnapshot(
+    executionRoute,
+    monster,
+    effectiveLifecycle,
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    executionRoute,
+    initialSupplies,
+    profile,
+    scheduledResume,
+    contact,
+    "FLEE",
+    executionRoute.authoritativeRoute.speedMetersPerSecond * 2,
+    null,
+    effectiveLifecycle,
+    null,
+    danger,
+  );
+  const route = applyExpeditionOutcomeToRoute(executionRoute, outcome);
+  const log = createExpeditionEventLogSnapshot(
+    route,
+    initialSupplies,
+    profile,
+    search,
+    discoveryDoctrine,
+    outcome,
+    scheduledResume,
+    outcome.stopLifecycle ?? effectiveLifecycle,
+    null,
+    dangerDetection,
+    danger,
+  );
+
+  return {
+    plannedStop,
+    plannedContactAtSeconds,
+    plannedRoute,
+    scheduledLifecycle,
+    effectiveLifecycle,
+    monster,
+    dangerDetection,
+    danger,
+    contact,
+    outcome,
+    route,
+    log,
+  };
+}
+
+test("GAME-021: AVOID snapshot schedules exact departure from discovery STOP", () => {
+  const scenario = game021ScenarioAt(0);
+
+  assert.equal(scenario.danger.status, "pending");
+  assert.equal(scenario.danger.triggerActivity, "idle");
+  assert.equal(scenario.danger.triggersDuringIdleStop, true);
+  assert.equal(scenario.danger.appliesAvoidance, true);
+  assert.equal(scenario.danger.interruptsIdleStop, true);
+  assert.ok(
+    scenario.danger.effectiveIdleDurationSeconds <
+      scenario.danger.scheduledIdleDurationSeconds,
+  );
+  assert.equal(scenario.danger.authoritativePlan.originalContact?.caravanActivity, "idle");
+  assert.equal(scenario.danger.authoritativePlan.effectiveContact, null);
+  assert.equal(scenario.contact.contact, null);
+});
+
+test("GAME-021: executed AVOID truncates STOP, logs resume and removes contact", () => {
+  const probe = game021ScenarioAt(0);
+  assert.ok(probe.danger.decisionAtSeconds);
+  const scenario = game021ScenarioAt(probe.danger.decisionAtSeconds + 1);
+
+  assert.equal(scenario.danger.status, "avoiding");
+  assert.equal(scenario.outcome.stopInterruptedByDangerAvoidance, true);
+  approx(
+    scenario.outcome.idleDurationSeconds,
+    scenario.danger.effectiveIdleDurationSeconds,
+    1e-5,
+  );
+  assert.ok(
+    scenario.route.position.elapsedSeconds >
+      scenario.plannedStop.elapsedSeconds,
+  );
+  assert.equal(scenario.outcome.monsterContact, null);
+  const kinds = scenario.log.events.map((event) => event.kind);
+  assert.ok(kinds.includes("danger-detected"));
+  assert.ok(kinds.includes("danger-doctrine-decision"));
+  assert.ok(kinds.includes("route-resumed"));
+  assert.equal(kinds.includes("monster-contact"), false);
+  assert.equal(
+    scenario.log.events.find((event) => event.kind === "route-resumed")
+      ?.resumeReason,
+    "danger-avoidance",
+  );
+});
+
+test("GAME-021: CONTINUE snapshot preserves the full STOP and later contact", () => {
+  const probe = game021ScenarioAt(0, { doctrine: "CONTINUE" });
+  assert.ok(probe.danger.decisionAtSeconds);
+  const scenario = game021ScenarioAt(
+    probe.plannedContactAtSeconds + 1,
+    { doctrine: "CONTINUE" },
+  );
+
+  assert.equal(scenario.danger.status, "continued");
+  assert.equal(scenario.danger.appliesAvoidance, false);
+  assert.equal(scenario.danger.effectiveRoute, scenario.plannedRoute);
+  assert.equal(scenario.danger.authoritativePlan.routeChanged, false);
+  assert.equal(
+    scenario.effectiveLifecycle.idleDurationSeconds,
+    scenario.scheduledLifecycle.idleDurationSeconds,
+  );
+  assert.equal(scenario.contact.contact?.caravanActivity, "idle");
+  assert.ok(scenario.outcome.monsterContact);
+  assert.ok(
+    scenario.log.events.some((event) => event.kind === "monster-contact"),
+  );
+});
+
 test("GAME-011: known target remains pending until the route reaches it", () => {
   const origin = rumorOrigin();
   const commands = directRumorCommands();

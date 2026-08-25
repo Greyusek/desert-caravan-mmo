@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 37 · GAME-020</p>
+          <p class="eyebrow">Checkpoint 38 · GAME-021</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -238,7 +238,7 @@
         aria-labelledby="contact-title"
       >
         <div class="contact-copy">
-          <p class="section-kicker">GAME-020 · Danger avoidance doctrine</p>
+          <p class="section-kicker">GAME-021 · Danger avoidance across STOP</p>
           <div class="contact-heading">
             <div>
               <h2 id="contact-title">Контакта на маршруте нет</h2>
@@ -323,8 +323,8 @@
             </label>
           </fieldset>
           <button id="contact-dev-route" type="button">DEV: маршрут на перехват</button>
-          <button id="contact-stop-dev-route" type="button">DEV: патруль к стоянке</button>
-          <p>«Маршрут на перехват» показывает AVOID или неизменный CONTINUE. PWR/FLEE исполняются только если контакт 500 м остался. «Патруль к стоянке» сохраняет прежний GAME-010 сценарий вне этого slice.</p>
+          <button id="contact-stop-dev-route" type="button">DEV: опасность во время STOP</button>
+          <p>«Маршрут на перехват» проверяет GAME-020 в движении. «Опасность во время STOP» планирует находку и шестичасовую стоянку: AVOID отменяет только её остаток и уходит из точной координаты, CONTINUE сохраняет полный STOP и контакт 500 м.</p>
         </div>
         <article class="contact-zoom-card" aria-labelledby="contact-zoom-title">
           <div class="contact-zoom-heading">

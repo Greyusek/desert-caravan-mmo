@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.38 — Checkpoint 38
+
+- Added `GAME-021`: the selected patrol can now raise the authoritative 1000 m warning while the caravan is stationary during a scheduled discovery `STOP`.
+- Preserved exact time domains: world time advances through the wait while route time remains pinned to the exact STOP coordinate.
+- Kept `CONTINUE` non-mutating with the original route object, complete scheduled wait and later contact unchanged.
+- Made `AVOID` cancel only the unelapsed wait, depart from the exact STOP coordinate and validate the post-decision continuation against the patrol at its real world time.
+- Preserved contact and caller-supplied earlier-boundary priority for any event at or before the warning; unavailable detours keep the original route and wait.
+- Integrated the effective stop duration, route, outcome and `danger-avoidance` resume provenance into the debug map, journal and a dedicated three-step STOP scenario.
+- Added eleven GAME-021 regressions; repository verification now runs 336 tests.
+
 ## 0.0.37 — Checkpoint 37
 
 - Added `GAME-020`: the first 1000 m moving-patrol warning now executes the explicit `AVOID | CONTINUE` doctrine.
