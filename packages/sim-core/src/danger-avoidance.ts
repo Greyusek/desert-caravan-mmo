@@ -4,6 +4,7 @@ import {
   findFirstExpeditionMonsterDangerDetection,
   findFirstExpeditionMonsterDangerDetectionAmongPatrols,
   findFirstExpeditionMonsterDangerDetectionDuringIdleStop,
+  findFirstExpeditionMonsterDangerDetectionDuringIdleStopAmongPatrols,
 } from "./danger-detection.js";
 import { ENCOUNTER_TIME_TOLERANCE_SECONDS } from "./encounter.js";
 import {
@@ -87,6 +88,13 @@ export interface IdleStopExpeditionMonsterDangerResponsePlan
 
 export interface MultiPatrolExpeditionMonsterDangerResponsePlan
   extends ExpeditionMonsterDangerResponsePlan {
+  readonly patrolCount: number;
+  /** Stable identity order for the patrols included in every clearance check. */
+  readonly clearanceMonsterIds: readonly string[];
+}
+
+export interface MultiPatrolIdleStopExpeditionMonsterDangerResponsePlan
+  extends IdleStopExpeditionMonsterDangerResponsePlan {
   readonly patrolCount: number;
   /** Stable identity order for the patrols included in every clearance check. */
   readonly clearanceMonsterIds: readonly string[];
@@ -566,6 +574,216 @@ export function planExpeditionMonsterDangerResponseDuringIdleStop(
   };
 }
 
+/**
+ * GAME-024 — executes the first aggregate patrol warning raised during one
+ * scheduled discovery STOP. CONTINUE preserves the complete wait and stable
+ * first contact. AVOID cancels only the unelapsed wait and accepts a departure
+ * route only when every patrol remains continuously outside contact range.
+ */
+export function planExpeditionMonsterDangerResponseDuringIdleStopAmongPatrols(
+  expeditionRoute: RoutePlan,
+  monsters: readonly WanderingMonster[],
+  doctrine: DangerAvoidanceDoctrine,
+  stopAtRouteSeconds: DurationSeconds,
+  idleDurationSeconds: DurationSeconds,
+  expeditionStartsAtSeconds: DurationSeconds = 0,
+  detectionRadiusMeters = DEFAULT_DANGER_DETECTION_RADIUS_METERS,
+  blockingExpeditionAtSeconds: DurationSeconds | null = null,
+): MultiPatrolIdleStopExpeditionMonsterDangerResponsePlan {
+  assertDoctrine(doctrine);
+  assertRouteTime(
+    expeditionRoute,
+    stopAtRouteSeconds,
+    "stopAtRouteSeconds",
+  );
+  assertNonNegativeFinite(idleDurationSeconds, "idleDurationSeconds");
+  assertNonNegativeFinite(
+    expeditionStartsAtSeconds,
+    "expeditionStartsAtSeconds",
+  );
+  if (blockingExpeditionAtSeconds !== null) {
+    assertNonNegativeFinite(
+      blockingExpeditionAtSeconds,
+      "blockingExpeditionAtSeconds",
+    );
+  }
+
+  const clearanceMonsterIds = monsters
+    .map((monster) => monster.id)
+    .sort(compareMonsterIds);
+  const detection =
+    findFirstExpeditionMonsterDangerDetectionDuringIdleStopAmongPatrols(
+      expeditionRoute,
+      monsters,
+      stopAtRouteSeconds,
+      idleDurationSeconds,
+      expeditionStartsAtSeconds,
+      detectionRadiusMeters,
+    );
+  const originalContact =
+    findFirstMonsterContactWithIdleStopAmongPatrols(
+      expeditionRoute,
+      monsters,
+      stopAtRouteSeconds,
+      idleDurationSeconds,
+      expeditionStartsAtSeconds,
+    );
+  if (!detection) {
+    return multiPatrolIdleStopPlan(
+      unchangedIdleStopPlan(
+        expeditionRoute,
+        doctrine,
+        "not-triggered",
+        null,
+        originalContact,
+        idleDurationSeconds,
+        blockingExpeditionAtSeconds,
+      ),
+      clearanceMonsterIds,
+    );
+  }
+
+  if (
+    originalContact &&
+    originalContact.expeditionElapsedSeconds <=
+      detection.expeditionElapsedSeconds +
+        ENCOUNTER_TIME_TOLERANCE_SECONDS
+  ) {
+    return multiPatrolIdleStopPlan(
+      unchangedIdleStopPlan(
+        expeditionRoute,
+        doctrine,
+        "blocked-by-contact",
+        detection,
+        originalContact,
+        idleDurationSeconds,
+        blockingExpeditionAtSeconds,
+      ),
+      clearanceMonsterIds,
+    );
+  }
+
+  if (
+    blockingExpeditionAtSeconds !== null &&
+    blockingExpeditionAtSeconds <=
+      detection.expeditionElapsedSeconds + TIME_EPSILON_SECONDS
+  ) {
+    return multiPatrolIdleStopPlan(
+      unchangedIdleStopPlan(
+        expeditionRoute,
+        doctrine,
+        "blocked-by-earlier-boundary",
+        detection,
+        originalContact,
+        idleDurationSeconds,
+        blockingExpeditionAtSeconds,
+      ),
+      clearanceMonsterIds,
+    );
+  }
+
+  if (doctrine === "CONTINUE") {
+    return multiPatrolIdleStopPlan(
+      unchangedIdleStopPlan(
+        expeditionRoute,
+        doctrine,
+        "continued",
+        detection,
+        originalContact,
+        idleDurationSeconds,
+        blockingExpeditionAtSeconds,
+      ),
+      clearanceMonsterIds,
+    );
+  }
+
+  const decision = positionAtTime(expeditionRoute, stopAtRouteSeconds);
+  if (decision.segmentIndex === null) {
+    return multiPatrolIdleStopPlan(
+      unchangedIdleStopPlan(
+        expeditionRoute,
+        doctrine,
+        "detour-unavailable",
+        detection,
+        originalContact,
+        idleDurationSeconds,
+        blockingExpeditionAtSeconds,
+      ),
+      clearanceMonsterIds,
+    );
+  }
+
+  const candidate = findSafeDetourCandidate(
+    expeditionRoute,
+    detection,
+    decision.segmentIndex,
+    (_candidateRoute, continuationRoute) =>
+      monsters.some((monster) =>
+        findFirstExpeditionMonsterContact(
+          continuationRoute,
+          monster,
+          detection.atSeconds,
+        ) !== null
+      ),
+  );
+  if (!candidate) {
+    return multiPatrolIdleStopPlan(
+      unchangedIdleStopPlan(
+        expeditionRoute,
+        doctrine,
+        "detour-unavailable",
+        detection,
+        originalContact,
+        idleDurationSeconds,
+        blockingExpeditionAtSeconds,
+      ),
+      clearanceMonsterIds,
+    );
+  }
+
+  const effectiveIdleDurationSeconds = Math.max(
+    0,
+    detection.expeditionElapsedSeconds - stopAtRouteSeconds,
+  );
+  return multiPatrolIdleStopPlan(
+    {
+      doctrine,
+      status: "avoided",
+      detection,
+      originalRoute: expeditionRoute,
+      effectiveRoute: candidate.route,
+      routeChanged: true,
+      originalContact,
+      effectiveContact: null,
+      decisionAtSeconds: detection.atSeconds,
+      decisionRouteElapsedSeconds: detection.routeElapsedSeconds,
+      decisionPosition: detection.caravanPosition,
+      decisionSegmentIndex: decision.segmentIndex,
+      decisionRouteDistanceMeters: decision.traveledDistanceMeters,
+      detourWaypoint: candidate.waypoint,
+      detourSide: candidate.side,
+      detourWaypointRadiusMeters: candidate.waypointRadiusMeters,
+      detourSegmentIndexes: candidate.segmentIndexes,
+      detourDistanceMeters: candidate.detourDistanceMeters,
+      addedDistanceMeters:
+        candidate.route.totalDistanceMeters -
+        expeditionRoute.totalDistanceMeters,
+      rejoinPosition: candidate.rejoinPosition,
+      rejoinOriginalSegmentIndex: candidate.rejoinOriginalSegmentIndex,
+      triggersDuringIdleStop: true,
+      scheduledIdleDurationSeconds: idleDurationSeconds,
+      effectiveIdleDurationSeconds,
+      interruptsIdleStop:
+        effectiveIdleDurationSeconds <
+        idleDurationSeconds - TIME_EPSILON_SECONDS,
+      blockingExpeditionAtSeconds,
+      completionAtExpeditionSeconds:
+        candidate.route.totalDurationSeconds + effectiveIdleDurationSeconds,
+    },
+    clearanceMonsterIds,
+  );
+}
+
 function findSafeDetourCandidate(
   route: RoutePlan,
   detection: ExpeditionMonsterDangerDetection,
@@ -717,22 +935,59 @@ function multiPatrolPlan(
   };
 }
 
+function multiPatrolIdleStopPlan(
+  plan: IdleStopExpeditionMonsterDangerResponsePlan,
+  clearanceMonsterIds: readonly string[],
+): MultiPatrolIdleStopExpeditionMonsterDangerResponsePlan {
+  return {
+    ...plan,
+    patrolCount: clearanceMonsterIds.length,
+    clearanceMonsterIds,
+  };
+}
+
 function findFirstMonsterContactAmongPatrols(
   route: RoutePlan,
   monsters: readonly WanderingMonster[],
   expeditionStartsAtSeconds: DurationSeconds,
 ): ExpeditionMonsterContact | null {
-  const contacts = monsters
-    .map((monster) =>
+  return selectFirstMonsterContact(
+    monsters.map((monster) =>
       findFirstExpeditionMonsterContact(
         route,
         monster,
         expeditionStartsAtSeconds,
       )
-    )
-    .filter(
-      (contact): contact is ExpeditionMonsterContact => contact !== null,
-    );
+    ),
+  );
+}
+
+function findFirstMonsterContactWithIdleStopAmongPatrols(
+  route: RoutePlan,
+  monsters: readonly WanderingMonster[],
+  stopAtRouteSeconds: DurationSeconds,
+  idleDurationSeconds: DurationSeconds,
+  expeditionStartsAtSeconds: DurationSeconds,
+): ExpeditionMonsterContact | null {
+  return selectFirstMonsterContact(
+    monsters.map((monster) =>
+      findFirstExpeditionMonsterContactWithIdleStop(
+        route,
+        monster,
+        stopAtRouteSeconds,
+        idleDurationSeconds,
+        expeditionStartsAtSeconds,
+      )
+    ),
+  );
+}
+
+function selectFirstMonsterContact(
+  possibleContacts: readonly (ExpeditionMonsterContact | null)[],
+): ExpeditionMonsterContact | null {
+  const contacts = possibleContacts.filter(
+    (contact): contact is ExpeditionMonsterContact => contact !== null,
+  );
   if (contacts.length === 0) return null;
 
   const earliestAtSeconds = Math.min(

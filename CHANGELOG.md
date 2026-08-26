@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.41 — Checkpoint 41
+
+- Added `GAME-024`: scheduled discovery `STOP` now executes `AVOID | CONTINUE` from the first stable warning across the complete patrol set.
+- Preserved exact time domains: world time advances through the wait while route time remains pinned to the STOP coordinate.
+- Kept `CONTINUE` non-mutating with the original route, complete scheduled wait and stable first contact unchanged.
+- Made `AVOID` cancel only the unelapsed wait and validate the real-time departure continuation continuously against every patrol.
+- Preserved contact and caller-supplied earlier-boundary priority at the same or an earlier expedition instant.
+- Integrated all-patrol STOP clearance and stable contact identity into the debug-map execution, journal and contact focus.
+- Added ten GAME-024 regressions; repository verification now runs 366 tests.
+
 ## 0.0.40 — Checkpoint 40
 
 - Added `GAME-023`: moving `AVOID | CONTINUE` now executes from the first authoritative warning selected across the complete patrol set.

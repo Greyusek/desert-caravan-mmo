@@ -896,10 +896,10 @@ function render() {
         preEmergencyOutcome.failureReason === "monster"
         ? preEmergencyOutcome.monsterContact?.expeditionElapsedSeconds ?? null
         : null;
-    const preliminaryDangerAvoidance = selectedMonster && stopLifecycle
-      ? createDangerAvoidanceDoctrineSnapshot(
+    const preliminaryDangerAvoidance = stopLifecycle
+      ? createMultiPatrolDangerAvoidanceDoctrineSnapshot(
           plannedRoute,
-          selectedMonster,
+          snapshot.monsters,
           readDangerAvoidanceDoctrine(),
           stopLifecycle,
           preEmergencyOutcome.planned.atSeconds,
@@ -964,32 +964,15 @@ function render() {
         snapshot.monsters,
         executionStopLifecycle,
       );
-    const usesIdleDangerDoctrine = Boolean(
-      executionStopLifecycle &&
-        executionStopLifecycle.resumeAtSeconds !== null,
-    );
-    const dangerDetection = usesIdleDangerDoctrine && selectedMonster
-      ? createDangerDetectionSnapshot(
-          supplyExecutionRoute,
-          selectedMonster,
-          executionStopLifecycle,
-        )
-      : multiPatrolDangerDetection;
-    const dangerAvoidance = usesIdleDangerDoctrine
-      ? selectedMonster
-        ? createDangerAvoidanceDoctrineSnapshot(
-            supplyExecutionRoute,
-            selectedMonster,
-            readDangerAvoidanceDoctrine(),
-            executionStopLifecycle,
-            finalDangerBlockingAtSeconds,
-          )
-        : null
-      : createMultiPatrolDangerAvoidanceDoctrineSnapshot(
-          supplyExecutionRoute,
-          snapshot.monsters,
-          readDangerAvoidanceDoctrine(),
-        );
+    const dangerDetection = multiPatrolDangerDetection;
+    const dangerAvoidance =
+      createMultiPatrolDangerAvoidanceDoctrineSnapshot(
+        supplyExecutionRoute,
+        snapshot.monsters,
+        readDangerAvoidanceDoctrine(),
+        executionStopLifecycle,
+        finalDangerBlockingAtSeconds,
+      );
     const executionRoute = dangerAvoidance?.effectiveRoute ??
       supplyExecutionRoute;
     const cityDestination = createCityArrivalSnapshot(
@@ -1027,8 +1010,7 @@ function render() {
     );
     const authoritativeContactMonsterId =
       dangerAvoidance?.originalContact?.monsterId ?? null;
-    const contactExecutionMonster = !usesIdleDangerDoctrine &&
-        authoritativeContactMonsterId
+    const contactExecutionMonster = authoritativeContactMonsterId
       ? snapshot.monsters.find(
           (monster) => monster.id === authoritativeContactMonsterId,
         ) ?? selectedMonster
@@ -1702,7 +1684,7 @@ function renderMultiPatrolDangerDetection(snapshot) {
       : "патрулей";
   if (!snapshot.detection) {
     multiPatrolDangerResult.textContent =
-      `GAME-023 · ${snapshot.patrolCount} ${patrolLabel}: новой границы 1000 м нет.`;
+      `GAME-024 · ${snapshot.patrolCount} ${patrolLabel}: новой границы 1000 м нет.`;
     return;
   }
 
@@ -1711,10 +1693,10 @@ function renderMultiPatrolDangerDetection(snapshot) {
     : "в движении";
   const state = snapshot.status === "detected" ? "обнаружен" : "прогноз";
   const executionScope = snapshot.detection.caravanActivity === "idle"
-    ? "STOP-обход пока проверяется только для выбранного QA-патруля."
+    ? `STOP-обход после выхода проверяется против всех ${snapshot.patrolCount} патрулей.`
     : `AVOID ниже проверяет обход против всех ${snapshot.patrolCount} патрулей.`;
   multiPatrolDangerResult.textContent =
-    `GAME-023 · первый из ${snapshot.patrolCount}: ${snapshot.detection.monsterId}, ${formatElapsed(snapshot.detection.atSeconds)}, ${activity} · ${state}. Равное время разрешается по monster ID; ${executionScope}`;
+    `GAME-024 · первый из ${snapshot.patrolCount}: ${snapshot.detection.monsterId}, ${formatElapsed(snapshot.detection.atSeconds)}, ${activity} · ${state}. Равное время разрешается по monster ID; ${executionScope}`;
 }
 
 /**

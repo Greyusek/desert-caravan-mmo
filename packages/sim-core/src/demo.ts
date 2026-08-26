@@ -25,6 +25,7 @@ import {
   planExpeditionMonsterDangerResponse,
   planExpeditionMonsterDangerResponseAmongPatrols,
   planExpeditionMonsterDangerResponseDuringIdleStop,
+  planExpeditionMonsterDangerResponseDuringIdleStopAmongPatrols,
   planEmergencySupplyReturn,
   planEmergencySupplyReturnDuringIdleStop,
   positionAtTime,
@@ -52,7 +53,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 40 demo");
+console.log("Desert Caravan MMO — Checkpoint 41 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -474,19 +475,38 @@ const idleDangerPatrolRoute = createRoutePlan(
   ],
   10,
 );
+const idleDangerMonster = {
+  id: "idle-danger-demo-monster",
+  kind: "wandering-monster" as const,
+  power: 110,
+  visionRadiusMeters: 300,
+  interactionRadiusMeters: 500,
+  patrolRoute: idleDangerPatrolRoute,
+};
 const idleDangerAvoidance = planExpeditionMonsterDangerResponseDuringIdleStop(
   encounterCaravan,
-  {
-    id: "idle-danger-demo-monster",
-    kind: "wandering-monster",
-    power: 110,
-    visionRadiusMeters: 300,
-    interactionRadiusMeters: 500,
-    patrolRoute: idleDangerPatrolRoute,
-  },
+  idleDangerMonster,
   "AVOID",
   100,
   200,
+);
+
+const multiPatrolIdleDangerAvoidance =
+  planExpeditionMonsterDangerResponseDuringIdleStopAmongPatrols(
+    encounterCaravan,
+    [
+      { ...idleDangerMonster, id: "idle-demo-patrol-b" },
+      { ...idleDangerMonster, id: "idle-demo-patrol-a" },
+    ],
+    "AVOID",
+    100,
+    200,
+  );
+console.log("\nGAME-024 multi-patrol doctrine during discovery STOP:");
+console.log(
+  multiPatrolIdleDangerAvoidance.detection
+    ? `  ${multiPatrolIdleDangerAvoidance.status.toUpperCase()}: trigger=${multiPatrolIdleDangerAvoidance.detection.monsterId}; cleared=${multiPatrolIdleDangerAvoidance.clearanceMonsterIds.join(",")}; world=${multiPatrolIdleDangerAvoidance.detection.expeditionElapsedSeconds.toFixed(6)} s; route=${multiPatrolIdleDangerAvoidance.detection.routeElapsedSeconds.toFixed(6)} s; idle=${multiPatrolIdleDangerAvoidance.effectiveIdleDurationSeconds.toFixed(6)} / ${multiPatrolIdleDangerAvoidance.scheduledIdleDurationSeconds.toFixed(6)} s; contact-after=${multiPatrolIdleDangerAvoidance.effectiveContact === null ? "none" : "unsafe"}`
+    : "  no aggregate danger detected during STOP",
 );
 console.log("\nGAME-021 danger doctrine during discovery STOP:");
 console.log(
@@ -589,5 +609,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 40 multi-patrol danger avoidance: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 41 multi-patrol STOP avoidance: npm run debug-map -> http://127.0.0.1:4173",
 );

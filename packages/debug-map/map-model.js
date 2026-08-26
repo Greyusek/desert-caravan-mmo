@@ -30,6 +30,7 @@ import {
   planExpeditionMonsterDangerResponse,
   planExpeditionMonsterDangerResponseAmongPatrols,
   planExpeditionMonsterDangerResponseDuringIdleStop,
+  planExpeditionMonsterDangerResponseDuringIdleStopAmongPatrols,
   planEmergencySupplyReturn,
   planEmergencySupplyReturnDuringIdleStop,
   projectCitySettlementAtTime,
@@ -569,39 +570,75 @@ export function createDangerAvoidanceDoctrineSnapshot(
 }
 
 /**
- * GAME-023 executes moving AVOID | CONTINUE from the first warning across all
- * patrols and exposes only routes continuously cleared against the full set.
- * Scheduled discovery STOP composition remains on the single-patrol wrapper
- * above until the next checkpoint.
+ * GAME-024 executes AVOID | CONTINUE from the first warning across all patrols
+ * both while moving and during a scheduled discovery STOP. Every accepted
+ * continuation is continuously cleared against the complete patrol set.
  * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
  * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"]} monsters
  * @param {import("../sim-core/dist/src/index.js").DangerAvoidanceDoctrine} doctrine
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
+ * @param {number | null} [blockingExpeditionAtSeconds]
  */
 export function createMultiPatrolDangerAvoidanceDoctrineSnapshot(
   route,
   monsters,
   doctrine,
+  stopLifecycle = null,
+  blockingExpeditionAtSeconds = null,
 ) {
-  const plan = planExpeditionMonsterDangerResponseAmongPatrols(
-    route.authoritativeRoute,
-    monsters.map((monster) => monster.authoritativeMonster),
-    doctrine,
+  const authoritativeMonsters = monsters.map(
+    (monster) => monster.authoritativeMonster,
   );
-  const evaluatedAtSeconds = route.position.elapsedSeconds;
+  const usesIdleStop = Boolean(
+    stopLifecycle && stopLifecycle.resumeAtSeconds !== null,
+  );
+  const idlePlan = usesIdleStop && stopLifecycle
+    ? planExpeditionMonsterDangerResponseDuringIdleStopAmongPatrols(
+        route.authoritativeRoute,
+        authoritativeMonsters,
+        doctrine,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+        0,
+        DEFAULT_DANGER_DETECTION_RADIUS_METERS,
+        blockingExpeditionAtSeconds,
+      )
+    : null;
+  const plan = idlePlan ?? planExpeditionMonsterDangerResponseAmongPatrols(
+        route.authoritativeRoute,
+        authoritativeMonsters,
+        doctrine,
+      );
+  const evaluatedAtSeconds = stopLifecycle?.evaluatedAtSeconds ??
+    route.position.elapsedSeconds;
   const decisionOccurred =
     plan.decisionAtSeconds !== null &&
     evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >= plan.decisionAtSeconds;
   const appliesAvoidance = plan.status === "avoided";
+  const scheduledIdleDurationSeconds =
+    idlePlan?.scheduledIdleDurationSeconds ?? 0;
+  const effectiveIdleDurationSeconds =
+    idlePlan?.effectiveIdleDurationSeconds ?? 0;
+  const effectiveRouteAtSeconds = appliesAvoidance && usesIdleStop &&
+      stopLifecycle
+    ? expeditionTimeToRouteTime(
+        evaluatedAtSeconds,
+        stopLifecycle.stopAtRouteSeconds,
+        effectiveIdleDurationSeconds,
+        true,
+      )
+    : evaluatedAtSeconds;
   const effectiveRoute = appliesAvoidance
-    ? createRoutePlanSnapshot(plan.effectiveRoute, evaluatedAtSeconds)
+    ? createRoutePlanSnapshot(plan.effectiveRoute, effectiveRouteAtSeconds)
     : route;
   const completionAtExpeditionSeconds =
+    idlePlan?.completionAtExpeditionSeconds ??
     plan.effectiveRoute.totalDurationSeconds;
   const status = plan.status === "avoided"
     ? !decisionOccurred
       ? /** @type {const} */ ("pending")
       : evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
-          completionAtExpeditionSeconds
+          (completionAtExpeditionSeconds ?? Number.POSITIVE_INFINITY)
         ? /** @type {const} */ ("avoided")
         : /** @type {const} */ ("avoiding")
     : plan.status === "continued" && !decisionOccurred
@@ -616,12 +653,14 @@ export function createMultiPatrolDangerAvoidanceDoctrineSnapshot(
     decisionOccurred,
     appliesAvoidance,
     triggerActivity: plan.detection?.caravanActivity ?? null,
-    triggersDuringIdleStop: false,
-    scheduledIdleDurationSeconds: 0,
-    effectiveIdleDurationSeconds: 0,
-    interruptsIdleStop: false,
-    blockedByEarlierBoundary: false,
-    blockingExpeditionAtSeconds: null,
+    triggersDuringIdleStop: idlePlan?.triggersDuringIdleStop ?? false,
+    scheduledIdleDurationSeconds,
+    effectiveIdleDurationSeconds,
+    interruptsIdleStop: idlePlan?.interruptsIdleStop ?? false,
+    blockedByEarlierBoundary:
+      plan.status === "blocked-by-earlier-boundary",
+    blockingExpeditionAtSeconds:
+      idlePlan?.blockingExpeditionAtSeconds ?? null,
     completionAtExpeditionSeconds,
     detection: plan.detection,
     decisionAtSeconds: plan.decisionAtSeconds,
