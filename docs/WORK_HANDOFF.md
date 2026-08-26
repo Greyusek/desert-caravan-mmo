@@ -49,22 +49,25 @@ the authoritative expedition contact/outcome API.
   `http://127.0.0.1:4173`; the served page contains the GAME-024 multi-patrol
   STOP section and browser assets build successfully.
 - Git tree and `git diff --check`: PASS at the functional commit.
-- GitHub Actions remains the merge gate. If this file is read from `main`, the
-  Checkpoint 41 PR passed that gate before merge.
+- `GITHUB_CI_NOT_STARTED`: GitHub Actions did not register a `CI / verify` run
+  for PR #48 after the permitted observation window.
+- `LOCAL_VERIFY_PASS`: the complete local quality gate passed on the published
+  Checkpoint 41 content.
+- `TREE_VERIFIED`: PR #48 HEAD tree
+  `64d24f89a2083a242f7b6f284c3652a8866a3833` exactly matches the locally
+  verified Checkpoint 41 tree; no source change followed verification.
 
 ## Current task
 
-Checkpoint 41 is complete on `feature/game-024-multi-patrol-stop`.
-Publication and CI-gated merge are pending.
+Checkpoint 41 is complete on `feature/game-024-multi-patrol-stop`; PR #48 is
+published and eligible for the documented local-verification CI fallback.
 
 ## Next action
 
-When publication is authorized, publish the feature branch, open its PR and
-merge only after `CI / verify` succeeds. Then run `npm run accept:main` on the
-user's Windows checkout. After a PASS, start GAME-025 as a new small task:
-promote stable multi-patrol contact selection into the authoritative expedition
-contact/outcome API while preserving first-boundary priority and resolving no
-more than one contact per slice.
+Merge PR #48 using the verified-tree fallback, then start GAME-025 as a new
+small task: promote stable multi-patrol contact selection into the authoritative
+expedition contact/outcome API while preserving first-boundary priority and
+resolving no more than one contact per slice.
 
 ## Known issues
 
@@ -83,6 +86,7 @@ more than one contact per slice.
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, `docs/ROADMAP.md`
 and this file. Verify the last known good point, continue `Current task` from
 `Next action`, and follow: one small task -> tests -> stable commit ->
-ROADMAP/TODO -> replace this handoff -> CI-gated PR/merge. If resources may not
-cover another safe task, stop as `RESOURCE LIMIT CHECKPOINT` after updating
-this file.
+ROADMAP/TODO -> replace this handoff -> PR/merge using GitHub CI when available
+or the documented verified-tree fallback when it does not start. If resources
+may not cover another safe task, stop as `RESOURCE LIMIT CHECKPOINT` after
+updating this file.
