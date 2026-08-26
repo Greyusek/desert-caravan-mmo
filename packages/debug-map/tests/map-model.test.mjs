@@ -39,6 +39,7 @@ import {
   splitPathAtAntimeridian,
 } from "../map-model.js";
 import {
+  createRoutePlan,
   createPlayerDiscoveryLedger,
   createPlayerTravelLedger,
   evaluateDiscoveryStopLifecycle,
@@ -3577,6 +3578,110 @@ test("GAME-022: debug arbitration also selects one stable idle-STOP warning", ()
   assert.equal(detection.status, "forecast");
   assert.equal(detection.detection?.monsterId, "idle-a");
   assert.equal(detection.detection?.caravanActivity, "idle");
+});
+
+test("GAME-024: debug STOP AVOID clears the departure against every patrol", () => {
+  const scenario = game021ScenarioAt(0);
+  const patrolA = {
+    ...scenario.monster,
+    id: "idle-a",
+    authoritativeMonster: {
+      ...scenario.monster.authoritativeMonster,
+      id: "idle-a",
+    },
+  };
+  const patrolB = {
+    ...scenario.monster,
+    id: "idle-b",
+    authoritativeMonster: {
+      ...scenario.monster.authoritativeMonster,
+      id: "idle-b",
+    },
+  };
+  const danger = createMultiPatrolDangerAvoidanceDoctrineSnapshot(
+    scenario.plannedRoute,
+    [patrolB, patrolA],
+    "AVOID",
+    scenario.scheduledLifecycle,
+    scenario.scheduledLifecycle.planned.atSeconds,
+  );
+
+  assert.equal(danger.status, "pending");
+  assert.equal(danger.planStatus, "avoided");
+  assert.equal(danger.triggerActivity, "idle");
+  assert.equal(danger.triggersDuringIdleStop, true);
+  assert.equal(danger.interruptsIdleStop, true);
+  assert.equal(danger.patrolCount, 2);
+  assert.deepEqual(danger.clearanceMonsterIds, ["idle-a", "idle-b"]);
+  assert.equal(danger.detection?.monsterId, "idle-a");
+  assert.equal(danger.effectiveContact, null);
+  assert.ok(
+    danger.effectiveIdleDurationSeconds <
+      danger.scheduledIdleDurationSeconds,
+  );
+
+  const plan = danger.authoritativePlan;
+  assert.ok(plan.decisionPosition);
+  assert.ok(plan.detourSegmentIndexes);
+  const continuation = createRoutePlan(
+    plan.decisionPosition,
+    plan.effectiveRoute.segments
+      .slice(plan.detourSegmentIndexes[0])
+      .map((segment) => ({
+        bearingDeg: segment.bearingDeg,
+        distanceMeters: segment.distanceMeters,
+      })),
+    plan.effectiveRoute.speedMetersPerSecond,
+    plan.effectiveRoute.planetRadiusMeters,
+  );
+  for (const patrol of [patrolA, patrolB]) {
+    assert.equal(
+      findFirstExpeditionMonsterContact(
+        continuation,
+        patrol.authoritativeMonster,
+        plan.decisionAtSeconds,
+      ),
+      null,
+    );
+  }
+});
+
+test("GAME-024: debug STOP CONTINUE preserves stable contact and full wait", () => {
+  const scenario = game021ScenarioAt(0, { doctrine: "CONTINUE" });
+  const patrolA = {
+    ...scenario.monster,
+    id: "idle-a",
+    authoritativeMonster: {
+      ...scenario.monster.authoritativeMonster,
+      id: "idle-a",
+    },
+  };
+  const patrolB = {
+    ...scenario.monster,
+    id: "idle-b",
+    authoritativeMonster: {
+      ...scenario.monster.authoritativeMonster,
+      id: "idle-b",
+    },
+  };
+  const danger = createMultiPatrolDangerAvoidanceDoctrineSnapshot(
+    scenario.plannedRoute,
+    [patrolB, patrolA],
+    "CONTINUE",
+    scenario.scheduledLifecycle,
+    scenario.scheduledLifecycle.planned.atSeconds,
+  );
+
+  assert.equal(danger.status, "pending");
+  assert.equal(danger.planStatus, "continued");
+  assert.equal(danger.effectiveRoute, scenario.plannedRoute);
+  assert.equal(danger.originalContact?.monsterId, "idle-a");
+  assert.equal(danger.effectiveContact, danger.originalContact);
+  assert.equal(
+    danger.effectiveIdleDurationSeconds,
+    scenario.scheduledLifecycle.idleDurationSeconds,
+  );
+  assert.equal(danger.interruptsIdleStop, false);
 });
 
 test("GAME-021: executed AVOID truncates STOP, logs resume and removes contact", () => {
