@@ -163,6 +163,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - GAME-019 отделяет раннее предупреждение от контакта: движущийся патруль сначала создаёт server-truth событие на 1000 м, а при сохранённом курсе позже входит в 500 м; если экспедиция уже стартовала внутри 500 м, обе границы совпадают и приоритет имеет контакт.
 - GAME-020 исполняет `AVOID | CONTINUE` на этой границе во время непрерывного движения. `CONTINUE` сохраняет исходный маршрут без изменений. `AVOID` сохраняет исполненный префикс, вставляет один детерминированный waypoint, возвращается к концу прерванного сегмента и сохраняет поздний суффикс; новый маршрут принимается только после непрерывной проверки отсутствия входа в 500 м выбранного патруля.
 - GAME-021 переносит ту же границу и решение внутрь scheduled discovery `STOP`. Мировое время продолжает идти при закреплённом route time; `CONTINUE` сохраняет полное ожидание, а `AVOID` отменяет только его остаток, выходит из точной координаты остановки и принимает обход лишь после проверки продолжения против выбранного патруля на фактическом мировом времени. Контакт или другая авторитетная граница на том же либо более раннем мгновении сохраняет приоритет.
+- GAME-022 выбирает одну первую server-truth границу 1000 м среди нескольких патрулей как при движении, так и внутри scheduled discovery `STOP`. Более раннее время имеет приоритет, а кандидаты в пределах числового допуска упорядочиваются по raw monster ID независимо от порядка входного массива и локали. Этот слой только обнаруживает опасность: обход по-прежнему проверяется против одного выбранного патруля до отдельного multi-patrol checkpoint.
 
 Затаившийся монстр использует уменьшенный базовый радиус обнаружения (150 м). Блуждающий монстр движется по собственному маршруту, поэтому геометрическое пересечение путей без совпадения во времени встречу не создаёт.
 
@@ -280,4 +281,5 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-019` — establish the first detected-danger boundary and its ordering relative to contact before adding `AVOID | CONTINUE` route replanning.
 - [x] `GAME-020` — execute `AVOID | CONTINUE` at that warning boundary and keep the avoidance geometry outside the 500 m contact radius.
 - [x] `GAME-021` — compose the warning and danger doctrine with a scheduled discovery STOP, preserving exact world/route time and first-boundary priority.
-- [ ] `GAME-022` — select the first danger warning across several patrols with stable time/identity ordering before attempting multi-patrol avoidance clearance.
+- [x] `GAME-022` — select the first danger warning across several patrols with stable time/identity ordering before attempting multi-patrol avoidance clearance.
+- [ ] `GAME-023` — execute moving danger doctrine for the selected warning and validate every accepted AVOID continuation against all patrols.

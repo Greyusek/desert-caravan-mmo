@@ -59,6 +59,39 @@ export interface ExpeditionMonsterDangerDetection {
 }
 
 /**
+ * GAME-022 — selects one authoritative warning across several patrols. Each
+ * patrol keeps the single-patrol continuous solver above; this layer only
+ * arbitrates their results. Times inside the encounter tolerance are treated
+ * as the same boundary and ordered by the raw monster id, so input array order
+ * and host locale cannot affect the winner.
+ */
+export function findFirstExpeditionMonsterDangerDetectionAmongPatrols(
+  expeditionRoute: RoutePlan,
+  monsters: readonly WanderingMonster[],
+  expeditionStartsAtSeconds: DurationSeconds = 0,
+  detectionRadiusMeters: DistanceMeters =
+    DEFAULT_DANGER_DETECTION_RADIUS_METERS,
+): ExpeditionMonsterDangerDetection | null {
+  assertNonNegativeFinite(
+    expeditionStartsAtSeconds,
+    "expeditionStartsAtSeconds",
+  );
+  assertPositiveFinite(detectionRadiusMeters, "detectionRadiusMeters");
+  assertUniqueMonsterIds(monsters);
+
+  return selectFirstDangerDetection(
+    monsters.map((monster) =>
+      findFirstExpeditionMonsterDangerDetection(
+        expeditionRoute,
+        monster,
+        expeditionStartsAtSeconds,
+        detectionRadiusMeters,
+      )
+    ),
+  );
+}
+
+/**
  * GAME-019 — returns the first server-truth entry into the technical danger
  * warning radius for an uninterrupted moving expedition. The warning radius
  * must be strictly larger than this monster's contact radius, so a normal
@@ -297,6 +330,84 @@ export function findFirstExpeditionMonsterDangerDetectionDuringIdleStop(
     secondsUntilContact:
       secondsUntilContact === null ? null : Math.max(0, secondsUntilContact),
   };
+}
+
+/**
+ * GAME-022 — the same stable arbitration for warnings raised strictly inside
+ * a scheduled discovery STOP. This remains detection-only: it does not choose
+ * or validate an avoidance route against the patrol set.
+ */
+export function findFirstExpeditionMonsterDangerDetectionDuringIdleStopAmongPatrols(
+  expeditionRoute: RoutePlan,
+  monsters: readonly WanderingMonster[],
+  stopAtRouteSeconds: DurationSeconds,
+  idleDurationSeconds: DurationSeconds,
+  expeditionStartsAtSeconds: DurationSeconds = 0,
+  detectionRadiusMeters: DistanceMeters =
+    DEFAULT_DANGER_DETECTION_RADIUS_METERS,
+): ExpeditionMonsterDangerDetection | null {
+  assertRouteTime(
+    expeditionRoute,
+    stopAtRouteSeconds,
+    "stopAtRouteSeconds",
+  );
+  assertNonNegativeFinite(idleDurationSeconds, "idleDurationSeconds");
+  assertNonNegativeFinite(
+    expeditionStartsAtSeconds,
+    "expeditionStartsAtSeconds",
+  );
+  assertPositiveFinite(detectionRadiusMeters, "detectionRadiusMeters");
+  assertUniqueMonsterIds(monsters);
+
+  return selectFirstDangerDetection(
+    monsters.map((monster) =>
+      findFirstExpeditionMonsterDangerDetectionDuringIdleStop(
+        expeditionRoute,
+        monster,
+        stopAtRouteSeconds,
+        idleDurationSeconds,
+        expeditionStartsAtSeconds,
+        detectionRadiusMeters,
+      )
+    ),
+  );
+}
+
+function selectFirstDangerDetection(
+  detections: readonly (ExpeditionMonsterDangerDetection | null)[],
+): ExpeditionMonsterDangerDetection | null {
+  const candidates = detections.filter(
+    (detection): detection is ExpeditionMonsterDangerDetection =>
+      detection !== null,
+  );
+  if (candidates.length === 0) return null;
+
+  const earliestAtSeconds = Math.min(
+    ...candidates.map((detection) => detection.atSeconds),
+  );
+  const tiedCandidates = candidates.filter(
+    (detection) =>
+      detection.atSeconds <=
+        earliestAtSeconds + ENCOUNTER_TIME_TOLERANCE_SECONDS,
+  );
+  tiedCandidates.sort((left, right) =>
+    compareMonsterIds(left.monsterId, right.monsterId)
+  );
+  return tiedCandidates[0] ?? null;
+}
+
+function assertUniqueMonsterIds(monsters: readonly WanderingMonster[]): void {
+  const monsterIds = new Set<string>();
+  for (const monster of monsters) {
+    if (monsterIds.has(monster.id)) {
+      throw new RangeError(`monster ids must be unique: ${monster.id}`);
+    }
+    monsterIds.add(monster.id);
+  }
+}
+
+function compareMonsterIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function assertRouteTime(

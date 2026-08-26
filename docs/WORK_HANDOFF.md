@@ -8,75 +8,74 @@ diary. Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-0 doctrine and survival. The single-patrol `AVOID | CONTINUE` path now
-works during uninterrupted movement and a scheduled discovery `STOP`; the
-next slice is deterministic warning arbitration across several patrols.
+MVP-0 doctrine and survival. The first authoritative 1000 m danger warning is
+now selected deterministically across several patrols during uninterrupted
+movement and a scheduled discovery `STOP`. The next slice is moving doctrine
+execution with clearance against the complete patrol set.
 
 ## Completed
 
-- Checkpoint 38 / GAME-021 / version `0.0.38` composes the authoritative
-  1000 m warning and `AVOID | CONTINUE` with one scheduled discovery STOP.
-- World time advances while route time and caravan position remain pinned to
-  the exact STOP boundary. A pre-STOP warning is not emitted again, while the
-  exact STOP instant belongs to idle execution.
-- `CONTINUE` preserves the original route object, full scheduled wait and
-  later contact unchanged.
-- `AVOID` preserves the exact route prefix to STOP, cancels only the unelapsed
-  wait and validates the post-decision continuation against the patrol at its
-  real world time before accepting the deterministic waypoint detour.
-- Contact or a caller-supplied boundary at or before the warning keeps
-  priority; unavailable detours preserve the original route and wait.
-- The DEV map composes effective STOP duration, route, contact, outcome and
-  journal ordering, including `danger-avoidance` resume provenance and a
-  dedicated three-step STOP scenario.
+- Checkpoint 39 / GAME-022 / version `0.0.39` adds detection-only arbitration
+  across several patrols while reusing each existing continuous warning solver.
+- The earliest absolute world time wins. Candidates within the established
+  encounter tolerance are ordered by raw monster ID, independently of caller
+  array order and runtime locale.
+- Duplicate monster IDs are rejected before evaluation; an empty patrol set
+  remains valid and returns no warning after shared input validation.
+- Moving and scheduled-STOP variants preserve the winning patrol's time
+  domains, activity, coordinates, separation and planned contact lead.
+- The DEV map evaluates both generated patrols and displays one winner,
+  forecast/detected state and moving/STOP activity in a dedicated line.
+- Existing `AVOID | CONTINUE` remains explicitly tied to the manually selected
+  QA patrol; Checkpoint 39 does not claim multi-patrol detour safety.
 
 ## Last known good commit
 
-- `c9969f0dc8c034c3c5e877d895ce6ae75a662d1c` — local functional commit for
-  Checkpoint 38 / version `0.0.38`; tree
-  `ba6552a9b4feecd10ae3040d0ba3b9c484dfce10`.
-- `7873c601e578ac1c927759b0572d6b00c1c20a27` — merged main immediately before
-  Checkpoint 38 (Checkpoint 37 merge and accepted Windows baseline).
+- `30180d4b8b8448b5a869c754d5b1fa97867220fa` — local functional commit for
+  Checkpoint 39 / version `0.0.39`; tree
+  `c464e638b88b73a4f26b61290d1c73a083041d11`.
+- `0c12c903877653fef665dbed5aedbfc6aed68fe5` — merged main immediately before
+  Checkpoint 39 (Checkpoint 38 merge and accepted Windows baseline).
 
 ## Verification
 
-- Clean `npm ci` with the workspace cache: PASS.
+- Clean `npm ci` with the workspace cache before implementation: PASS.
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Automated suite: `336/336` PASS, zero failures (`331` simulation/UI plus `5`
+- Automated suite: `346/346` PASS, zero failures (`341` simulation/UI plus `5`
   tooling regressions).
-- Compiled Checkpoint 38 demo: PASS; the idle warning reports separate world
-  and route times, `40 / 200 s` effective/scheduled idle and
-  `contact-after=none`.
-- Local debug server: PASS; Checkpoint 38 HTML, the STOP QA control, browser
-  integration and compiled sim-core entry are served successfully.
+- Compiled Checkpoint 39 demo: PASS; simultaneous input
+  `[demo-patrol-b, demo-patrol-a]` selects `demo-patrol-a` at the exact shared
+  warning time.
+- Local debug server start: PASS on `http://127.0.0.1:4173`; Checkpoint 39 HTML,
+  browser model integration and compiled sim-core entry build successfully.
 - Git tree and `git diff --check`: PASS at the functional commit.
 - GitHub Actions remains the merge gate. If this file is read from `main`, the
-  Checkpoint 38 PR passed that gate before merge.
+  Checkpoint 39 PR passed that gate before merge.
 
 ## Current task
 
-Checkpoint 38 is complete. On `feature/game-021-danger-stop`, publication and
-CI-gated merge are pending. On `main`, only the user's Windows acceptance is
-pending.
+Checkpoint 39 is complete on `feature/game-022-multi-patrol-danger`.
+Publication and CI-gated merge are pending.
 
 ## Next action
 
-If still on the feature branch and publication is authorized, publish it,
-open its PR and merge only after `CI / verify` succeeds. Then run
-`npm run accept:main` on the user's Windows checkout. After a PASS, start
-GAME-022 as a new small task: select the earliest 1000 m warning across several
-patrols with stable time/monster-id tie-breaking, without implementing
-multi-patrol avoidance clearance in the same slice.
+When publication is authorized, publish the feature branch, open its PR and
+merge only after `CI / verify` succeeds. Then run `npm run accept:main` on the
+user's Windows checkout. After a PASS, start GAME-023 as a new small task:
+execute moving `AVOID | CONTINUE` for the selected first warning and accept an
+AVOID continuation only after continuous clearance checks against every
+patrol. Keep scheduled-STOP composition for a later slice.
 
 ## Known issues
 
-- GAME-021 still evaluates one selected patrol; several simultaneous warning
-  and contact candidates are not arbitrated.
-- Avoidance checks deterministic one-waypoint candidates on finite clearance
-  rings and returns `detour-unavailable` if none is safe; pursuit and arbitrary
-  pathfinding remain outside the slice.
-- GAME-022 is detection-only; a later step must verify any executed detour
-  against every relevant patrol before claiming multi-patrol safety.
+- Danger detection now arbitrates several patrols, but contact/outcome
+  arbitration still follows one selected patrol in the debug execution path.
+- Existing AVOID validates deterministic one-waypoint candidates against only
+  the selected patrol and must not yet be described as multi-patrol safe.
+- GAME-023 should cover uninterrupted movement only; reusing it during a STOP
+  requires a separate first-boundary and effective-idle composition step.
+- Avoidance returns `detour-unavailable` if no configured one-waypoint candidate
+  is safe; pursuit and arbitrary pathfinding remain outside the slice.
 - Automatic resupply, money/cargo transfer, selection among known cities,
   persistence and production sensor calibration are not implemented.
 

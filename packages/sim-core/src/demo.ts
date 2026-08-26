@@ -14,6 +14,7 @@ import {
   evaluateStaticObjectDiscoveryDoctrine,
   findFirstCityArrival,
   findFirstExpeditionMonsterDangerDetection,
+  findFirstExpeditionMonsterDangerDetectionAmongPatrols,
   findFirstExpeditionMonsterContact,
   findFirstExpeditionMonsterContactWithIdleStop,
   findFirstMovingEncounter,
@@ -50,7 +51,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 38 demo");
+console.log("Desert Caravan MMO — Checkpoint 39 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -378,6 +379,14 @@ const dangerAvoidance = planExpeditionMonsterDangerResponse(
   demoMonster,
   "AVOID",
 );
+const multiPatrolDanger =
+  findFirstExpeditionMonsterDangerDetectionAmongPatrols(
+    encounterCaravan,
+    [
+      { ...demoMonster, id: "demo-patrol-b" },
+      { ...demoMonster, id: "demo-patrol-a" },
+    ],
+  );
 console.log("\nGAME-019 detected danger:");
 console.log(
   dangerDetection
@@ -389,6 +398,12 @@ console.log(
   dangerAvoidance.status === "avoided"
     ? `  AVOID: side=${dangerAvoidance.detourSide}; extra=${((dangerAvoidance.addedDistanceMeters ?? 0) / 1_000).toFixed(3)} km; contact-after=${dangerAvoidance.effectiveContact === null ? "none" : "unsafe"}`
     : `  AVOID: ${dangerAvoidance.status}`,
+);
+console.log("\nGAME-022 multi-patrol danger arbitration:");
+console.log(
+  multiPatrolDanger
+    ? `  first= ${multiPatrolDanger.monsterId} at T=${multiPatrolDanger.atSeconds.toFixed(6)} s from input [demo-patrol-b, demo-patrol-a]`
+    : "  no danger detected across patrols",
 );
 console.log("\nGAME-004 expedition contact:");
 console.log(
@@ -558,5 +573,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 38 STOP danger avoidance: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 39 multi-patrol danger selection: npm run debug-map -> http://127.0.0.1:4173",
 );

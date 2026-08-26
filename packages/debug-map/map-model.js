@@ -18,7 +18,9 @@ import {
   expeditionTimeToRouteTime,
   findFirstCityArrival,
   findFirstExpeditionMonsterDangerDetection,
+  findFirstExpeditionMonsterDangerDetectionAmongPatrols,
   findFirstExpeditionMonsterDangerDetectionDuringIdleStop,
+  findFirstExpeditionMonsterDangerDetectionDuringIdleStopAmongPatrols,
   findFirstExpeditionMonsterContact,
   findFirstExpeditionMonsterContactWithIdleStop,
   generateSeededWorld,
@@ -364,6 +366,67 @@ export function createDangerDetectionSnapshot(
       detection.expeditionElapsedSeconds
         ? /** @type {const} */ ("detected")
         : /** @type {const} */ ("forecast"),
+    evaluatedAtSeconds,
+    detection: {
+      ...detection,
+      segmentIndex: routePosition.segmentIndex,
+      routeDistanceKilometers:
+        routePosition.traveledDistanceMeters / 1_000,
+      caravanPoint: projectCoordinate(detection.caravanPosition),
+      monsterPoint: projectCoordinate(detection.monsterPosition),
+    },
+  };
+}
+
+/**
+ * GAME-022 exposes the first authoritative warning across every patrol in the
+ * debug world. It is intentionally separate from the selected-patrol doctrine
+ * snapshot: multi-patrol avoidance clearance is a later checkpoint.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"]} monsters
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
+ */
+export function createMultiPatrolDangerDetectionSnapshot(
+  route,
+  monsters,
+  stopLifecycle = null,
+) {
+  const detection = stopLifecycle && stopLifecycle.resumeAtSeconds !== null
+    ? findFirstExpeditionMonsterDangerDetectionDuringIdleStopAmongPatrols(
+        route.authoritativeRoute,
+        monsters.map((monster) => monster.authoritativeMonster),
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+      )
+    : findFirstExpeditionMonsterDangerDetectionAmongPatrols(
+        route.authoritativeRoute,
+        monsters.map((monster) => monster.authoritativeMonster),
+      );
+  const evaluatedAtSeconds = Math.min(
+    stopLifecycle?.evaluatedAtSeconds ?? route.position.elapsedSeconds,
+    route.totalDurationSeconds + (stopLifecycle?.idleDurationSeconds ?? 0),
+  );
+
+  if (!detection) {
+    return {
+      status: /** @type {const} */ ("clear"),
+      patrolCount: monsters.length,
+      evaluatedAtSeconds,
+      detection: null,
+    };
+  }
+
+  const routePosition = positionAtTime(
+    route.authoritativeRoute,
+    detection.routeElapsedSeconds,
+  );
+  return {
+    status:
+      evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
+      detection.expeditionElapsedSeconds
+        ? /** @type {const} */ ("detected")
+        : /** @type {const} */ ("forecast"),
+    patrolCount: monsters.length,
     evaluatedAtSeconds,
     detection: {
       ...detection,
