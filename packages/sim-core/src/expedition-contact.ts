@@ -91,6 +91,32 @@ export function findFirstExpeditionMonsterContact(
 }
 
 /**
+ * GAME-025 — selects one first authoritative moving contact across every
+ * patrol. Earlier world time wins; contacts within the encounter solver's
+ * numeric tolerance use raw monster-ID ordering, independent of input order.
+ */
+export function findFirstExpeditionMonsterContactAmongPatrols(
+  expeditionRoute: RoutePlan,
+  monsters: readonly WanderingMonster[],
+  expeditionStartsAtSeconds: DurationSeconds = 0,
+): ExpeditionMonsterContact | null {
+  assertNonNegativeFinite(
+    expeditionStartsAtSeconds,
+    "expeditionStartsAtSeconds",
+  );
+  assertUniqueMonsterIds(monsters);
+  return selectFirstMonsterContact(
+    monsters.map((monster) =>
+      findFirstExpeditionMonsterContact(
+        expeditionRoute,
+        monster,
+        expeditionStartsAtSeconds,
+      )
+    ),
+  );
+}
+
+/**
  * GAME-010 — searches the complete world-time execution around one discovery
  * STOP: moving before it, stationary throughout the idle interval, then moving
  * again after resume. A contact exactly at resume belongs to the moving phase.
@@ -205,6 +231,77 @@ export function findFirstExpeditionMonsterContactWithIdleStop(
     routeElapsedSeconds:
       stopAtRouteSeconds + postStop.routeElapsedSeconds,
   };
+}
+
+/**
+ * GAME-025 — applies the same one-contact arbitration to the complete
+ * moving/idle/moving execution around one scheduled discovery STOP.
+ */
+export function findFirstExpeditionMonsterContactWithIdleStopAmongPatrols(
+  expeditionRoute: RoutePlan,
+  monsters: readonly WanderingMonster[],
+  stopAtRouteSeconds: DurationSeconds,
+  idleDurationSeconds: DurationSeconds,
+  expeditionStartsAtSeconds: DurationSeconds = 0,
+): ExpeditionMonsterContact | null {
+  assertRouteTime(
+    expeditionRoute,
+    stopAtRouteSeconds,
+    "stopAtRouteSeconds",
+  );
+  assertNonNegativeFinite(idleDurationSeconds, "idleDurationSeconds");
+  assertNonNegativeFinite(
+    expeditionStartsAtSeconds,
+    "expeditionStartsAtSeconds",
+  );
+  assertUniqueMonsterIds(monsters);
+  return selectFirstMonsterContact(
+    monsters.map((monster) =>
+      findFirstExpeditionMonsterContactWithIdleStop(
+        expeditionRoute,
+        monster,
+        stopAtRouteSeconds,
+        idleDurationSeconds,
+        expeditionStartsAtSeconds,
+      )
+    ),
+  );
+}
+
+function selectFirstMonsterContact(
+  possibleContacts: readonly (ExpeditionMonsterContact | null)[],
+): ExpeditionMonsterContact | null {
+  const contacts = possibleContacts.filter(
+    (contact): contact is ExpeditionMonsterContact => contact !== null,
+  );
+  if (contacts.length === 0) return null;
+
+  const earliestAtSeconds = Math.min(
+    ...contacts.map((contact) => contact.atSeconds),
+  );
+  const tiedContacts = contacts.filter(
+    (contact) =>
+      contact.atSeconds <=
+        earliestAtSeconds + ENCOUNTER_TIME_TOLERANCE_SECONDS,
+  );
+  tiedContacts.sort((left, right) =>
+    compareMonsterIds(left.monsterId, right.monsterId)
+  );
+  return tiedContacts[0] ?? null;
+}
+
+function assertUniqueMonsterIds(monsters: readonly WanderingMonster[]): void {
+  const monsterIds = new Set<string>();
+  for (const monster of monsters) {
+    if (monsterIds.has(monster.id)) {
+      throw new RangeError(`monster ids must be unique: ${monster.id}`);
+    }
+    monsterIds.add(monster.id);
+  }
+}
+
+function compareMonsterIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function createRouteRemainder(

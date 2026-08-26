@@ -16,6 +16,7 @@ import {
   findFirstExpeditionMonsterDangerDetection,
   findFirstExpeditionMonsterDangerDetectionAmongPatrols,
   findFirstExpeditionMonsterContact,
+  findFirstExpeditionMonsterContactAmongPatrols,
   findFirstExpeditionMonsterContactWithIdleStop,
   findFirstMovingEncounter,
   greatCircleDistance,
@@ -53,7 +54,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 41 demo");
+console.log("Desert Caravan MMO — Checkpoint 42 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -376,6 +377,13 @@ const expeditionContact = findFirstExpeditionMonsterContact(
   encounterCaravan,
   demoMonster,
 );
+const multiPatrolContact = findFirstExpeditionMonsterContactAmongPatrols(
+  encounterCaravan,
+  [
+    { ...demoMonster, id: "demo-contact-b" },
+    { ...demoMonster, id: "demo-contact-a" },
+  ],
+);
 const dangerAvoidance = planExpeditionMonsterDangerResponse(
   encounterCaravan,
   demoMonster,
@@ -427,6 +435,12 @@ console.log(
   expeditionContact
     ? `  ${expeditionContact.monsterId}: contact at T=${expeditionContact.expeditionElapsedSeconds.toFixed(6)} s, separation=${expeditionContact.separationMeters.toFixed(3)} m, power=${expeditionContact.monsterPower}`
     : "  no contact",
+);
+console.log("\nGAME-025 authoritative multi-patrol contact:");
+console.log(
+  multiPatrolContact
+    ? `  first=${multiPatrolContact.monsterId} at T=${multiPatrolContact.expeditionElapsedSeconds.toFixed(6)} s; resolved contacts=1`
+    : "  no contact across patrols",
 );
 
 const idlePatrolStart = destinationPoint(
@@ -609,5 +623,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 41 multi-patrol STOP avoidance: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 42 stable multi-patrol contact/outcome: npm run debug-map -> http://127.0.0.1:4173",
 );

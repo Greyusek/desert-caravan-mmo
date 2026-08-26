@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.42 — Checkpoint 42
+
+- Added `GAME-025`: the expedition contact API now selects one first authoritative contact across the complete patrol set.
+- Preserved earliest-world-time priority and raw monster-ID tie-breaking within the encounter solver tolerance, independently of patrol input order.
+- Applied the same arbitration to uninterrupted movement and scheduled discovery `STOP` execution with exact world/route time domains.
+- Routed the debug-map outcome and journal through the aggregate contact snapshot instead of the selected presentation patrol.
+- Preserved earlier doctrine, depletion, arrival and danger boundaries; only the selected first contact is resolved in one slice.
+- Reused the public aggregate contact API inside multi-patrol danger planning and kept empty/duplicate patrol handling explicit.
+- Added six GAME-025 regressions; repository verification now runs 372 tests.
+
 ## 0.0.41 — Checkpoint 41
 
 - Added `GAME-024`: scheduled discovery `STOP` now executes `AVOID | CONTINUE` from the first stable warning across the complete patrol set.
