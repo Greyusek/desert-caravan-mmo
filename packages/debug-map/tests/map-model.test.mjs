@@ -20,6 +20,7 @@ import {
   createDebugMapSnapshot,
   createDangerAvoidanceDoctrineSnapshot,
   createDangerDetectionSnapshot,
+  createMultiPatrolDangerDetectionSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
   createDiscoveryStopLifecycleSnapshot,
@@ -1619,6 +1620,66 @@ test("GAME-019: debug warning precedes the exact contact forecast", () => {
 
   const reached = monsterInterceptAt(detection.atSeconds);
   assert.equal(reached.danger.status, "detected");
+});
+
+test("GAME-022: debug map exposes one stable winner across all patrols", () => {
+  const planned = monsterInterceptAt();
+  const source = planned.monster;
+  const patrolA = {
+    ...source,
+    id: "patrol-a",
+    authoritativeMonster: {
+      ...source.authoritativeMonster,
+      id: "patrol-a",
+    },
+  };
+  const patrolB = {
+    ...source,
+    id: "patrol-b",
+    authoritativeMonster: {
+      ...source.authoritativeMonster,
+      id: "patrol-b",
+    },
+  };
+  const forward = createMultiPatrolDangerDetectionSnapshot(
+    planned.route,
+    [patrolB, patrolA],
+  );
+  const reverse = createMultiPatrolDangerDetectionSnapshot(
+    planned.route,
+    [patrolA, patrolB],
+  );
+
+  assert.equal(forward.patrolCount, 2);
+  assert.equal(forward.status, "forecast");
+  assert.equal(forward.detection?.monsterId, "patrol-a");
+  assert.deepEqual(reverse, forward);
+});
+
+test("GAME-022: debug arbitration changes from forecast to detected exactly at warning", () => {
+  const planned = monsterInterceptAt();
+  const forecast = createMultiPatrolDangerDetectionSnapshot(
+    planned.route,
+    planned.world.monsters,
+  );
+  assert.ok(forecast.detection);
+
+  const reachedRoute = createFourSegmentRouteSnapshot(
+    planned.city.position,
+    planned.preset.commands,
+    planned.preset.speedKilometersPerHour,
+    forecast.detection.atSeconds,
+  );
+  const reached = createMultiPatrolDangerDetectionSnapshot(
+    reachedRoute,
+    planned.world.monsters,
+  );
+
+  assert.equal(reached.status, "detected");
+  assert.equal(
+    reached.detection?.monsterId,
+    forecast.detection.monsterId,
+  );
 });
 
 test("GAME-020: AVOID snapshot applies one contact-free planned detour", () => {
@@ -3410,6 +3471,36 @@ test("GAME-021: AVOID snapshot schedules exact departure from discovery STOP", (
   assert.equal(scenario.danger.authoritativePlan.originalContact?.caravanActivity, "idle");
   assert.equal(scenario.danger.authoritativePlan.effectiveContact, null);
   assert.equal(scenario.contact.contact, null);
+});
+
+test("GAME-022: debug arbitration also selects one stable idle-STOP warning", () => {
+  const scenario = game021ScenarioAt(0);
+  const patrolA = {
+    ...scenario.monster,
+    id: "idle-a",
+    authoritativeMonster: {
+      ...scenario.monster.authoritativeMonster,
+      id: "idle-a",
+    },
+  };
+  const patrolB = {
+    ...scenario.monster,
+    id: "idle-b",
+    authoritativeMonster: {
+      ...scenario.monster.authoritativeMonster,
+      id: "idle-b",
+    },
+  };
+  const detection = createMultiPatrolDangerDetectionSnapshot(
+    scenario.plannedRoute,
+    [patrolB, patrolA],
+    scenario.scheduledLifecycle,
+  );
+
+  assert.equal(detection.patrolCount, 2);
+  assert.equal(detection.status, "forecast");
+  assert.equal(detection.detection?.monsterId, "idle-a");
+  assert.equal(detection.detection?.caravanActivity, "idle");
 });
 
 test("GAME-021: executed AVOID truncates STOP, logs resume and removes contact", () => {

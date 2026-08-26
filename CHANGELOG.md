@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.39 — Checkpoint 39
+
+- Added `GAME-022`: moving expeditions and scheduled discovery `STOP`s now select the first authoritative 1000 m warning across several patrols.
+- Reused the existing continuous single-patrol solvers for every candidate, then selected the earliest absolute world time without weakening their contact ordering or time-domain records.
+- Made candidates inside the encounter tolerance deterministic through raw monster-ID ordering, independent of patrol array order and host locale.
+- Rejected duplicate monster IDs so identity ties cannot silently fall back to caller ordering; empty sets remain valid and return no warning.
+- Exposed the multi-patrol winner, exact time and moving/STOP activity in a separate debug-map result while keeping selected-patrol AVOID execution explicitly outside this detection-only slice.
+- Added ten GAME-022 regressions; repository verification now runs 346 tests.
+
 ## 0.0.38 — Checkpoint 38
 
 - Added `GAME-021`: the selected patrol can now raise the authoritative 1000 m warning while the caravan is stationary during a scheduled discovery `STOP`.

@@ -17,6 +17,7 @@ import {
   createDebugMapSnapshot,
   createDangerAvoidanceDoctrineSnapshot,
   createDangerDetectionSnapshot,
+  createMultiPatrolDangerDetectionSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
   createDiscoveryStopLifecycleSnapshot,
@@ -209,6 +210,10 @@ const dangerDoctrineContinue = requireElement(
 );
 const dangerDoctrineResult = requireElement(
   "danger-doctrine-result",
+  HTMLParagraphElement,
+);
+const multiPatrolDangerResult = requireElement(
+  "multi-patrol-danger-result",
   HTMLParagraphElement,
 );
 const contactMonsterSelect = requireElement(
@@ -959,6 +964,12 @@ function render() {
           executionStopLifecycle,
         )
       : null;
+    const multiPatrolDangerDetection =
+      createMultiPatrolDangerDetectionSnapshot(
+        supplyExecutionRoute,
+        snapshot.monsters,
+        executionStopLifecycle,
+      );
     const dangerAvoidance = selectedMonster
       ? createDangerAvoidanceDoctrineSnapshot(
           supplyExecutionRoute,
@@ -1129,6 +1140,7 @@ function render() {
     renderDiscoveryLedger(discoveryLedger, travelLedger, snapshot);
     renderCaravanStatus(caravanStatus);
     renderSupplyEmergencyDoctrine(supplyEmergency, startCity, outcome);
+    renderMultiPatrolDangerDetection(multiPatrolDangerDetection);
     renderDangerAvoidanceDoctrine(dangerAvoidance);
     renderExpeditionOutcome(outcome);
     renderMonsterContact(monsterContact, outcome);
@@ -1655,6 +1667,29 @@ function renderDangerAvoidanceDoctrine(snapshot) {
     : "DEV: к исходу CONTINUE";
   dangerDoctrineResult.textContent =
     `CONTINUE исполнен: исходный маршрут${idleTrigger ? ", полная стоянка" : ""} и рассчитанный контакт сохранены без изменений.`;
+}
+
+/**
+ * @param {ReturnType<typeof createMultiPatrolDangerDetectionSnapshot>} snapshot
+ */
+function renderMultiPatrolDangerDetection(snapshot) {
+  const patrolLabel = snapshot.patrolCount === 1
+    ? "патруль"
+    : snapshot.patrolCount >= 2 && snapshot.patrolCount <= 4
+      ? "патруля"
+      : "патрулей";
+  if (!snapshot.detection) {
+    multiPatrolDangerResult.textContent =
+      `GAME-022 · ${snapshot.patrolCount} ${patrolLabel}: новой границы 1000 м нет. Доктрина ниже остаётся QA-проверкой одного выбранного патруля.`;
+    return;
+  }
+
+  const activity = snapshot.detection.caravanActivity === "idle"
+    ? "во время STOP"
+    : "в движении";
+  const state = snapshot.status === "detected" ? "обнаружен" : "прогноз";
+  multiPatrolDangerResult.textContent =
+    `GAME-022 · первый из ${snapshot.patrolCount}: ${snapshot.detection.monsterId}, ${formatElapsed(snapshot.detection.atSeconds)}, ${activity} · ${state}. Равное время разрешается по monster ID; AVOID ниже пока исполняется только для выбранного QA-патруля.`;
 }
 
 /**
