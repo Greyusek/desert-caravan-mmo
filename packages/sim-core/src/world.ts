@@ -15,6 +15,12 @@ import {
   normalizeBearing,
   type WorldCoordinate,
 } from "./types.js";
+import {
+  DEFAULT_NPC_CARAVAN_INTERACTION_RADIUS_METERS,
+  DEFAULT_NPC_CARAVAN_SPEED_METERS_PER_SECOND,
+  DEFAULT_NPC_CARAVAN_VISION_RADIUS_METERS,
+  type NpcCaravan,
+} from "./npc-caravan.js";
 
 export interface City {
   readonly id: string;
@@ -40,6 +46,7 @@ export interface SeededWorld {
   readonly cityPopulations: readonly CityPopulation[];
   readonly staticObjects: readonly StaticWorldObject[];
   readonly wanderingMonsters: readonly WanderingMonster[];
+  readonly npcCaravans: readonly NpcCaravan[];
 }
 
 export type StaticWorldObjectKind = "oasis" | "mine" | "ruins" | "cave";
@@ -58,6 +65,7 @@ export interface WorldGenerationOptions {
   readonly cityCount?: number;
   readonly staticObjectCounts?: StaticWorldObjectCounts;
   readonly wanderingMonsterCount?: number;
+  readonly npcCaravanCount?: number;
 }
 
 const DEFAULT_CITY_COUNT = 10;
@@ -65,6 +73,7 @@ const CITY_NAME_PREFIX = "City";
 const STATIC_OBJECT_KINDS = ["oasis", "mine", "ruins", "cave"] as const;
 const DEFAULT_STATIC_OBJECT_COUNT = 1;
 const DEFAULT_WANDERING_MONSTER_COUNT = 1;
+const DEFAULT_NPC_CARAVAN_COUNT = 1;
 const WANDERING_MONSTER_MINIMUM_LEG_METERS = 4_000;
 const WANDERING_MONSTER_MAXIMUM_LEG_METERS = 12_000;
 const CITY_MINIMUM_STOCK_UNITS = 10_000;
@@ -155,6 +164,12 @@ export function generateSeededWorld(
     { length: wanderingMonsterCount },
     (_, index): WanderingMonster => createWanderingMonster(seed, index),
   );
+  const npcCaravanCount = options.npcCaravanCount ?? DEFAULT_NPC_CARAVAN_COUNT;
+  assertNpcCaravanCount(npcCaravanCount);
+  const npcCaravans = Array.from(
+    { length: npcCaravanCount },
+    (_, index): NpcCaravan => createNpcCaravan(cities, index),
+  );
 
   return {
     seed,
@@ -163,6 +178,7 @@ export function generateSeededWorld(
     cityPopulations,
     staticObjects,
     wanderingMonsters,
+    npcCaravans,
   };
 }
 
@@ -178,6 +194,47 @@ function assertWanderingMonsterCount(count: number): void {
       "wanderingMonsterCount must be a non-negative safe integer",
     );
   }
+}
+
+function assertNpcCaravanCount(count: number): void {
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new RangeError("npcCaravanCount must be a non-negative safe integer");
+  }
+}
+
+function createNpcCaravan(cities: readonly City[], index: number): NpcCaravan {
+  const sequence = index + 1;
+  const origin = cities[index % cities.length];
+  const destination = cities[(index + 1) % cities.length];
+  if (!origin || !destination) {
+    throw new RangeError("NPC caravan generation requires at least one city");
+  }
+
+  const distanceMeters = greatCircleDistance(origin.position, destination.position);
+  const route = createRoutePlan(
+    origin.position,
+    [
+      {
+        bearingDeg:
+          distanceMeters === 0
+            ? 0
+            : initialBearingDegrees(origin.position, destination.position),
+        distanceMeters,
+      },
+    ],
+    DEFAULT_NPC_CARAVAN_SPEED_METERS_PER_SECOND,
+  );
+
+  return {
+    id: `npc-caravan-${String(sequence).padStart(2, "0")}`,
+    kind: "npc-caravan",
+    originCityId: origin.id,
+    destinationCityId: destination.id,
+    departsAtSeconds: 0,
+    visionRadiusMeters: DEFAULT_NPC_CARAVAN_VISION_RADIUS_METERS,
+    interactionRadiusMeters: DEFAULT_NPC_CARAVAN_INTERACTION_RADIUS_METERS,
+    route,
+  };
 }
 
 function createWanderingMonster(seed: string, index: number): WanderingMonster {

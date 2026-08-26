@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.43 — Checkpoint 43
+
+- Added `LIVING-001`: deterministic NPC caravans travel between seeded cities.
+- Reused `RoutePlan`, SIM-005 position projection, speed units and authoritative world time instead of introducing NPC-specific movement physics.
+- Added explicit scheduled, moving and arrived projections for delayed departures.
+- Kept NPC generation configurable and independent from static-object and monster PRNG streams.
+- Added five LIVING-001 regressions; repository verification now runs 377 tests.
+
 ## 0.0.42 — Checkpoint 42
 
 - Added `GAME-025`: the expedition contact API now selects one first authoritative contact across the complete patrol set.
