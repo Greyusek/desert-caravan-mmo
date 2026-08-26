@@ -22,6 +22,7 @@ import {
   createDangerDetectionSnapshot,
   createMultiPatrolDangerAvoidanceDoctrineSnapshot,
   createMultiPatrolDangerDetectionSnapshot,
+  createMultiPatrolMonsterContactSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
   createDiscoveryStopLifecycleSnapshot,
@@ -2013,6 +2014,97 @@ test("GAME-004: QA intercept preset is deterministic and guarantees contact", ()
       first.route.totalDurationSeconds,
   );
   assert.equal(first.contact.contact.monsterSpeedMetersPerSecond, 1.5);
+});
+
+test("GAME-025: authoritative outcome resolves only the stable first patrol contact", () => {
+  const probe = monsterInterceptAt();
+  const contactAt = probe.contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const selected = monsterInterceptAt(contactAt + 1);
+  const patrolA = {
+    ...selected.monster,
+    id: "contact-a",
+    authoritativeMonster: {
+      ...selected.monster.authoritativeMonster,
+      id: "contact-a",
+    },
+  };
+  const patrolB = {
+    ...selected.monster,
+    id: "contact-b",
+    authoritativeMonster: {
+      ...selected.monster.authoritativeMonster,
+      id: "contact-b",
+    },
+  };
+  const contact = createMultiPatrolMonsterContactSnapshot(
+    selected.route,
+    [patrolB, patrolA],
+  );
+  const outcome = createExpeditionOutcomeSnapshot(
+    selected.route,
+    searchSupplies,
+    searchConsumption,
+    null,
+    contact,
+  );
+  const log = createExpeditionEventLogSnapshot(
+    selected.route,
+    searchSupplies,
+    searchConsumption,
+    null,
+    null,
+    outcome,
+  );
+  const contactEvents = log.events.filter(
+    (event) => event.kind === "monster-contact",
+  );
+
+  assert.equal(contact.status, "contact");
+  assert.equal(contact.contact?.monsterId, "contact-a");
+  assert.equal(outcome.monsterContact?.monsterId, "contact-a");
+  assert.equal(contactEvents.length, 1);
+  assert.equal(contactEvents[0]?.monsterId, "contact-a");
+});
+
+test("GAME-025: an earlier expedition boundary suppresses aggregate contact", () => {
+  const planned = monsterInterceptAt();
+  const patrolA = {
+    ...planned.monster,
+    id: "contact-a",
+    authoritativeMonster: {
+      ...planned.monster.authoritativeMonster,
+      id: "contact-a",
+    },
+  };
+  const patrolB = {
+    ...planned.monster,
+    id: "contact-b",
+    authoritativeMonster: {
+      ...planned.monster.authoritativeMonster,
+      id: "contact-b",
+    },
+  };
+  const contact = createMultiPatrolMonsterContactSnapshot(
+    planned.route,
+    [patrolB, patrolA],
+  );
+  const contactAt = contact.contact?.expeditionElapsedSeconds;
+  assert.ok(contactAt);
+  const outcome = createExpeditionOutcomeSnapshot(
+    planned.route,
+    searchSupplies,
+    searchConsumption,
+    {
+      status: "stopped",
+      decision: { decidedAtSeconds: contactAt - 1 },
+    },
+    contact,
+  );
+
+  assert.equal(outcome.interruptionCause, "doctrine-stop");
+  assert.equal(outcome.monsterContact, null);
+  assert.equal(outcome.monsterContactResolution, null);
 });
 
 test("GAME-019: expedition log records warning before contact without replanning", () => {

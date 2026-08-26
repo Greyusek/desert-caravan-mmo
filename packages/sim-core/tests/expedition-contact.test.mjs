@@ -5,7 +5,9 @@ import {
   createWorldCoordinate,
   destinationPoint,
   findFirstExpeditionMonsterContact,
+  findFirstExpeditionMonsterContactAmongPatrols,
   findFirstExpeditionMonsterContactWithIdleStop,
+  findFirstExpeditionMonsterContactWithIdleStopAmongPatrols,
 } from "../dist/src/index.js";
 
 const PLANET_RADIUS_METERS = 1_000_000;
@@ -220,5 +222,118 @@ test("GAME-004: negative expedition start time is rejected", () => {
   assert.throws(
     () => findFirstExpeditionMonsterContact(expeditionRoute, monster, -1),
     /expeditionStartsAtSeconds must be a non-negative finite number/,
+  );
+});
+
+test("GAME-025: the earliest moving contact wins independently of patrol order", () => {
+  const { expeditionRoute, monster } = crossingScenario();
+  const earlier = {
+    ...monster,
+    id: "z-earlier-contact",
+    interactionRadiusMeters: 500,
+  };
+  const later = {
+    ...monster,
+    id: "a-later-contact",
+    interactionRadiusMeters: 100,
+  };
+  const forward = findFirstExpeditionMonsterContactAmongPatrols(
+    expeditionRoute,
+    [later, earlier],
+  );
+  const reverse = findFirstExpeditionMonsterContactAmongPatrols(
+    expeditionRoute,
+    [earlier, later],
+  );
+
+  assert.equal(forward?.monsterId, "z-earlier-contact");
+  assert.deepEqual(reverse, forward);
+  const laterContact = findFirstExpeditionMonsterContact(
+    expeditionRoute,
+    later,
+  );
+  assert.ok(forward);
+  assert.ok(laterContact);
+  assert.ok(forward.atSeconds < laterContact.atSeconds);
+});
+
+test("GAME-025: simultaneous moving contacts use raw monster-id ordering", () => {
+  const { expeditionRoute, monster } = crossingScenario(500);
+  const patrol10 = { ...monster, id: "patrol-10" };
+  const patrol2 = { ...monster, id: "patrol-2" };
+  const contact = findFirstExpeditionMonsterContactAmongPatrols(
+    expeditionRoute,
+    [patrol2, patrol10],
+  );
+
+  assert.equal(contact?.monsterId, "patrol-10");
+});
+
+test("GAME-025: scheduled STOP exposes one stable aggregate idle contact", () => {
+  const { expeditionRoute, monster } = stationaryStopScenario();
+  const patrolA = { ...monster, id: "idle-a" };
+  const patrolB = { ...monster, id: "idle-b" };
+  const forward =
+    findFirstExpeditionMonsterContactWithIdleStopAmongPatrols(
+      expeditionRoute,
+      [patrolB, patrolA],
+      100,
+      100,
+    );
+  const reverse =
+    findFirstExpeditionMonsterContactWithIdleStopAmongPatrols(
+      expeditionRoute,
+      [patrolA, patrolB],
+      100,
+      100,
+    );
+
+  assert.equal(forward?.monsterId, "idle-a");
+  assert.equal(forward?.caravanActivity, "idle");
+  assert.deepEqual(reverse, forward);
+});
+
+test("GAME-025: empty patrols and duplicate identities stay explicit", () => {
+  const { expeditionRoute, monster } = crossingScenario();
+
+  assert.equal(
+    findFirstExpeditionMonsterContactAmongPatrols(expeditionRoute, []),
+    null,
+  );
+  assert.equal(
+    findFirstExpeditionMonsterContactWithIdleStopAmongPatrols(
+      expeditionRoute,
+      [],
+      50,
+      100,
+    ),
+    null,
+  );
+  assert.throws(
+    () =>
+      findFirstExpeditionMonsterContactAmongPatrols(
+        expeditionRoute,
+        [monster, { ...monster }],
+      ),
+    /monster ids must be unique: test-monster/,
+  );
+  assert.throws(
+    () =>
+      findFirstExpeditionMonsterContactAmongPatrols(
+        expeditionRoute,
+        [],
+        -1,
+      ),
+    /expeditionStartsAtSeconds must be a non-negative finite number/,
+  );
+  assert.throws(
+    () =>
+      findFirstExpeditionMonsterContactWithIdleStopAmongPatrols(
+        expeditionRoute,
+        [],
+        expeditionRoute.totalDurationSeconds + 1,
+        100,
+      ),
+    /stopAtRouteSeconds must not exceed route total duration/,
   );
 });

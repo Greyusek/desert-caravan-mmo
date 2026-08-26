@@ -22,7 +22,9 @@ import {
   findFirstExpeditionMonsterDangerDetectionDuringIdleStop,
   findFirstExpeditionMonsterDangerDetectionDuringIdleStopAmongPatrols,
   findFirstExpeditionMonsterContact,
+  findFirstExpeditionMonsterContactAmongPatrols,
   findFirstExpeditionMonsterContactWithIdleStop,
+  findFirstExpeditionMonsterContactWithIdleStopAmongPatrols,
   generateSeededWorld,
   greatCircleDistance,
   kilometers,
@@ -721,6 +723,46 @@ export function createMonsterContactSnapshot(
         route.authoritativeRoute,
         monster.authoritativeMonster,
       );
+
+  return createContactSnapshot(route, contact, stopLifecycle);
+}
+
+/**
+ * GAME-025 exposes one stable first contact across the complete patrol set to
+ * the same expedition outcome API used by the single-patrol path.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"]} monsters
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} [stopLifecycle]
+ */
+export function createMultiPatrolMonsterContactSnapshot(
+  route,
+  monsters,
+  stopLifecycle = null,
+) {
+  const authoritativeMonsters = monsters.map(
+    (monster) => monster.authoritativeMonster,
+  );
+  const contact = stopLifecycle && stopLifecycle.resumeAtSeconds !== null
+    ? findFirstExpeditionMonsterContactWithIdleStopAmongPatrols(
+        route.authoritativeRoute,
+        authoritativeMonsters,
+        stopLifecycle.stopAtRouteSeconds,
+        stopLifecycle.idleDurationSeconds,
+      )
+    : findFirstExpeditionMonsterContactAmongPatrols(
+        route.authoritativeRoute,
+        authoritativeMonsters,
+      );
+
+  return createContactSnapshot(route, contact, stopLifecycle);
+}
+
+/**
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {import("../sim-core/dist/src/index.js").ExpeditionMonsterContact | null} contact
+ * @param {ReturnType<typeof createDiscoveryStopLifecycleSnapshot> | null} stopLifecycle
+ */
+function createContactSnapshot(route, contact, stopLifecycle) {
 
   if (!contact) {
     return {

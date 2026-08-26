@@ -9,7 +9,9 @@ import {
 import { ENCOUNTER_TIME_TOLERANCE_SECONDS } from "./encounter.js";
 import {
   findFirstExpeditionMonsterContact,
+  findFirstExpeditionMonsterContactAmongPatrols,
   findFirstExpeditionMonsterContactWithIdleStop,
+  findFirstExpeditionMonsterContactWithIdleStopAmongPatrols,
   type ExpeditionMonsterContact,
 } from "./expedition-contact.js";
 import {
@@ -280,7 +282,7 @@ export function planExpeditionMonsterDangerResponseAmongPatrols(
     );
   }
 
-  const originalContact = findFirstMonsterContactAmongPatrols(
+  const originalContact = findFirstExpeditionMonsterContactAmongPatrols(
     expeditionRoute,
     monsters,
     expeditionStartsAtSeconds,
@@ -621,7 +623,7 @@ export function planExpeditionMonsterDangerResponseDuringIdleStopAmongPatrols(
       detectionRadiusMeters,
     );
   const originalContact =
-    findFirstMonsterContactWithIdleStopAmongPatrols(
+    findFirstExpeditionMonsterContactWithIdleStopAmongPatrols(
       expeditionRoute,
       monsters,
       stopAtRouteSeconds,
@@ -944,64 +946,6 @@ function multiPatrolIdleStopPlan(
     patrolCount: clearanceMonsterIds.length,
     clearanceMonsterIds,
   };
-}
-
-function findFirstMonsterContactAmongPatrols(
-  route: RoutePlan,
-  monsters: readonly WanderingMonster[],
-  expeditionStartsAtSeconds: DurationSeconds,
-): ExpeditionMonsterContact | null {
-  return selectFirstMonsterContact(
-    monsters.map((monster) =>
-      findFirstExpeditionMonsterContact(
-        route,
-        monster,
-        expeditionStartsAtSeconds,
-      )
-    ),
-  );
-}
-
-function findFirstMonsterContactWithIdleStopAmongPatrols(
-  route: RoutePlan,
-  monsters: readonly WanderingMonster[],
-  stopAtRouteSeconds: DurationSeconds,
-  idleDurationSeconds: DurationSeconds,
-  expeditionStartsAtSeconds: DurationSeconds,
-): ExpeditionMonsterContact | null {
-  return selectFirstMonsterContact(
-    monsters.map((monster) =>
-      findFirstExpeditionMonsterContactWithIdleStop(
-        route,
-        monster,
-        stopAtRouteSeconds,
-        idleDurationSeconds,
-        expeditionStartsAtSeconds,
-      )
-    ),
-  );
-}
-
-function selectFirstMonsterContact(
-  possibleContacts: readonly (ExpeditionMonsterContact | null)[],
-): ExpeditionMonsterContact | null {
-  const contacts = possibleContacts.filter(
-    (contact): contact is ExpeditionMonsterContact => contact !== null,
-  );
-  if (contacts.length === 0) return null;
-
-  const earliestAtSeconds = Math.min(
-    ...contacts.map((contact) => contact.atSeconds),
-  );
-  const tiedContacts = contacts.filter(
-    (contact) =>
-      contact.atSeconds <=
-        earliestAtSeconds + ENCOUNTER_TIME_TOLERANCE_SECONDS,
-  );
-  tiedContacts.sort((left, right) =>
-    compareMonsterIds(left.monsterId, right.monsterId)
-  );
-  return tiedContacts[0] ?? null;
 }
 
 function compareMonsterIds(left: string, right: string): number {

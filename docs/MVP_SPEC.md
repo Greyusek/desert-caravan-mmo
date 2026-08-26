@@ -166,6 +166,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - GAME-022 выбирает одну первую server-truth границу 1000 м среди нескольких патрулей как при движении, так и внутри scheduled discovery `STOP`. Более раннее время имеет приоритет, а кандидаты в пределах числового допуска упорядочиваются по raw monster ID независимо от порядка входного массива и локали. Этот слой только обнаруживает опасность: обход по-прежнему проверяется против одного выбранного патруля до отдельного multi-patrol checkpoint.
 - GAME-023 исполняет moving `AVOID | CONTINUE` от выбранной общей границы. `CONTINUE` сохраняет исходный маршрут и стабильный первый контакт, а каждый кандидат `AVOID` принимается только после непрерывной проверки полного timed-маршрута против всех патрулей. Контакт любого патруля в то же или более раннее мгновение блокирует решение; scheduled discovery `STOP` остаётся отдельным следующим слоем.
 - GAME-024 переносит тот же multi-patrol контракт в scheduled discovery `STOP`. `CONTINUE` сохраняет полное ожидание и стабильный первый контакт, а `AVOID` отменяет только остаток стоянки, выходит из точной STOP-координаты на фактическом мировом времени и проверяет продолжение против каждого патруля. Контакт или другая авторитетная граница на том же либо более раннем мгновении сохраняет приоритет.
+- GAME-025 делает стабильный выбор первого контакта публичной частью expedition contact/outcome API для движения и scheduled discovery `STOP`. Более раннее мировое время выигрывает, числовые ничьи разрешаются raw monster ID, а один outcome-срез разрешает не более одного контакта и сохраняет приоритет более ранних границ.
 
 Затаившийся монстр использует уменьшенный базовый радиус обнаружения (150 м). Блуждающий монстр движется по собственному маршруту, поэтому геометрическое пересечение путей без совпадения во времени встречу не создаёт.
 
@@ -286,4 +287,4 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-022` — select the first danger warning across several patrols with stable time/identity ordering before attempting multi-patrol avoidance clearance.
 - [x] `GAME-023` — execute moving danger doctrine for the selected warning and validate every accepted AVOID continuation against all patrols.
 - [x] `GAME-024` — compose multi-patrol `AVOID | CONTINUE` with a scheduled discovery `STOP`, preserving exact world/route time, contact priority and all-patrol clearance after departure.
-- [ ] `GAME-025` — expose stable multi-patrol contact selection through the authoritative expedition contact/outcome API without resolving more than one contact per slice.
+- [x] `GAME-025` — expose stable multi-patrol contact selection through the authoritative expedition contact/outcome API without resolving more than one contact per slice.

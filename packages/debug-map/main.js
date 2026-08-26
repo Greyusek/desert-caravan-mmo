@@ -19,6 +19,7 @@ import {
   createDangerDetectionSnapshot,
   createMultiPatrolDangerAvoidanceDoctrineSnapshot,
   createMultiPatrolDangerDetectionSnapshot,
+  createMultiPatrolMonsterContactSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
   createDiscoveryStopLifecycleSnapshot,
@@ -873,13 +874,11 @@ function render() {
     }
     const strongMonsterDoctrine = readStrongMonsterDoctrine();
     const fleeSpeedMetersPerSecond = contactFleeSpeed.valueAsNumber / 3.6;
-    const preEmergencyMonsterContact = selectedMonster
-      ? createMonsterContactSnapshot(
-          plannedRoute,
-          selectedMonster,
-          stopLifecycle,
-        )
-      : null;
+    const preEmergencyMonsterContact = createMultiPatrolMonsterContactSnapshot(
+      plannedRoute,
+      snapshot.monsters,
+      stopLifecycle,
+    );
     const preEmergencyOutcome = createExpeditionOutcomeSnapshot(
       plannedRoute,
       supplySettings.initial,
@@ -1008,20 +1007,20 @@ function render() {
       proposedDoctrine,
       resumedDiscoveryObjectId,
     );
+    const monsterContact = createMultiPatrolMonsterContactSnapshot(
+      executionRoute,
+      snapshot.monsters,
+      dangerExecutionStopLifecycle,
+    );
     const authoritativeContactMonsterId =
-      dangerAvoidance?.originalContact?.monsterId ?? null;
+      monsterContact.contact?.monsterId ??
+      dangerAvoidance?.originalContact?.monsterId ??
+      null;
     const contactExecutionMonster = authoritativeContactMonsterId
       ? snapshot.monsters.find(
           (monster) => monster.id === authoritativeContactMonsterId,
         ) ?? selectedMonster
       : selectedMonster;
-    const monsterContact = contactExecutionMonster
-      ? createMonsterContactSnapshot(
-          executionRoute,
-          contactExecutionMonster,
-          dangerExecutionStopLifecycle,
-        )
-      : null;
     const outcome = createExpeditionOutcomeSnapshot(
       executionRoute,
       supplySettings.initial,

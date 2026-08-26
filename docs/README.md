@@ -64,7 +64,8 @@
 - `CHECKPOINT_39.md` — детерминированный выбор первой 1000-метровой границы опасности среди нескольких патрулей при движении и scheduled discovery STOP.
 - `CHECKPOINT_40.md` — исполнение moving `AVOID | CONTINUE` от первой общей границы с непрерывной проверкой обхода против всех патрулей.
 - `CHECKPOINT_41.md` — multi-patrol `AVOID | CONTINUE` во время scheduled discovery STOP с точными временными доменами и общей проверкой отхода.
+- `CHECKPOINT_42.md` — стабильный первый multi-patrol контакт в публичном expedition contact/outcome API с разрешением не более одного контакта за срез.
 - `WORK_HANDOFF.md` — короткая актуальная точка восстановления автономной Work-серии.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006`, `GAME-001..GAME-024` и `CITY-001..CITY-003` покрыты 361 simulation/UI-тестом; вместе с 5 tooling-регрессиями GitHub Actions запускает 366 тестов в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006`, `GAME-001..GAME-025` и `CITY-001..CITY-003` покрыты 367 simulation/UI-тестами; вместе с 5 tooling-регрессиями проверка запускает 372 теста. Согласованный блок MVP 0.1 завершён; следующий этап не начат.
