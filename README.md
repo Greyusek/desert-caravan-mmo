@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 42 — GAME-025: implemented and covered by automated tests. MVP 0.1 complete.**
+**Checkpoint 43 — LIVING-001: implemented and covered by automated tests. MVP-1 in progress.**
 
 Implemented and covered by the automated test suite:
 
@@ -56,6 +56,7 @@ Also implemented:
 - GAME-023 — moving `AVOID | CONTINUE` now executes from that selected warning: CONTINUE preserves the route and stable first contact, while AVOID accepts a deterministic detour only after the complete timed route is continuously clear of every patrol.
 - GAME-024 — the same multi-patrol doctrine now composes with scheduled discovery `STOP`: CONTINUE preserves the complete wait and stable first contact, while AVOID cancels only the remainder and proves the real-time departure route clear of every patrol.
 - GAME-025 — uninterrupted and scheduled-STOP execution expose one stable first contact across every patrol to the authoritative outcome/journal path; earlier boundaries retain priority and one slice resolves at most one contact.
+- LIVING-001 — deterministic NPC caravans travel between seeded cities through the same `RoutePlan`, speed units, SIM-005 position solver and authoritative world time used by player expeditions.
 - CITY-001 — every seeded city has deterministic finite food and water stocks exposed in DEV details, without trading or consumption yet.
 - CITY-002 — deterministic aggregate NPC populations consume those stocks from authoritative world time at explicit provisional per-person rates; exact depletion is visible in DEV details.
 - CITY-003 — the first food or water shortage reduces aggregate population by a deterministic 1% per game day; declining population also slows later consumption of any remaining stock.
@@ -97,17 +98,17 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 42:
+Expected for Checkpoint 43:
 
 ```text
-# tests 372
-# pass 372
+# tests 377
+# pass 377
 # fail 0
 ```
 
-This total contains 367 simulation/UI tests and 5 tooling regression tests.
+This total contains 372 simulation/UI tests and 5 tooling regression tests.
 
-GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_42.md` for GAME-025 details.
+GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_43.md` for LIVING-001 details.
 
 ## Developer debug map
 
@@ -132,4 +133,5 @@ Then open `http://127.0.0.1:4173`. The world map is intentionally a developer ov
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The agreed MVP 0.1 implementation block is complete at GAME-025. MVP-1 and later roadmap stages are intentionally not started without a separate command.
+The agreed MVP 0.1 implementation block is complete at GAME-025. MVP-1 is now
+in progress at LIVING-001; Trading Prototype and later stages remain out of scope.

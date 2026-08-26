@@ -54,6 +54,16 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-023`: execute moving `AVOID | CONTINUE` for the selected first warning and accept an AVOID route only after continuous clearance checks against every patrol; keep discovery-STOP composition for a later slice.
 - [x] `GAME-024`: compose multi-patrol `AVOID | CONTINUE` with a scheduled discovery `STOP`, preserving exact world/route time, contact priority and all-patrol clearance after departure.
 - [x] `GAME-025`: promote stable multi-patrol contact selection into the authoritative expedition contact/outcome API, preserving first-boundary priority without resolving more than one contact per slice.
+- [x] `LIVING-001`: add deterministic route-backed NPC caravans that reuse SIM-004/SIM-005 and authoritative world time.
+- [ ] `LIVING-002`: add asymmetric caravan detection without requiring reciprocal visibility.
+- [ ] `LIVING-003`: derive deterministic coordinate-free tracks with approximate age from executed NPC travel.
+- [ ] `LIVING-004`: add minimal deterministic pursuit/evasion over the existing route model.
+- [ ] `CONSEQUENCE-001`: retain destroyed caravans as degrading world remains with minimal loot.
+- [ ] `KNOWLEDGE-001`: record tracks/remains with source, observation time and confidence in player knowledge and the event journal.
+- [ ] `LIBRARY-001`: add local city archives and physical knowledge deposit/copy transfer without global synchronization.
+- [ ] `LIBRARY-002`: keep fallen-city libraries discoverable and degrade their information deterministically.
+- [ ] `HISTORY-001`: add rumor quality, persistent creature/population catch-up, creature intelligence and earned legendary history.
+- [ ] `MVP1-001`: prove the complete deterministic Living Path scenario and close MVP-1.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors

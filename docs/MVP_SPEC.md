@@ -1,4 +1,4 @@
-# Desert Caravan MMO — MVP_SPEC v0.5
+# Desert Caravan MMO — MVP_SPEC v0.6
 
 **Дата:** 24 августа 2026
 
@@ -82,7 +82,7 @@
 
 ### MovingEntity
 - id
-- type: wandering_monster (later NPC caravan)
+- type: wandering_monster | npc_caravan
 - route[]
 - speed
 - vision radius
@@ -288,3 +288,4 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-023` — execute moving danger doctrine for the selected warning and validate every accepted AVOID continuation against all patrols.
 - [x] `GAME-024` — compose multi-patrol `AVOID | CONTINUE` with a scheduled discovery `STOP`, preserving exact world/route time, contact priority and all-patrol clearance after departure.
 - [x] `GAME-025` — expose stable multi-patrol contact selection through the authoritative expedition contact/outcome API without resolving more than one contact per slice.
+- [x] `LIVING-001` — project deterministic NPC caravans through the same route, speed and authoritative world-time primitives as player expeditions.

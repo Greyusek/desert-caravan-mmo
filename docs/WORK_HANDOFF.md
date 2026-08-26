@@ -2,78 +2,58 @@
 
 Updated: 26 August 2026
 
-This is the short operational recovery point for an autonomous Work series.
-Replace stale details after every completed task; repository history and
-checkpoint documents contain the full record.
+This is the short operational recovery point for the autonomous MAIN3 series.
+Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-The agreed MVP 0.1 implementation block is complete at Checkpoint 42 /
-GAME-025. Stable multi-patrol warning, avoidance and first-contact authority now
-cover uninterrupted movement and scheduled discovery `STOP`. MVP-1 and later
-roadmap stages have not been started.
+MVP-1 «Living Path» is in progress. Checkpoint 43 / LIVING-001 / version
+`0.0.43` adds the first deterministic route-backed NPC caravan without starting
+Trading Prototype, tactical combat, multiplayer or persistent storage.
 
 ## Completed
 
-- Checkpoint 42 / GAME-025 / version `0.0.42` exposes one first authoritative
-  expedition contact across the complete patrol set.
-- Earlier world time wins; numeric ties use raw monster-ID ordering independent
-  of patrol input order.
-- The same public contract covers uninterrupted movement and scheduled STOP
-  execution with exact world/route time domains.
-- The debug-map outcome, Power/FLEE resolution and journal consume one aggregate
-  contact snapshot and resolve no more than one contact per slice.
-- Earlier depletion, doctrine, arrival and danger boundaries preserve their
-  established priority.
-- GAME-023/024 danger planners now reuse the public aggregate contact API.
-- TODO, MVP_SPEC, ROADMAP, README, changelog and Checkpoint 42 mark the agreed
-  MVP 0.1 implementation block complete without starting MVP-1.
+- Seeded worlds contain configurable NPC caravans travelling between cities.
+- NPC travel reuses `RoutePlan`, SIM-005, existing speed units and authoritative
+  world time; no parallel movement physics exists.
+- Delayed departures expose scheduled, moving and arrived states.
+- Existing city, static-object and wandering-monster deterministic streams are
+  preserved.
 
 ## Last known good commit
 
-- `bde2c0d5324d31965b5c67aea474743e225be6f3` — local functional commit for
-  Checkpoint 42 / version `0.0.42`; tree
-  `e92fab11bd35d55dca69051cb8a9d16e175ee91d`.
-- `8a8e39a42eb5e5638a21ba212bcabb2177ee897f` — PR #49 merge containing
-  Checkpoint 42 on `main`; tree
-  `7b445feb09c6932f1fda6aa2b2f8abba0b4edd91`.
+- `9c9b8c39a9fbda37fe8fae20c75ee06db605f67b` — LIVING-001 functional commit;
+  tree `bf954bd4fad4334b86bce3f57117ec1520ec68c5`.
+- Branch: `feature/living-001-npc-caravans`; PR/merge status is updated after
+  the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- `npm run verify:local`: `372/372` PASS, zero failures (`367` simulation/UI
-  plus `5` tooling regressions); the complete log records tests and demo.
-- Targeted GAME-025/contact/danger/debug-map suite: `155/155` PASS.
-- Compiled Checkpoint 42 demo: PASS; simultaneous input selects
-  `demo-contact-a` and reports `resolved contacts=1`.
-- Debug server and HTTP asset smoke: PASS; the served browser module contains
-  both aggregate-contact execution calls.
-- GitHub `CI / verify`: PASS on PR #49 HEAD
-  `37a7126f754cc7ccb379205673342ec70f932eef`, whose tree exactly matches the
-  locally verified final Checkpoint 42 tree.
+- Full local equivalent of `npm run verify:local`: `377/377` PASS, zero
+  failures, compiled demo PASS.
+- Targeted NPC/world/monster suite: `36/36` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 42 / GAME-025 is merged through PR #49. The agreed MVP 0.1 block is
-complete and `main` is stable.
+Complete the PR/CI/merge cycle for Checkpoint 43, then continue immediately to
+LIVING-002.
 
 ## Next action
 
-Stop the autonomous series. Do not begin MVP-1 or any later roadmap stage until
-the user supplies a separate command and product direction for the next block.
+`LIVING-002`: implement asymmetric caravan detection using the existing
+continuous moving-encounter geometry while keeping each observer's vision
+radius independent. Player-facing output must not contain absolute coordinates.
 
-## Known limitations after MVP 0.1
+## Scope boundary
 
-- One evaluation slice resolves only the first aggregate contact; repeated
-  sequential encounters remain a later composition problem.
-- Avoidance returns `detour-unavailable` when no configured one-waypoint
-  candidate is safe; pursuit and arbitrary pathfinding are outside MVP 0.1.
-- Automatic resupply, money/cargo transfer, persistence, production physical
-  map ownership, tactical combat and autonomous neural agents are not included.
+No trading economy, production chains, tactical combat, PvP, multiplayer,
+database, full physical-map inventory, Magic/System 256 or neural agents.
 
 ## Resume instruction
 
-Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, `docs/ROADMAP.md`
-and this file. The autonomous MVP 0.1 series is complete; verify `main` if
-needed, but do not start MVP-1 without a separate command.
+Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, the MVP-1 section of
+`docs/ROADMAP.md`, `docs/MVP_SPEC.md`, this file and the latest checkpoint only.
+Verify the branch/PR/main state, finish the current quality gate if necessary,
+then continue with the exact next action above.

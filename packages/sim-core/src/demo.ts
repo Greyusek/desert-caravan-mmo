@@ -23,6 +23,7 @@ import {
   generateSeededWorld,
   kilometers,
   meters,
+  npcCaravanPositionAtWorldTime,
   planExpeditionMonsterDangerResponse,
   planExpeditionMonsterDangerResponseAmongPatrols,
   planExpeditionMonsterDangerResponseDuringIdleStop,
@@ -54,7 +55,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 42 demo");
+console.log("Desert Caravan MMO — Checkpoint 43 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -138,6 +139,18 @@ console.log(`\nWORLD-001 seed=${world.seed}: ${world.cities.length} cities`);
 for (const city of world.cities) {
   console.log(
     `  ${city.id} ${city.name}: ${city.position.latitudeDeg.toFixed(6)}, ${city.position.longitudeDeg.toFixed(6)}`,
+  );
+}
+const demoNpcCaravan = world.npcCaravans[0];
+if (demoNpcCaravan) {
+  const halfway = npcCaravanPositionAtWorldTime(
+    demoNpcCaravan,
+    demoNpcCaravan.route.totalDurationSeconds / 2,
+  );
+  console.log(
+    `LIVING-001 ${demoNpcCaravan.id}: ${demoNpcCaravan.originCityId} -> ${demoNpcCaravan.destinationCityId}; status=${halfway.status}; progress=${(
+      halfway.traveledDistanceMeters / demoNpcCaravan.route.totalDistanceMeters
+    ).toFixed(3)}; coordinates=server-truth-only`,
   );
 }
 console.log("CITY-001 finite city stocks:");
@@ -623,5 +636,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 42 stable multi-patrol contact/outcome: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 43 route-backed NPC caravans: npm run debug-map -> http://127.0.0.1:4173",
 );
