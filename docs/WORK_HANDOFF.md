@@ -3,90 +3,78 @@
 Updated: 26 August 2026
 
 This is the short operational recovery point for an autonomous Work series.
-Replace stale details after every completed task; do not append a development
-diary. Repository history and checkpoint documents contain the full record.
+Replace stale details after every completed task; repository history and
+checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-0 doctrine and survival. Multi-patrol `AVOID | CONTINUE` now executes both
-while moving and during a scheduled discovery `STOP`, with exact time domains
-and all-patrol clearance. The next slice promotes stable contact selection into
-the authoritative expedition contact/outcome API.
+The agreed MVP 0.1 implementation block is complete at Checkpoint 42 /
+GAME-025. Stable multi-patrol warning, avoidance and first-contact authority now
+cover uninterrupted movement and scheduled discovery `STOP`. MVP-1 and later
+roadmap stages have not been started.
 
 ## Completed
 
-- Checkpoint 41 / GAME-024 / version `0.0.41` composes aggregate patrol danger
-  doctrine with one scheduled discovery `STOP`.
-- Warning and contact arbitration preserve earliest-time then raw-ID ordering;
-  contact or a caller-supplied boundary at the same or earlier instant wins.
-- `CONTINUE` preserves the original route, complete scheduled wait and stable
-  first contact.
-- `AVOID` cancels only the unelapsed wait, departs from the exact STOP
-  coordinate at the real world time and checks every patrol continuously.
-- Input order and whole patrol-cycle delay cannot change selected identity,
-  effective idle duration or detour geometry.
-- The DEV STOP flow now uses both generated patrols for warning, doctrine,
-  route clearance, journal execution and contact focus.
+- Checkpoint 42 / GAME-025 / version `0.0.42` exposes one first authoritative
+  expedition contact across the complete patrol set.
+- Earlier world time wins; numeric ties use raw monster-ID ordering independent
+  of patrol input order.
+- The same public contract covers uninterrupted movement and scheduled STOP
+  execution with exact world/route time domains.
+- The debug-map outcome, Power/FLEE resolution and journal consume one aggregate
+  contact snapshot and resolve no more than one contact per slice.
+- Earlier depletion, doctrine, arrival and danger boundaries preserve their
+  established priority.
+- GAME-023/024 danger planners now reuse the public aggregate contact API.
+- TODO, MVP_SPEC, ROADMAP, README, changelog and Checkpoint 42 mark the agreed
+  MVP 0.1 implementation block complete without starting MVP-1.
 
 ## Last known good commit
 
-- `bbabad4bcc30dd0e9b91c71232628b87b5c437e9` — local functional commit for
-  Checkpoint 41 / version `0.0.41`; tree
-  `0624001d25ab6f16341ba3ec0c0da793cb6e2ccb`.
-- `f7ebc8d0330336b49f333ace6cc92adabb0bc8d9` — merged and user-accepted main
-  immediately before Checkpoint 41 (Checkpoint 40 merge).
+- `bde2c0d5324d31965b5c67aea474743e225be6f3` — local functional commit for
+  Checkpoint 42 / version `0.0.42`; tree
+  `e92fab11bd35d55dca69051cb8a9d16e175ee91d`.
+- `731e3333d4581983f95d3dd501d2708ddd8bf8f6` — merged main immediately before
+  Checkpoint 42 (PR #48 / Checkpoint 41). Its delayed `CI / verify` completed
+  successfully on the exact published tree before merge.
 
 ## Verification
 
-- Clean `npm ci` with the workspace cache before implementation: PASS.
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Automated suite: `366/366` PASS, zero failures (`361` simulation/UI plus `5`
-  tooling regressions).
-- Compiled Checkpoint 41 demo: PASS; simultaneous idle input selects
-  `idle-demo-patrol-a`, clears both sorted patrol IDs, preserves route time at
-  100 seconds, truncates idle time to 40 seconds and reports no later contact.
-- Local debug server start and HTTP response: PASS on
-  `http://127.0.0.1:4173`; the served page contains the GAME-024 multi-patrol
-  STOP section and browser assets build successfully.
-- Git tree and `git diff --check`: PASS at the functional commit.
-- `GITHUB_CI_NOT_STARTED`: GitHub Actions did not register a `CI / verify` run
-  for PR #48 after the permitted observation window.
-- `LOCAL_VERIFY_PASS`: the complete local quality gate passed on the published
-  Checkpoint 41 content.
-- `TREE_VERIFIED`: PR #48 HEAD tree
-  `64d24f89a2083a242f7b6f284c3652a8866a3833` exactly matches the locally
-  verified Checkpoint 41 tree; no source change followed verification.
+- `npm run verify:local`: `372/372` PASS, zero failures (`367` simulation/UI
+  plus `5` tooling regressions); the complete log records tests and demo.
+- Targeted GAME-025/contact/danger/debug-map suite: `155/155` PASS.
+- Compiled Checkpoint 42 demo: PASS; simultaneous input selects
+  `demo-contact-a` and reports `resolved contacts=1`.
+- Debug server and HTTP asset smoke: PASS; the served browser module contains
+  both aggregate-contact execution calls.
+- `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 41 is complete on `feature/game-024-multi-patrol-stop`; PR #48 is
-published and eligible for the documented local-verification CI fallback.
+Checkpoint 42 is complete on `feature/game-025-authoritative-contact`.
+Publication, PR verification and merge are pending.
 
 ## Next action
 
-Merge PR #48 using the verified-tree fallback, then start GAME-025 as a new
-small task: promote stable multi-patrol contact selection into the authoritative
-expedition contact/outcome API while preserving first-boundary priority and
-resolving no more than one contact per slice.
+Publish the exact Checkpoint 42 tree, open its PR and merge after `CI / verify`.
+If GitHub CI does not start in the documented observation window, use the
+`LOCAL_VERIFY_PASS` / `TREE_VERIFIED` fallback without changing history solely
+to retrigger CI. After merge, verify `main` tree and stop: MVP-1 requires a
+separate user command.
 
-## Known issues
+## Known limitations after MVP 0.1
 
-- Danger doctrine is multi-patrol-safe for moving and scheduled-STOP execution,
-  but stable contact selection is still planner-internal rather than a public
-  expedition contact/outcome API.
-- GAME-025 should expose only the first aggregate contact; repeated sequential
-  encounters remain a later composition problem.
-- Avoidance returns `detour-unavailable` if no configured one-waypoint candidate
-  is safe; pursuit and arbitrary pathfinding remain outside the slice.
-- Automatic resupply, money/cargo transfer, selection among known cities,
-  persistence and production sensor calibration are not implemented.
+- One evaluation slice resolves only the first aggregate contact; repeated
+  sequential encounters remain a later composition problem.
+- Avoidance returns `detour-unavailable` when no configured one-waypoint
+  candidate is safe; pursuit and arbitrary pathfinding are outside MVP 0.1.
+- Automatic resupply, money/cargo transfer, persistence, production physical
+  map ownership, tactical combat and autonomous neural agents are not included.
 
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, `docs/ROADMAP.md`
-and this file. Verify the last known good point, continue `Current task` from
-`Next action`, and follow: one small task -> tests -> stable commit ->
-ROADMAP/TODO -> replace this handoff -> PR/merge using GitHub CI when available
-or the documented verified-tree fallback when it does not start. If resources
-may not cover another safe task, stop as `RESOURCE LIMIT CHECKPOINT` after
-updating this file.
+and this file. If Checkpoint 42 is not merged, continue only its publication
+and verified-tree merge. If it is already on `main`, the autonomous MVP 0.1
+series is complete; do not start MVP-1 without a separate command.
