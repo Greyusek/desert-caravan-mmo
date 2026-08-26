@@ -51,7 +51,8 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-020`: at the first 1000 m detected-danger boundary, execute `AVOID | CONTINUE`; preserve the route for `CONTINUE` and replace only its future prefix with one deterministic 500 m-clearance detour for `AVOID`.
 - [x] `GAME-021`: compose the same 1000 m warning and `AVOID | CONTINUE` decision with a scheduled discovery `STOP`; preserve contact priority, and let AVOID cancel only the remaining wait before departing from the exact stop coordinate.
 - [x] `GAME-022`: select the first authoritative 1000 m danger warning across several patrols with stable time/monster-id tie-breaking; keep multi-patrol avoidance clearance outside this detection-only slice.
-- [ ] `GAME-023`: execute moving `AVOID | CONTINUE` for the selected first warning and accept an AVOID route only after continuous clearance checks against every patrol; keep discovery-STOP composition for a later slice.
+- [x] `GAME-023`: execute moving `AVOID | CONTINUE` for the selected first warning and accept an AVOID route only after continuous clearance checks against every patrol; keep discovery-STOP composition for a later slice.
+- [ ] `GAME-024`: compose multi-patrol `AVOID | CONTINUE` with a scheduled discovery `STOP`, preserving exact world/route time, contact priority and all-patrol clearance after departure.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors

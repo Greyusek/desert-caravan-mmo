@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.40 — Checkpoint 40
+
+- Added `GAME-023`: moving `AVOID | CONTINUE` now executes from the first authoritative warning selected across the complete patrol set.
+- Preserved `CONTINUE` as a non-mutating decision with the original route and stable first contact identity unchanged.
+- Reused the continuous contact solver against every patrol for every deterministic AVOID candidate; a candidate is accepted only when the complete timed route remains contact-free from all of them.
+- Preserved contact priority when any patrol reaches contact at the warning instant or earlier, and retained the original route when no configured detour is safe.
+- Made route choice independent of patrol input order and patrol-cycle delay while preserving stable raw-ID arbitration.
+- Integrated moving all-patrol clearance into the debug-map intercept flow while leaving scheduled-STOP doctrine explicitly tied to the selected QA patrol for the next slice.
+- Added ten GAME-023 regressions; repository verification now runs 356 tests.
+
 ## 0.0.39 — Checkpoint 39
 
 - Added `GAME-022`: moving expeditions and scheduled discovery `STOP`s now select the first authoritative 1000 m warning across several patrols.
