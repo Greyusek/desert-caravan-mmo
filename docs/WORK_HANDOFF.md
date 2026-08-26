@@ -34,9 +34,9 @@ roadmap stages have not been started.
 - `bde2c0d5324d31965b5c67aea474743e225be6f3` — local functional commit for
   Checkpoint 42 / version `0.0.42`; tree
   `e92fab11bd35d55dca69051cb8a9d16e175ee91d`.
-- `731e3333d4581983f95d3dd501d2708ddd8bf8f6` — merged main immediately before
-  Checkpoint 42 (PR #48 / Checkpoint 41). Its delayed `CI / verify` completed
-  successfully on the exact published tree before merge.
+- `8a8e39a42eb5e5638a21ba212bcabb2177ee897f` — PR #49 merge containing
+  Checkpoint 42 on `main`; tree
+  `7b445feb09c6932f1fda6aa2b2f8abba0b4edd91`.
 
 ## Verification
 
@@ -48,20 +48,20 @@ roadmap stages have not been started.
   `demo-contact-a` and reports `resolved contacts=1`.
 - Debug server and HTTP asset smoke: PASS; the served browser module contains
   both aggregate-contact execution calls.
+- GitHub `CI / verify`: PASS on PR #49 HEAD
+  `37a7126f754cc7ccb379205673342ec70f932eef`, whose tree exactly matches the
+  locally verified final Checkpoint 42 tree.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 42 is complete on `feature/game-025-authoritative-contact`.
-Publication, PR verification and merge are pending.
+Checkpoint 42 / GAME-025 is merged through PR #49. The agreed MVP 0.1 block is
+complete and `main` is stable.
 
 ## Next action
 
-Publish the exact Checkpoint 42 tree, open its PR and merge after `CI / verify`.
-If GitHub CI does not start in the documented observation window, use the
-`LOCAL_VERIFY_PASS` / `TREE_VERIFIED` fallback without changing history solely
-to retrigger CI. After merge, verify `main` tree and stop: MVP-1 requires a
-separate user command.
+Stop the autonomous series. Do not begin MVP-1 or any later roadmap stage until
+the user supplies a separate command and product direction for the next block.
 
 ## Known limitations after MVP 0.1
 
@@ -75,6 +75,5 @@ separate user command.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, `docs/ROADMAP.md`
-and this file. If Checkpoint 42 is not merged, continue only its publication
-and verified-tree merge. If it is already on `main`, the autonomous MVP 0.1
-series is complete; do not start MVP-1 without a separate command.
+and this file. The autonomous MVP 0.1 series is complete; verify `main` if
+needed, but do not start MVP-1 without a separate command.
