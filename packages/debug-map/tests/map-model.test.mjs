@@ -20,6 +20,7 @@ import {
   createDebugMapSnapshot,
   createDangerAvoidanceDoctrineSnapshot,
   createDangerDetectionSnapshot,
+  createMultiPatrolDangerAvoidanceDoctrineSnapshot,
   createMultiPatrolDangerDetectionSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
@@ -41,6 +42,7 @@ import {
   createPlayerDiscoveryLedger,
   createPlayerTravelLedger,
   evaluateDiscoveryStopLifecycle,
+  findFirstExpeditionMonsterContact,
   recordDirectDiscoveryObservation,
   recordExpeditionTravelProgress,
   recordReachedCityLandmark,
@@ -1680,6 +1682,80 @@ test("GAME-022: debug arbitration changes from forecast to detected exactly at w
     reached.detection?.monsterId,
     forecast.detection.monsterId,
   );
+});
+
+test("GAME-023: debug moving AVOID clears the route against every patrol", () => {
+  const planned = monsterInterceptAt();
+  const source = planned.monster;
+  const patrolA = {
+    ...source,
+    id: "patrol-a",
+    authoritativeMonster: {
+      ...source.authoritativeMonster,
+      id: "patrol-a",
+    },
+  };
+  const patrolB = {
+    ...source,
+    id: "patrol-b",
+    authoritativeMonster: {
+      ...source.authoritativeMonster,
+      id: "patrol-b",
+    },
+  };
+  const avoidance = createMultiPatrolDangerAvoidanceDoctrineSnapshot(
+    planned.route,
+    [patrolB, patrolA],
+    "AVOID",
+  );
+
+  assert.equal(avoidance.status, "pending");
+  assert.equal(avoidance.planStatus, "avoided");
+  assert.equal(avoidance.patrolCount, 2);
+  assert.deepEqual(avoidance.clearanceMonsterIds, ["patrol-a", "patrol-b"]);
+  assert.equal(avoidance.detection?.monsterId, "patrol-a");
+  assert.equal(avoidance.effectiveContact, null);
+  for (const patrol of [patrolA, patrolB]) {
+    assert.equal(
+      findFirstExpeditionMonsterContact(
+        avoidance.authoritativePlan.effectiveRoute,
+        patrol.authoritativeMonster,
+      ),
+      null,
+    );
+  }
+});
+
+test("GAME-023: debug moving CONTINUE preserves the stable first contact", () => {
+  const planned = monsterInterceptAt();
+  const source = planned.monster;
+  const patrolA = {
+    ...source,
+    id: "patrol-a",
+    authoritativeMonster: {
+      ...source.authoritativeMonster,
+      id: "patrol-a",
+    },
+  };
+  const patrolB = {
+    ...source,
+    id: "patrol-b",
+    authoritativeMonster: {
+      ...source.authoritativeMonster,
+      id: "patrol-b",
+    },
+  };
+  const continued = createMultiPatrolDangerAvoidanceDoctrineSnapshot(
+    planned.route,
+    [patrolB, patrolA],
+    "CONTINUE",
+  );
+
+  assert.equal(continued.status, "pending");
+  assert.equal(continued.planStatus, "continued");
+  assert.equal(continued.effectiveRoute, planned.route);
+  assert.equal(continued.originalContact?.monsterId, "patrol-a");
+  assert.equal(continued.effectiveContact, continued.originalContact);
 });
 
 test("GAME-020: AVOID snapshot applies one contact-free planned detour", () => {

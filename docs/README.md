@@ -1,6 +1,6 @@
 # Desert Caravan MMO — Project Docs
 
-Обновлено: 25 августа 2026
+Обновлено: 26 августа 2026
 
 ## Актуальный дизайн
 
@@ -62,7 +62,8 @@
 - `CHECKPOINT_37.md` — исполнение `AVOID | CONTINUE` на границе 1000 м с одним детерминированным обходным waypoint вне контакта 500 м.
 - `CHECKPOINT_38.md` — композиция предупреждения и `AVOID | CONTINUE` с scheduled discovery STOP, точным мировым/маршрутным временем и приоритетом первой границы.
 - `CHECKPOINT_39.md` — детерминированный выбор первой 1000-метровой границы опасности среди нескольких патрулей при движении и scheduled discovery STOP.
+- `CHECKPOINT_40.md` — исполнение moving `AVOID | CONTINUE` от первой общей границы с непрерывной проверкой обхода против всех патрулей.
 - `WORK_HANDOFF.md` — короткая актуальная точка восстановления автономной Work-серии.
 - `DEVELOPMENT_WORKFLOW.md` — быстрый CI-gated процесс до MVP, локальная приёмка и откат.
 
-Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006`, `GAME-001..GAME-022` и `CITY-001..CITY-003` покрыты 341 simulation/UI-тестом; вместе с 5 tooling-регрессиями GitHub Actions запускает 346 тестов в pull request.
+Текущий статус: `SIM-001..SIM-008`, `WORLD-001..WORLD-004`, `UI-001..UI-006`, `GAME-001..GAME-023` и `CITY-001..CITY-003` покрыты 351 simulation/UI-тестом; вместе с 5 tooling-регрессиями GitHub Actions запускает 356 тестов в pull request.

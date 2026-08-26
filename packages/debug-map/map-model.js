@@ -28,6 +28,7 @@ import {
   kilometers,
   positionAtTime,
   planExpeditionMonsterDangerResponse,
+  planExpeditionMonsterDangerResponseAmongPatrols,
   planExpeditionMonsterDangerResponseDuringIdleStop,
   planEmergencySupplyReturn,
   planEmergencySupplyReturnDuringIdleStop,
@@ -560,6 +561,99 @@ export function createDangerAvoidanceDoctrineSnapshot(
       : null,
     originalContact: plan.originalContact,
     effectiveContact: plan.effectiveContact,
+    patrolCount: 1,
+    clearanceMonsterIds: [monster.id],
+    effectiveRoute,
+    authoritativePlan: plan,
+  };
+}
+
+/**
+ * GAME-023 executes moving AVOID | CONTINUE from the first warning across all
+ * patrols and exposes only routes continuously cleared against the full set.
+ * Scheduled discovery STOP composition remains on the single-patrol wrapper
+ * above until the next checkpoint.
+ * @param {ReturnType<typeof createFourSegmentRouteSnapshot>} route
+ * @param {ReturnType<typeof createDebugMapSnapshot>["monsters"]} monsters
+ * @param {import("../sim-core/dist/src/index.js").DangerAvoidanceDoctrine} doctrine
+ */
+export function createMultiPatrolDangerAvoidanceDoctrineSnapshot(
+  route,
+  monsters,
+  doctrine,
+) {
+  const plan = planExpeditionMonsterDangerResponseAmongPatrols(
+    route.authoritativeRoute,
+    monsters.map((monster) => monster.authoritativeMonster),
+    doctrine,
+  );
+  const evaluatedAtSeconds = route.position.elapsedSeconds;
+  const decisionOccurred =
+    plan.decisionAtSeconds !== null &&
+    evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >= plan.decisionAtSeconds;
+  const appliesAvoidance = plan.status === "avoided";
+  const effectiveRoute = appliesAvoidance
+    ? createRoutePlanSnapshot(plan.effectiveRoute, evaluatedAtSeconds)
+    : route;
+  const completionAtExpeditionSeconds =
+    plan.effectiveRoute.totalDurationSeconds;
+  const status = plan.status === "avoided"
+    ? !decisionOccurred
+      ? /** @type {const} */ ("pending")
+      : evaluatedAtSeconds + EVENT_TIME_EPSILON_SECONDS >=
+          completionAtExpeditionSeconds
+        ? /** @type {const} */ ("avoided")
+        : /** @type {const} */ ("avoiding")
+    : plan.status === "continued" && !decisionOccurred
+      ? /** @type {const} */ ("pending")
+      : plan.status;
+
+  return {
+    doctrine,
+    status,
+    planStatus: plan.status,
+    evaluatedAtSeconds,
+    decisionOccurred,
+    appliesAvoidance,
+    triggerActivity: plan.detection?.caravanActivity ?? null,
+    triggersDuringIdleStop: false,
+    scheduledIdleDurationSeconds: 0,
+    effectiveIdleDurationSeconds: 0,
+    interruptsIdleStop: false,
+    blockedByEarlierBoundary: false,
+    blockingExpeditionAtSeconds: null,
+    completionAtExpeditionSeconds,
+    detection: plan.detection,
+    decisionAtSeconds: plan.decisionAtSeconds,
+    decisionRouteElapsedSeconds: plan.decisionRouteElapsedSeconds,
+    decisionSegmentIndex: plan.decisionSegmentIndex,
+    decisionRouteDistanceKilometers:
+      plan.decisionRouteDistanceMeters === null
+        ? null
+        : plan.decisionRouteDistanceMeters / 1_000,
+    detourWaypoint: plan.detourWaypoint,
+    detourWaypointPoint: plan.detourWaypoint
+      ? projectCoordinate(plan.detourWaypoint)
+      : null,
+    detourSide: plan.detourSide,
+    detourWaypointRadiusMeters: plan.detourWaypointRadiusMeters,
+    detourSegmentIndexes: plan.detourSegmentIndexes,
+    detourDistanceKilometers:
+      plan.detourDistanceMeters === null
+        ? null
+        : plan.detourDistanceMeters / 1_000,
+    addedDistanceKilometers:
+      plan.addedDistanceMeters === null
+        ? null
+        : plan.addedDistanceMeters / 1_000,
+    rejoinPosition: plan.rejoinPosition,
+    rejoinPoint: plan.rejoinPosition
+      ? projectCoordinate(plan.rejoinPosition)
+      : null,
+    originalContact: plan.originalContact,
+    effectiveContact: plan.effectiveContact,
+    patrolCount: plan.patrolCount,
+    clearanceMonsterIds: [...plan.clearanceMonsterIds],
     effectiveRoute,
     authoritativePlan: plan,
   };

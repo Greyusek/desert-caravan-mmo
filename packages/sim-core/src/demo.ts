@@ -23,6 +23,7 @@ import {
   kilometers,
   meters,
   planExpeditionMonsterDangerResponse,
+  planExpeditionMonsterDangerResponseAmongPatrols,
   planExpeditionMonsterDangerResponseDuringIdleStop,
   planEmergencySupplyReturn,
   planEmergencySupplyReturnDuringIdleStop,
@@ -51,7 +52,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 39 demo");
+console.log("Desert Caravan MMO — Checkpoint 40 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -387,6 +388,15 @@ const multiPatrolDanger =
       { ...demoMonster, id: "demo-patrol-a" },
     ],
   );
+const multiPatrolAvoidance =
+  planExpeditionMonsterDangerResponseAmongPatrols(
+    encounterCaravan,
+    [
+      { ...demoMonster, id: "demo-patrol-b" },
+      { ...demoMonster, id: "demo-patrol-a" },
+    ],
+    "AVOID",
+  );
 console.log("\nGAME-019 detected danger:");
 console.log(
   dangerDetection
@@ -404,6 +414,12 @@ console.log(
   multiPatrolDanger
     ? `  first= ${multiPatrolDanger.monsterId} at T=${multiPatrolDanger.atSeconds.toFixed(6)} s from input [demo-patrol-b, demo-patrol-a]`
     : "  no danger detected across patrols",
+);
+console.log("\nGAME-023 multi-patrol danger doctrine:");
+console.log(
+  multiPatrolAvoidance.status === "avoided"
+    ? `  AVOID: trigger=${multiPatrolAvoidance.detection?.monsterId}; cleared=${multiPatrolAvoidance.clearanceMonsterIds.join(",")}; side=${multiPatrolAvoidance.detourSide}; contact-after=${multiPatrolAvoidance.effectiveContact === null ? "none" : "unsafe"}`
+    : `  AVOID: ${multiPatrolAvoidance.status}`,
 );
 console.log("\nGAME-004 expedition contact:");
 console.log(
@@ -573,5 +589,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 39 multi-patrol danger selection: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 40 multi-patrol danger avoidance: npm run debug-map -> http://127.0.0.1:4173",
 );

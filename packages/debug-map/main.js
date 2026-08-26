@@ -17,6 +17,7 @@ import {
   createDebugMapSnapshot,
   createDangerAvoidanceDoctrineSnapshot,
   createDangerDetectionSnapshot,
+  createMultiPatrolDangerAvoidanceDoctrineSnapshot,
   createMultiPatrolDangerDetectionSnapshot,
   createDiscoveryDoctrineSnapshot,
   createDiscoveryResumeSnapshot,
@@ -957,28 +958,38 @@ function render() {
     const finalDangerBlockingAtSeconds = supplyEmergency.appliesReturn
       ? null
       : preEmergencyOutcome.planned.atSeconds;
-    const dangerDetection = selectedMonster
-      ? createDangerDetectionSnapshot(
-          supplyExecutionRoute,
-          selectedMonster,
-          executionStopLifecycle,
-        )
-      : null;
     const multiPatrolDangerDetection =
       createMultiPatrolDangerDetectionSnapshot(
         supplyExecutionRoute,
         snapshot.monsters,
         executionStopLifecycle,
       );
-    const dangerAvoidance = selectedMonster
-      ? createDangerAvoidanceDoctrineSnapshot(
+    const usesIdleDangerDoctrine = Boolean(
+      executionStopLifecycle &&
+        executionStopLifecycle.resumeAtSeconds !== null,
+    );
+    const dangerDetection = usesIdleDangerDoctrine && selectedMonster
+      ? createDangerDetectionSnapshot(
           supplyExecutionRoute,
           selectedMonster,
-          readDangerAvoidanceDoctrine(),
           executionStopLifecycle,
-          finalDangerBlockingAtSeconds,
         )
-      : null;
+      : multiPatrolDangerDetection;
+    const dangerAvoidance = usesIdleDangerDoctrine
+      ? selectedMonster
+        ? createDangerAvoidanceDoctrineSnapshot(
+            supplyExecutionRoute,
+            selectedMonster,
+            readDangerAvoidanceDoctrine(),
+            executionStopLifecycle,
+            finalDangerBlockingAtSeconds,
+          )
+        : null
+      : createMultiPatrolDangerAvoidanceDoctrineSnapshot(
+          supplyExecutionRoute,
+          snapshot.monsters,
+          readDangerAvoidanceDoctrine(),
+        );
     const executionRoute = dangerAvoidance?.effectiveRoute ??
       supplyExecutionRoute;
     const cityDestination = createCityArrivalSnapshot(
@@ -1014,10 +1025,18 @@ function render() {
       proposedDoctrine,
       resumedDiscoveryObjectId,
     );
-    const monsterContact = selectedMonster
+    const authoritativeContactMonsterId =
+      dangerAvoidance?.originalContact?.monsterId ?? null;
+    const contactExecutionMonster = !usesIdleDangerDoctrine &&
+        authoritativeContactMonsterId
+      ? snapshot.monsters.find(
+          (monster) => monster.id === authoritativeContactMonsterId,
+        ) ?? selectedMonster
+      : selectedMonster;
+    const monsterContact = contactExecutionMonster
       ? createMonsterContactSnapshot(
           executionRoute,
-          selectedMonster,
+          contactExecutionMonster,
           dangerExecutionStopLifecycle,
         )
       : null;
@@ -1146,7 +1165,7 @@ function render() {
     renderMonsterContact(monsterContact, outcome);
     renderContactZoom(
       route,
-      selectedMonster ?? null,
+      contactExecutionMonster ?? null,
       monsterContact,
       effectiveStopLifecycle,
     );
@@ -1617,6 +1636,9 @@ function renderDangerAvoidanceDoctrine(snapshot) {
     return;
   }
   const idleTrigger = snapshot.triggerActivity === "idle";
+  const clearanceLabel = snapshot.patrolCount === 1
+    ? "выбранного патруля"
+    : `всех ${snapshot.patrolCount} патрулей`;
   const triggerButton = idleTrigger ? contactStopDevRoute : contactDevRoute;
   if (snapshot.status === "not-triggered") {
     dangerDoctrineResult.textContent =
@@ -1635,7 +1657,7 @@ function renderDangerAvoidanceDoctrine(snapshot) {
   }
   if (snapshot.status === "detour-unavailable") {
     dangerDoctrineResult.textContent =
-      "Один проверяемый обходной waypoint не найден; исходный маршрут сохранён.";
+      `Безопасный против ${clearanceLabel} обходной waypoint не найден; исходный маршрут сохранён.`;
     return;
   }
   if (snapshot.status === "pending") {
@@ -1643,14 +1665,14 @@ function renderDangerAvoidanceDoctrine(snapshot) {
       ? "DEV: к решению в STOP"
       : "DEV: к решению 1000 м";
     dangerDoctrineResult.textContent = snapshot.appliesAvoidance
-      ? `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)}${idleTrigger ? ` после ${formatDuration(snapshot.effectiveIdleDurationSeconds)} STOP` : ""} будет выбран ${dangerSideLabel(snapshot.detourSide)} обход: +${formatNumber(snapshot.addedDistanceKilometers ?? 0, 2)} км; весь новый путь проверен вне 500 м.`
+      ? `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)}${idleTrigger ? ` после ${formatDuration(snapshot.effectiveIdleDurationSeconds)} STOP` : ""} предупреждение ${snapshot.detection?.monsterId ?? "патруля"} выберет ${dangerSideLabel(snapshot.detourSide)} обход: +${formatNumber(snapshot.addedDistanceKilometers ?? 0, 2)} км; весь новый путь проверен вне 500 м против ${clearanceLabel}.`
       : `На ${formatElapsed(snapshot.decisionAtSeconds ?? 0)} CONTINUE сохранит маршрут${idleTrigger ? " и полную стоянку" : ""} без изменений.`;
     return;
   }
   if (snapshot.status === "avoiding") {
     triggerButton.textContent = "DEV: к финишу обхода";
     dangerDoctrineResult.textContent =
-      `AVOID исполнен${idleTrigger ? ` из точной координаты STOP после ${formatDuration(snapshot.effectiveIdleDurationSeconds)}; остаток ${formatDuration(Math.max(0, snapshot.scheduledIdleDurationSeconds - snapshot.effectiveIdleDurationSeconds))} отменён` : ""}: ${dangerSideLabel(snapshot.detourSide)} waypoint на ${formatNumber(snapshot.detourWaypointRadiusMeters ?? 0, 0)} м от позиции патруля; контакт 500 м исключён непрерывной проверкой.`;
+      `AVOID исполнен${idleTrigger ? ` из точной координаты STOP после ${formatDuration(snapshot.effectiveIdleDurationSeconds)}; остаток ${formatDuration(Math.max(0, snapshot.scheduledIdleDurationSeconds - snapshot.effectiveIdleDurationSeconds))} отменён` : ""}: ${dangerSideLabel(snapshot.detourSide)} waypoint на ${formatNumber(snapshot.detourWaypointRadiusMeters ?? 0, 0)} м от позиции патруля; контакт 500 м с ${clearanceLabel} исключён непрерывной проверкой.`;
     return;
   }
   if (snapshot.status === "avoided") {
@@ -1658,7 +1680,7 @@ function renderDangerAvoidanceDoctrine(snapshot) {
       ? "DEV: новый STOP-обход"
       : "DEV: новый перехват";
     dangerDoctrineResult.textContent =
-      "Детерминированный обход завершён без входа в 500 м; исходный маршрут продолжен после точки возврата.";
+      `Детерминированный обход завершён без входа в 500 м для ${clearanceLabel}; исходный маршрут продолжен после точки возврата.`;
     return;
   }
 
@@ -1680,7 +1702,7 @@ function renderMultiPatrolDangerDetection(snapshot) {
       : "патрулей";
   if (!snapshot.detection) {
     multiPatrolDangerResult.textContent =
-      `GAME-022 · ${snapshot.patrolCount} ${patrolLabel}: новой границы 1000 м нет. Доктрина ниже остаётся QA-проверкой одного выбранного патруля.`;
+      `GAME-023 · ${snapshot.patrolCount} ${patrolLabel}: новой границы 1000 м нет.`;
     return;
   }
 
@@ -1688,8 +1710,11 @@ function renderMultiPatrolDangerDetection(snapshot) {
     ? "во время STOP"
     : "в движении";
   const state = snapshot.status === "detected" ? "обнаружен" : "прогноз";
+  const executionScope = snapshot.detection.caravanActivity === "idle"
+    ? "STOP-обход пока проверяется только для выбранного QA-патруля."
+    : `AVOID ниже проверяет обход против всех ${snapshot.patrolCount} патрулей.`;
   multiPatrolDangerResult.textContent =
-    `GAME-022 · первый из ${snapshot.patrolCount}: ${snapshot.detection.monsterId}, ${formatElapsed(snapshot.detection.atSeconds)}, ${activity} · ${state}. Равное время разрешается по monster ID; AVOID ниже пока исполняется только для выбранного QA-патруля.`;
+    `GAME-023 · первый из ${snapshot.patrolCount}: ${snapshot.detection.monsterId}, ${formatElapsed(snapshot.detection.atSeconds)}, ${activity} · ${state}. Равное время разрешается по monster ID; ${executionScope}`;
 }
 
 /**
