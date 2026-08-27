@@ -155,12 +155,32 @@ export function copyFallenLibraryKnowledgeToBundle(
   carrierId: string,
   selectedEntryIds: readonly string[],
 ): PhysicalKnowledgeBundle {
-  return copyCityLibraryKnowledgeToBundle(
+  const bundle = copyCityLibraryKnowledgeToBundle(
     projection.recoverableArchive,
     carrierId,
     selectedEntryIds,
     projection.worldTimeSeconds,
   );
+  const selectedStates = selectedEntryIds.map((entryId) => {
+    const entryState = projection.entryStates.find(
+      (candidate) => candidate.entryId === entryId,
+    );
+    if (!entryState || !entryState.recoverable) {
+      throw new RangeError("selected fallen-library entry must be recoverable");
+    }
+    return entryState;
+  });
+  const archiveFidelity = Math.min(
+    ...selectedStates.map((state) => state.completenessFraction),
+  );
+  return {
+    ...bundle,
+    sourceKind: "fallen-city-library",
+    sourceId: projection.library.id,
+    fidelityFraction:
+      Math.round(bundle.fidelityFraction * archiveFidelity * 1_000_000) /
+      1_000_000,
+  };
 }
 
 function cloneEntry(

@@ -9,6 +9,7 @@ import {
   buyGoodFromCity,
   cityGood,
   copyPlayerKnowledgeToBundle,
+  copyPhysicalKnowledgeBundle,
   createCityLibraryArchive,
   createCityEconomyState,
   createTradeCaravanState,
@@ -86,7 +87,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 59 demo");
+console.log("Desert Caravan MMO — Checkpoint 60 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -242,6 +243,20 @@ if (demoNpcCaravan) {
   );
   console.log(
     `INFO-TRADE-001 local quote: city=${originLibrary.cityId}; novelty=${informationQuote.entryQuotes[0]?.noveltyMultiplier}; accuracy=${informationQuote.entryQuotes[0]?.accuracyMultiplier}; age=${informationQuote.entryQuotes[0]?.ageMultiplier}; confirmation=${informationQuote.entryQuotes[0]?.confirmationMultiplier}; value=${informationQuote.totalValueCredits} credits`,
+  );
+  const copiedBundle = copyPhysicalKnowledgeBundle(
+    bundle,
+    "demo-copy-carrier",
+    [evidence.entry.id],
+    weathered.worldTimeSeconds + 24 * 60 * 60,
+  );
+  const copiedQuote = quoteKnowledgeBundleForLibrary(
+    remoteLibrary,
+    copiedBundle,
+    copiedBundle.createdAtWorldTimeSeconds,
+  );
+  console.log(
+    `INFO-TRADE-002 physical copy: generation=${copiedBundle.copyGeneration}; fidelity=${copiedBundle.fidelityFraction.toFixed(2)}; entries=${copiedBundle.entries.length}/3; value=${copiedQuote.totalValueCredits} credits`,
   );
   const originCity = world.cities.find(
     (city) => city.id === demoNpcCaravan.originCityId,
@@ -929,5 +944,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 59 INFO-TRADE-001 information value complete: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 60 INFO-TRADE-002 constrained copies complete: npm run debug-map -> http://127.0.0.1:4173",
 );

@@ -22,6 +22,7 @@ export interface InformationEntryQuote {
   readonly knownObservationCount: number;
   readonly noveltyMultiplier: number;
   readonly accuracyMultiplier: number;
+  readonly bundleFidelityMultiplier: number;
   readonly ageSeconds: DurationSeconds;
   readonly ageMultiplier: number;
   readonly confirmationCount: number;
@@ -56,7 +57,7 @@ export function quoteKnowledgeBundleForLibrary(
 ): InformationBundleQuote {
   assertQuoteContext(library, bundle, quotedAtWorldTimeSeconds);
   const entryQuotes = bundle.entries.map((entry) =>
-    quoteEntry(library, entry, quotedAtWorldTimeSeconds),
+    quoteEntry(library, bundle, entry, quotedAtWorldTimeSeconds),
   );
   return {
     targetLibraryCityId: library.cityId,
@@ -86,6 +87,7 @@ export function sellKnowledgeBundleToLibrary(
 
 function quoteEntry(
   library: CityLibraryArchive,
+  bundle: PhysicalKnowledgeBundle,
   entry: PlayerWorldEvidenceEntry,
   quotedAtWorldTimeSeconds: DurationSeconds,
 ): InformationEntryQuote {
@@ -106,6 +108,10 @@ function quoteEntry(
             0.5 * (novelObservationCount / entry.provenance.length),
           );
   const accuracyMultiplier = informationAccuracyMultiplier(entry);
+  const bundleFidelityMultiplier = knowledgeBundleFidelityAtWorldTime(
+    bundle,
+    quotedAtWorldTimeSeconds,
+  );
   const ageSeconds =
     quotedAtWorldTimeSeconds - entry.latestObservedAtWorldTimeSeconds;
   const ageMultiplier = informationAgeMultiplier(ageSeconds);
@@ -124,6 +130,7 @@ function quoteEntry(
       strategicValueCredits *
         noveltyMultiplier *
         accuracyMultiplier *
+        bundleFidelityMultiplier *
         ageMultiplier *
         confirmationMultiplier,
     ),
@@ -136,6 +143,7 @@ function quoteEntry(
     knownObservationCount,
     noveltyMultiplier,
     accuracyMultiplier,
+    bundleFidelityMultiplier,
     ageSeconds,
     ageMultiplier,
     confirmationCount,
@@ -143,6 +151,27 @@ function quoteEntry(
     strategicValueCredits,
     valueCredits,
   };
+}
+
+/** Physical medium fidelity decays separately from the age of the observation. */
+export function knowledgeBundleFidelityAtWorldTime(
+  bundle: PhysicalKnowledgeBundle,
+  worldTimeSeconds: DurationSeconds,
+): number {
+  assertNonNegativeFinite(worldTimeSeconds, "worldTimeSeconds");
+  if (worldTimeSeconds < bundle.createdAtWorldTimeSeconds) {
+    throw new RangeError("bundle fidelity projection must not precede creation");
+  }
+  const carrierAgeSeconds = worldTimeSeconds - bundle.createdAtWorldTimeSeconds;
+  const carrierAgeMultiplier =
+    carrierAgeSeconds < 7 * 24 * 60 * 60
+      ? 1
+      : carrierAgeSeconds < 30 * 24 * 60 * 60
+        ? 0.9
+        : carrierAgeSeconds < 90 * 24 * 60 * 60
+          ? 0.7
+          : 0.5;
+  return roundMultiplier(bundle.fidelityFraction * carrierAgeMultiplier);
 }
 
 export function informationAgeMultiplier(

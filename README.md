@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 59 — INFO-TRADE-001: physical knowledge has a local transparent library value.**
+**Checkpoint 60 — INFO-TRADE-002: physical knowledge copies are constrained and degrade in value.**
 
 Implemented and covered by the automated test suite:
 
@@ -70,10 +70,11 @@ Also implemented:
 - TRADE-003 — a wallet-backed caravan buys into finite cargo capacity, physically follows a city-to-city RoutePlan, sells into the destination market and records journaled profit/loss.
 - TRADE-004 — an NPC trader reuses those exact market/cargo/route operations; its physical delivery changes destination stock and the next price quoted to the player.
 - INFO-TRADE-001 — a physical knowledge bundle is quoted per target library from novelty, accuracy, age, confirmations and strategic evidence type; an identical known observation is worth zero.
+- INFO-TRADE-002 — bundles carry at most three entries, direct copying stops at generation two, and copy/medium/fallen-archive fidelity lowers later local value.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
-Not implemented yet (intentionally): information copy/fidelity limits, automatic resupply, production chains, repeated sequential contacts, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, multiplayer, full Magic/System 256, and autonomous neural NPC / City / Species agents.
+Not implemented yet (intentionally): automatic resupply, production chains, repeated sequential contacts, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, multiplayer, full Magic/System 256, and autonomous neural NPC / City / Species agents.
 
 ## Requirements
 
@@ -108,15 +109,15 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 59:
+Expected for Checkpoint 60:
 
 ```text
-# tests 496
-# pass 496
+# tests 504
+# pass 504
 # fail 0
 ```
 
-This total includes the 8-test INFO-TRADE-001 information-market regression suite.
+This total includes the 8-test INFO-TRADE-002 copy/degradation regression suite.
 
 GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_54.md` for final MVP-1 details.
 
@@ -145,4 +146,4 @@ Then open `http://127.0.0.1:4173`. The world map is intentionally a developer ov
 
 The agreed MVP 0.1 implementation block is complete at GAME-025, MVP-1
 «Living Path» is complete at MVP1-001, and Trading Prototype is now in progress
-at INFO-TRADE-001. Tactical Combat and later stages remain gated.
+at INFO-TRADE-002. Tactical Combat and later stages remain gated.

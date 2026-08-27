@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.60 — Checkpoint 60
+
+- Added `INFO-TRADE-002`: physical bundles carry at most three entries and
+  direct copy chains stop after two generations.
+- Applied inherited copy fidelity plus separate physical-medium age degradation
+  to INFO-TRADE-001 quotes.
+- Made fallen-library fragments inherit the existing archive completeness loss
+  instead of restoring pristine knowledge.
+- Added eight INFO-TRADE-002 regressions; repository verification now runs 504
+  tests.
+
 ## 0.0.59 — Checkpoint 59
 
 - Added `INFO-TRADE-001`: deterministic physical-bundle quotes scoped to one

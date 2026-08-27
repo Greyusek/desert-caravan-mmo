@@ -7,9 +7,9 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 59 /
-INFO-TRADE-001 / version `0.0.59`: physical knowledge now has a transparent
-value scoped to one target library. Tactical
+MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 60 /
+INFO-TRADE-002 / version `0.0.60`: physical knowledge copies now have bounded
+size/generation and inherited fidelity degradation. Tactical
 Combat Prototype and every later roadmap stage remain gated by a separate user
 command.
 
@@ -37,6 +37,8 @@ command.
   destination delivery changes the price subsequently quoted to the player.
 - INFO-TRADE-001 quotes a physical bundle from target-library novelty, accuracy,
   age, confirmations/provenance and strategic evidence kind; exact repeats pay 0.
+- INFO-TRADE-002 limits bundles to three entries/two copy generations and carries
+  copy, medium-age and fallen-archive fidelity into the local price.
 
 ## Last known good main
 
@@ -47,21 +49,20 @@ command.
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `496/496` PASS, zero failures, compiled
-  Checkpoint 59 demo PASS.
-- Targeted INFO-TRADE-001 suite: `8/8` PASS.
+- Full `npm run verify:local`: `504/504` PASS, zero failures, compiled
+  Checkpoint 60 demo PASS.
+- Targeted INFO-TRADE-002 suite: `8/8` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 59, then implement
-`INFO-TRADE-002`.
+Complete the PR/CI/merge cycle for Checkpoint 60, then implement `UI-007`.
 
 ## Next action
 
-After stable `main`, start `INFO-TRADE-002` in its own feature branch. Limit
-small physical copies and add fidelity/age degradation so copied, stale and
-fallen-library fragments cannot reset themselves to pristine full value.
+After stable `main`, start `UI-007` in its own feature branch. Extend the current
+debug map only enough to expose goods/flows/prices, player cargo and journal,
+NPC market impact and target-library information quotes.
 
 ## Scope boundary
 
