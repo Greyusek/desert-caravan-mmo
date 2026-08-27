@@ -8,6 +8,7 @@ import {
   createRoutePlan,
   createWorldCoordinate,
   destinationPoint,
+  deriveNpcCaravanTrackMarks,
   discoverStaticObjectsAlongRoute,
   evaluateDiscoveryStopLifecycle,
   evaluateExpeditionOutcome,
@@ -24,6 +25,7 @@ import {
   kilometers,
   meters,
   npcCaravanPositionAtWorldTime,
+  observeCaravanTrack,
   planExpeditionMonsterDangerResponse,
   planExpeditionMonsterDangerResponseAmongPatrols,
   planExpeditionMonsterDangerResponseDuringIdleStop,
@@ -55,7 +57,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 43 demo");
+console.log("Desert Caravan MMO — Checkpoint 45 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -143,15 +145,29 @@ for (const city of world.cities) {
 }
 const demoNpcCaravan = world.npcCaravans[0];
 if (demoNpcCaravan) {
+  const halfwayWorldTime =
+    demoNpcCaravan.departsAtSeconds +
+    demoNpcCaravan.route.totalDurationSeconds / 2;
   const halfway = npcCaravanPositionAtWorldTime(
     demoNpcCaravan,
-    demoNpcCaravan.route.totalDurationSeconds / 2,
+    halfwayWorldTime,
   );
   console.log(
     `LIVING-001 ${demoNpcCaravan.id}: ${demoNpcCaravan.originCityId} -> ${demoNpcCaravan.destinationCityId}; status=${halfway.status}; progress=${(
       halfway.traveledDistanceMeters / demoNpcCaravan.route.totalDistanceMeters
     ).toFixed(3)}; coordinates=server-truth-only`,
   );
+  const marks = deriveNpcCaravanTrackMarks(demoNpcCaravan, halfwayWorldTime);
+  const latestMark = marks.at(-1);
+  if (latestMark) {
+    const clue = observeCaravanTrack(
+      latestMark,
+      halfwayWorldTime + 2 * 3_600,
+    );
+    console.log(
+      `LIVING-003 track clue: marks=${marks.length}; age=${clue.approximateAge}; direction=${clue.approximateDirection}; coordinates=not-exposed`,
+    );
+  }
 }
 console.log("CITY-001 finite city stocks:");
 for (const stocks of world.cityStocks) {
@@ -636,5 +652,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 43 route-backed NPC caravans: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 45 coordinate-free NPC tracks: npm run debug-map -> http://127.0.0.1:4173",
 );

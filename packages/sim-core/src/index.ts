@@ -21,3 +21,4 @@ export * from "./danger-detection.js";
 export * from "./danger-avoidance.js";
 export * from "./npc-caravan.js";
 export * from "./caravan-detection.js";
+export * from "./caravan-track.js";
