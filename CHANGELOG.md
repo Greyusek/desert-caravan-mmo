@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.61 — Checkpoint 61
+
+- Added `UI-007`: a compact Trading Prototype panel in the existing
+  dependency-free debug map.
+- Projected both seven-good city markets, production/consumption, prices,
+  capacity-limited player cargo, route result and the complete trade journal.
+- Exposed the later price change caused by a physical NPC delivery and the
+  different local values of novel, duplicate and degraded copied information.
+- Added six UI-007 regressions; repository verification now runs 510 tests.
+
 ## 0.0.60 — Checkpoint 60
 
 - Added `INFO-TRADE-002`: physical bundles carry at most three entries and

@@ -34,6 +34,7 @@ import {
   createReachedCityLandmarkInput,
   createSessionKnowledgeMapSnapshot,
   createStationaryStopPatrolPreset,
+  createTradingDebugSnapshot,
   projectCoordinate,
 } from "./map-model.js";
 import {
@@ -64,6 +65,29 @@ const clockSpeed = requireElement("clock-speed", HTMLSelectElement);
 const clockStatus = requireElement("clock-status", HTMLOutputElement);
 const worldMap = requireElement("world-map", SVGSVGElement);
 const errorMessage = requireElement("error-message", HTMLParagraphElement);
+const tradingRouteSummary = requireElement(
+  "trading-route-summary",
+  HTMLOutputElement,
+);
+const tradingOriginName = requireElement("trading-origin-name", HTMLSpanElement);
+const tradingDestinationName = requireElement(
+  "trading-destination-name",
+  HTMLSpanElement,
+);
+const tradingMarketBody = requireElement("trading-market-body", HTMLElement);
+const tradingProfit = requireElement("trading-profit", HTMLOutputElement);
+const tradingCargoSummary = requireElement("trading-cargo-summary", HTMLElement);
+const tradingJournal = requireElement("trading-journal", HTMLOListElement);
+const tradingNpcDelta = requireElement("trading-npc-delta", HTMLOutputElement);
+const tradingNpcSummary = requireElement("trading-npc-summary", HTMLElement);
+const tradingInformationValue = requireElement(
+  "trading-information-value",
+  HTMLOutputElement,
+);
+const tradingInformationSummary = requireElement(
+  "trading-information-summary",
+  HTMLElement,
+);
 const mapTitle = requireElement("map-title", HTMLHeadingElement);
 const cityCount = requireElement("city-count", HTMLElement);
 const objectCount = requireElement("object-count", HTMLElement);
@@ -729,6 +753,7 @@ function render() {
       elapsedSeconds,
       2,
     );
+    const trading = createTradingDebugSnapshot(snapshot.seed);
     if (discoveryLedger.worldSeed !== snapshot.seed) {
       discoveryLedger = createPlayerDiscoveryLedger(snapshot.seed);
       travelLedger = createPlayerTravelLedger(snapshot.seed);
@@ -1138,6 +1163,7 @@ function render() {
       dangerAvoidance,
     );
     renderDiscoveryLedger(discoveryLedger, travelLedger, snapshot);
+    renderTradingPrototype(trading);
     renderCaravanStatus(caravanStatus);
     renderSupplyEmergencyDoctrine(supplyEmergency, startCity, outcome);
     renderMultiPatrolDangerDetection(multiPatrolDangerDetection);
@@ -1178,6 +1204,119 @@ function render() {
     errorMessage.textContent = error instanceof Error ? error.message : String(error);
     errorMessage.hidden = false;
   }
+}
+
+/**
+ * @param {ReturnType<typeof createTradingDebugSnapshot>} snapshot
+ * @returns {void}
+ */
+function renderTradingPrototype(snapshot) {
+  const [origin, destination] = snapshot.cities;
+  if (!origin || !destination) {
+    throw new Error("Trading Prototype требует два города");
+  }
+  tradingOriginName.textContent = origin.name;
+  tradingDestinationName.textContent = destination.name;
+  tradingRouteSummary.textContent = `${origin.name} → ${destination.name} · ${formatNumber(snapshot.route.distanceMeters / 1_000, 0)} км · ${formatElapsed(snapshot.route.durationSeconds)}`;
+
+  /** @type {Record<import("../sim-core/dist/src/index.js").TradeGoodId, string>} */
+  const goodLabels = {
+    food: "Еда",
+    water: "Вода",
+    salt: "Соль",
+    textiles: "Ткани",
+    ore: "Руда",
+    medicine: "Лекарства",
+    tools: "Инструменты",
+  };
+  tradingMarketBody.replaceChildren(
+    ...origin.goods.map((originGood) => {
+      const destinationGood = destination.goods.find(
+        (candidate) => candidate.goodId === originGood.goodId,
+      );
+      if (!destinationGood) {
+        throw new Error(`Нет рынка назначения для ${originGood.goodId}`);
+      }
+      const row = document.createElement("tr");
+      row.dataset.active = String(originGood.goodId === snapshot.route.goodId);
+      const values = [
+        goodLabels[originGood.goodId],
+        formatNumber(originGood.stockUnits),
+        `${formatNumber(originGood.productionUnitsPerDay)} / ${formatNumber(originGood.consumptionUnitsPerDay)}`,
+        `${originGood.citySellPriceCredits} кр`,
+        formatNumber(destinationGood.stockUnits),
+        `${formatNumber(destinationGood.productionUnitsPerDay)} / ${formatNumber(destinationGood.consumptionUnitsPerDay)}`,
+        `${destinationGood.cityBuyPriceCredits} кр`,
+      ];
+      row.replaceChildren(
+        ...values.map((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          return cell;
+        }),
+      );
+      return row;
+    }),
+  );
+
+  const cargo = snapshot.player.loadedStacks
+    .map((stack) => `${goodLabels[stack.goodId]}: ${stack.units}`)
+    .join(", ");
+  tradingProfit.textContent = `${snapshot.player.profitCredits >= 0 ? "+" : ""}${snapshot.player.profitCredits} кр`;
+  renderTradingSummary(tradingCargoSummary, [
+    ["Груз после покупки", cargo],
+    ["Занято", `${snapshot.player.loadedCargoUnits} / ${snapshot.player.capacityCargoUnits}`],
+    ["Кошелёк", `${snapshot.player.startingCredits} → ${snapshot.player.endingCredits} кр`],
+    ["Груз после продажи", snapshot.player.endingStacks.length === 0 ? "пусто" : "остался"],
+  ]);
+  tradingJournal.replaceChildren(
+    ...snapshot.player.journal.map((event) => {
+      const item = document.createElement("li");
+      const detail =
+        event.kind === "purchase" || event.kind === "sale"
+          ? ` · ${event.units} ${goodLabels[event.goodId]} · ${event.creditsDelta > 0 ? "+" : ""}${event.creditsDelta} кр`
+          : "";
+      item.textContent = `${formatElapsed(event.atWorldTimeSeconds)} · ${event.kind}${detail}`;
+      return item;
+    }),
+  );
+
+  const npcPriceDelta =
+    snapshot.npc.quoteAfterSale.cityBuyPriceCredits -
+    snapshot.npc.quoteBeforeSale.cityBuyPriceCredits;
+  tradingNpcDelta.textContent = `${npcPriceDelta > 0 ? "+" : ""}${npcPriceDelta} кр/ед`;
+  renderTradingSummary(tradingNpcSummary, [
+    ["Торговец", snapshot.npc.traderId],
+    ["Доставлено", `${snapshot.npc.units} ед. руды`],
+    ["Цена до / после", `${snapshot.npc.quoteBeforeSale.cityBuyPriceCredits} → ${snapshot.npc.quoteAfterSale.cityBuyPriceCredits} кр`],
+    ["Журнал", snapshot.npc.journalKinds.join(" → ")],
+  ]);
+
+  tradingInformationValue.textContent = `${snapshot.information.directValueCredits} кр`;
+  renderTradingSummary(tradingInformationSummary, [
+    ["Новая запись", `${snapshot.information.directValueCredits} кр`],
+    ["Повтор в той же библиотеке", `${snapshot.information.duplicateValueCredits} кр`],
+    ["Физическая копия", `${snapshot.information.copiedValueCredits} кр`],
+    ["Поколение / точность", `${snapshot.information.copyGeneration} / ${Math.round(snapshot.information.copiedFidelityFraction * 100)}%`],
+  ]);
+}
+
+/**
+ * @param {HTMLElement} list
+ * @param {readonly (readonly [string, string])[]} rows
+ */
+function renderTradingSummary(list, rows) {
+  list.replaceChildren(
+    ...rows.map(([label, value]) => {
+      const row = document.createElement("div");
+      const term = document.createElement("dt");
+      const detail = document.createElement("dd");
+      term.textContent = label;
+      detail.textContent = value;
+      row.append(term, detail);
+      return row;
+    }),
+  );
 }
 
 /** @returns {void} */

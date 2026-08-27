@@ -87,7 +87,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 60 demo");
+console.log("Desert Caravan MMO — Checkpoint 61 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -944,5 +944,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 60 INFO-TRADE-002 constrained copies complete: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 61 UI-007 Trading Prototype projection complete: npm run debug-map -> http://127.0.0.1:4173",
 );

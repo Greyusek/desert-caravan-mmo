@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 60 — INFO-TRADE-002: physical knowledge copies are constrained and degrade in value.**
+**Checkpoint 61 — UI-007: the complete Trading Prototype state is visible in the debug map.**
 
 Implemented and covered by the automated test suite:
 
@@ -71,6 +71,7 @@ Also implemented:
 - TRADE-004 — an NPC trader reuses those exact market/cargo/route operations; its physical delivery changes destination stock and the next price quoted to the player.
 - INFO-TRADE-001 — a physical knowledge bundle is quoted per target library from novelty, accuracy, age, confirmations and strategic evidence type; an identical known observation is worth zero.
 - INFO-TRADE-002 — bundles carry at most three entries, direct copying stops at generation two, and copy/medium/fallen-archive fidelity lowers later local value.
+- UI-007 — the existing debug map projects city production/consumption and prices, player cargo and journal, physical route profit, NPC market impact and local information value.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
@@ -109,15 +110,15 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 60:
+Expected for Checkpoint 61:
 
 ```text
-# tests 504
-# pass 504
+# tests 510
+# pass 510
 # fail 0
 ```
 
-This total includes the 8-test INFO-TRADE-002 copy/degradation regression suite.
+This total includes the 6-test UI-007 Trading Prototype projection suite.
 
 GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_54.md` for final MVP-1 details.
 
@@ -129,7 +130,7 @@ Launch the first browser view with:
 npm run debug-map
 ```
 
-Then open `http://127.0.0.1:4173`. The world map is intentionally a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, supplies, timeline, doctrines, outcomes and Power/FLEE resolution. The separate player-facing map starts as unexplored darkness. Select `STOP`, press `DEV: маршрут к цели`, and advance time: only the actually travelled path cuts a transparent corridor with a physical radius of 300 m. Planned future legs are never drawn, moving the DEV slider backwards does not erase retained visibility, and earlier expedition corridors remain. The center line and confirmed knowledge markers stay visible above the fog. Independent origin cities still use separate charts. After an authoritative city arrival, the reached city appears as a confirmed relative landmark only on the expedition's origin-city chart. `DEV: возврат в пути` prepares GAME-017; two more clicks advance to the moving 50% decision and successful origin-city re-entry. `DEV: возврат из STOP` prepares GAME-018 with a six-hour discovery wait and idle-only consumption; its next two clicks advance to the two-hour 50% boundary and then the same authoritative return. For moving GAME-023, keep `AVOID` selected and press `DEV: маршрут на перехват`; the first warning is selected across both generated patrols and every detour candidate is continuously checked against both. For GAME-024, keep `STOP` and `AVOID` selected and press `DEV: опасность во время STOP`; the next two clicks advance to the exact idle warning and then the end of the all-patrol-clear detour. World time advances while route time remains pinned, only the remaining part of the six-hour wait is cancelled, and the journal records `danger-avoidance` resume provenance without a patrol contact. Repeat with `CONTINUE` to preserve the full wait and stable first 500 m contact. GAME-025 now sends the first contact across both patrols into the same outcome and journal path; the patrol selector controls presentation/QA setup, not contact authority. The danger panel reports the winning patrol and confirms all-patrol clearance for both moving and STOP execution. The local contact inset still draws both concentric server-truth boundaries. Discoveries, tracks, city landmarks and session fog reset together on a different seed, page reload or the clear button. Existing arrival, idle-contact and Power/FLEE DEV presets remain available. Stop the server with `Ctrl+C`.
+Then open `http://127.0.0.1:4173`. The new Trading Prototype panel shows both seven-good markets, production/consumption, prices, loaded cargo, the player journal and profit, the next quote changed by an NPC delivery, and novel/duplicate/copied information values for the selected seed. The world map remains a developer overlay: it shows exact coordinates, hidden static objects, monster radii, patrol routes, the editable four-segment caravan route, supplies, timeline, doctrines, outcomes and Power/FLEE resolution. The separate player-facing map starts as unexplored darkness. Select `STOP`, press `DEV: маршрут к цели`, and advance time: only the actually travelled path cuts a transparent corridor with a physical radius of 300 m. Planned future legs are never drawn, moving the DEV slider backwards does not erase retained visibility, and earlier expedition corridors remain. The center line and confirmed knowledge markers stay visible above the fog. Independent origin cities still use separate charts. After an authoritative city arrival, the reached city appears as a confirmed relative landmark only on the expedition's origin-city chart. `DEV: возврат в пути` prepares GAME-017; two more clicks advance to the moving 50% decision and successful origin-city re-entry. `DEV: возврат из STOP` prepares GAME-018 with a six-hour discovery wait and idle-only consumption; its next two clicks advance to the two-hour 50% boundary and then the same authoritative return. For moving GAME-023, keep `AVOID` selected and press `DEV: маршрут на перехват`; the first warning is selected across both generated patrols and every detour candidate is continuously checked against both. For GAME-024, keep `STOP` and `AVOID` selected and press `DEV: опасность во время STOP`; the next two clicks advance to the exact idle warning and then the end of the all-patrol-clear detour. World time advances while route time remains pinned, only the remaining part of the six-hour wait is cancelled, and the journal records `danger-avoidance` resume provenance without a patrol contact. Repeat with `CONTINUE` to preserve the full wait and stable first 500 m contact. GAME-025 now sends the first contact across both patrols into the same outcome and journal path; the patrol selector controls presentation/QA setup, not contact authority. The danger panel reports the winning patrol and confirms all-patrol clearance for both moving and STOP execution. The local contact inset still draws both concentric server-truth boundaries. Discoveries, tracks, city landmarks and session fog reset together on a different seed, page reload or the clear button. Existing arrival, idle-contact and Power/FLEE DEV presets remain available. Stop the server with `Ctrl+C`.
 
 ## Project structure
 
@@ -146,4 +147,4 @@ Then open `http://127.0.0.1:4173`. The world map is intentionally a developer ov
 
 The agreed MVP 0.1 implementation block is complete at GAME-025, MVP-1
 «Living Path» is complete at MVP1-001, and Trading Prototype is now in progress
-at INFO-TRADE-002. Tactical Combat and later stages remain gated.
+at UI-007. Tactical Combat and later stages remain gated.

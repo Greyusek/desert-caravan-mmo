@@ -7,11 +7,11 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 60 /
-INFO-TRADE-002 / version `0.0.60`: physical knowledge copies now have bounded
-size/generation and inherited fidelity degradation. Tactical
-Combat Prototype and every later roadmap stage remain gated by a separate user
-command.
+MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 61 / UI-007 /
+version `0.0.61`: the existing debug map now projects the material and
+information economy as one deterministic Trading Prototype QA scenario.
+Tactical Combat Prototype and every later roadmap stage remain gated by a
+separate user command.
 
 ## Completed
 
@@ -39,30 +39,35 @@ command.
   age, confirmations/provenance and strategic evidence kind; exact repeats pay 0.
 - INFO-TRADE-002 limits bundles to three entries/two copy generations and carries
   copy, medium-age and fallen-archive fidelity into the local price.
+- UI-007 exposes both seven-good markets, production/consumption, cargo and the
+  player journal/profit, physical NPC price impact and differentiated local
+  information quotes without duplicating sim-core formulas in the DOM.
 
 ## Last known good main
 
-- `cfa92c9009e1abe8685cfe78b80df785da6a7a54` — merge of PR #62;
-  tree `35c8b60ed3840723024043252bffe92bcd7ae29a`.
-- `main` exactly matches `origin/main`; PR #62 is merged and no PR is open.
+- `99c392ff9c156d340195a0c5c4910e40209226a9` — merge of PR #69;
+  tree `cf476cc4fbbbfabb28688062f15955c5220df40e`.
+- `main` exactly matched `origin/main` before the UI-007 feature branch; PR #69
+  is merged and its GitHub CI run #151 succeeded.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `504/504` PASS, zero failures, compiled
-  Checkpoint 60 demo PASS.
-- Targeted INFO-TRADE-002 suite: `8/8` PASS.
+- Full `npm run verify:local`: `510/510` PASS, zero failures, compiled
+  Checkpoint 61 demo PASS.
+- Debug-map suite: `132/132` PASS, including `6/6` new UI-007 regressions.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 60, then implement `UI-007`.
+Complete the PR/CI/merge cycle for Checkpoint 61, then implement `TRADING-001`.
 
 ## Next action
 
-After stable `main`, start `UI-007` in its own feature branch. Extend the current
-debug map only enough to expose goods/flows/prices, player cargo and journal,
-NPC market impact and target-library information quotes.
+After stable `main`, start `TRADING-001` in its own feature branch. Add one
+authoritative seeded end-to-end scenario that composes the player goods route,
+later NPC market impact and physically delivered library information, then close
+Stage 3 and stop before Tactical Combat.
 
 ## Scope boundary
 
