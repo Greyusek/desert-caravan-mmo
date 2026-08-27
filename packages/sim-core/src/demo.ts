@@ -3,6 +3,7 @@ import {
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
   createKnownObjectReturnNavigation,
+  createNpcCaravanRemains,
   createPlayerDiscoveryLedger,
   createRumorSearchScenario,
   createRoutePlan,
@@ -35,6 +36,7 @@ import {
   positionAtTime,
   projectCitySettlementAtTime,
   projectCityStocksAtTime,
+  projectCaravanRemainsAtWorldTime,
   projectSupplies,
   recordDirectDiscoveryObservation,
   resolveMonsterPowerContact,
@@ -57,7 +59,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 46 demo");
+console.log("Desert Caravan MMO — Checkpoint 47 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -168,6 +170,19 @@ if (demoNpcCaravan) {
       `LIVING-003 track clue: marks=${marks.length}; age=${clue.approximateAge}; direction=${clue.approximateDirection}; coordinates=not-exposed`,
     );
   }
+  const remains = createNpcCaravanRemains(
+    world.seed,
+    demoNpcCaravan,
+    halfwayWorldTime,
+    "caravan-contact",
+  );
+  const weathered = projectCaravanRemainsAtWorldTime(
+    remains,
+    halfwayWorldTime + 4 * 24 * 60 * 60,
+  );
+  console.log(
+    `CONSEQUENCE-001 ${remains.id}: condition=${weathered.condition}; integrity=${weathered.integrityFraction.toFixed(3)}; loot=${weathered.availableLoot.foodUnits}/${weathered.availableLoot.waterUnits}/${weathered.availableLoot.salvageUnits}; permanent=${weathered.permanentlyPresent}`,
+  );
 }
 console.log("CITY-001 finite city stocks:");
 for (const stocks of world.cityStocks) {
@@ -652,5 +667,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 46 route-backed pursuit/evasion: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 47 permanent degrading caravan remains: npm run debug-map -> http://127.0.0.1:4173",
 );
