@@ -4,10 +4,14 @@ import {
   canSurviveDuration,
   catchUpPersistentCreature,
   advanceCityEconomyToWorldTime,
+  arriveTradeJourney,
+  beginTradeJourney,
+  buyGoodFromCity,
   cityGood,
   copyPlayerKnowledgeToBundle,
   createCityLibraryArchive,
   createCityEconomyState,
+  createTradeCaravanState,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -37,6 +41,7 @@ import {
   findFirstMovingEncounter,
   greatCircleDistance,
   generateSeededWorld,
+  initialBearingDegrees,
   kilometers,
   meters,
   npcCaravanPositionAtWorldTime,
@@ -58,6 +63,7 @@ import {
   recordCreatureLegendEvent,
   recordObservedCaravanRemains,
   resolveMonsterPowerContact,
+  sellGoodToCity,
   resumeStaticObjectDiscoveryDoctrine,
   timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
@@ -78,7 +84,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 56 demo");
+console.log("Desert Caravan MMO — Checkpoint 57 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -312,6 +318,87 @@ if (firstCityStocks && firstCityPopulation) {
   console.log(
     `TRADE-002 ${economy.cityId} food: stock=${foodQuote.stockUnits.toFixed(1)}; target=${foodQuote.targetStockUnits.toFixed(1)}; pressure=${foodQuote.scarcityMultiplier.toFixed(3)}x; city buys/sells=${foodQuote.cityBuyPriceCredits}/${foodQuote.citySellPriceCredits} credits`,
   );
+  const destinationCity = world.cities[1];
+  const destinationStocks = world.cityStocks[1];
+  const destinationPopulation = world.cityPopulations[1];
+  const originCity = world.cities[0];
+  if (
+    originCity &&
+    destinationCity &&
+    destinationStocks &&
+    destinationPopulation
+  ) {
+    const originMarket = {
+      ...economy,
+      goods: economy.goods.map((good) =>
+        good.goodId === "ore" ? { ...good, stockUnits: 1_000_000 } : good,
+      ),
+    };
+    const destinationMarket = createCityEconomyState(
+      world.seed,
+      destinationStocks,
+      destinationPopulation,
+    );
+    const scarceDestinationMarket = {
+      ...destinationMarket,
+      goods: destinationMarket.goods.map((good) =>
+        good.goodId === "ore" ? { ...good, stockUnits: 0 } : good,
+      ),
+    };
+    const trader = createTradeCaravanState(
+      "demo-trader",
+      originCity.id,
+      1_000,
+      20,
+    );
+    const purchase = buyGoodFromCity(
+      originMarket,
+      trader,
+      "ore",
+      10,
+      0,
+    );
+    const physicalRoute = createRoutePlan(
+      originCity.position,
+      [
+        {
+          bearingDeg: initialBearingDegrees(
+            originCity.position,
+            destinationCity.position,
+          ),
+          distanceMeters: greatCircleDistance(
+            originCity.position,
+            destinationCity.position,
+          ),
+        },
+      ],
+      10,
+    );
+    const travelling = beginTradeJourney(
+      purchase.caravan,
+      originCity,
+      destinationCity,
+      physicalRoute,
+      0,
+    );
+    const arrived = arriveTradeJourney(
+      travelling,
+      physicalRoute.totalDurationSeconds,
+    );
+    const sale = sellGoodToCity(
+      {
+        ...scarceDestinationMarket,
+        updatedAtWorldTimeSeconds: physicalRoute.totalDurationSeconds,
+      },
+      arrived,
+      "ore",
+      10,
+      physicalRoute.totalDurationSeconds,
+    );
+    console.log(
+      `TRADE-003 physical route: ${originCity.id}->${destinationCity.id}; ore=10; capacity=20/20; journal=${sale.caravan.journal.length}; profit=${sale.profitCredits} credits`,
+    );
+  }
 }
 console.log(`WORLD-002 hidden static objects: ${world.staticObjects.length}`);
 for (const object of world.staticObjects) {
@@ -814,5 +901,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 56 TRADE-002 stock prices complete: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 57 TRADE-003 physical trade route complete: npm run debug-map -> http://127.0.0.1:4173",
 );

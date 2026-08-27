@@ -7,9 +7,9 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 56 /
-TRADE-002 / version `0.0.56`: seven finite city goods now have bounded local
-stock/demand prices. Tactical
+MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 57 /
+TRADE-003 / version `0.0.57`: player cargo now completes a capacity-limited
+physical buy-route-sell loop with journaled profit/loss. Tactical
 Combat Prototype and every later roadmap stage remain gated by a separate user
 command.
 
@@ -31,6 +31,8 @@ command.
   and guarantees one deterministic surplus and deficit flow per city.
 - TRADE-002 derives city buy/sell quotes from thirty-day target demand, current
   stock, `0.5x..3x` scarcity bounds and a fixed 10% spread.
+- TRADE-003 changes the same markets through capacity-limited purchase and sale,
+  requires physical route completion and retains cost basis for route profit.
 
 ## Last known good main
 
@@ -41,19 +43,20 @@ command.
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `472/472` PASS, zero failures, compiled
-  Checkpoint 56 demo PASS.
-- Targeted TRADE-002 suite: `6/6` PASS.
+- Full `npm run verify:local`: `482/482` PASS, zero failures, compiled
+  Checkpoint 57 demo PASS.
+- Targeted TRADE-003 suite: `10/10` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 56, then implement `TRADE-003`.
+Complete the PR/CI/merge cycle for Checkpoint 57, then implement `TRADE-004`.
 
 ## Next action
 
-After stable `main`, start `TRADE-003` in its own feature branch: capacity-bound
-cargo, local buy/sell operations, physical route delivery, journal and profit.
+After stable `main`, start `TRADE-004` in its own feature branch. An NPC trader
+must reuse the same buy, cargo, route, arrival and sale operations so its action
+changes the later quote seen by the player.
 
 ## Scope boundary
 
