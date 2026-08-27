@@ -7,45 +7,47 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is in progress. Checkpoint 47 / CONSEQUENCE-001 / version
-`0.0.47` adds permanent degrading caravan remains with minimal loot.
+MVP-1 «Living Path» is in progress. Checkpoint 48 / KNOWLEDGE-001 / version
+`0.0.48` adds coordinate-free provenance-aware world evidence knowledge.
 
 ## Completed
 
-- NPC destruction creates a permanent authoritative object at the exact
-  world-time-projected caravan position.
-- A deterministic temporary stub generates small food, water and salvage loot
-  without introducing a production inventory or economy.
-- Integrity and naturally remaining loot degrade linearly to zero over seven
-  game days; the ruined object itself remains permanently present.
-- Recovery takes only currently available loot, records recovered totals and
-  cannot duplicate resources on repeated calls.
+- Track and remains observations enter a dedicated session evidence state.
+- Every knowledge entry stores first/latest observation time, confidence and a
+  complete ordered provenance list.
+- Direct track clues are `probable`; direct remains inspection is `confirmed`.
+- Every accepted observation appends exactly one coordinate-free journal event;
+  repeated renders at the same time are idempotent.
+- Later observations preserve provenance and update current facts, including
+  remains becoming ruined/empty.
+- Serialized player state contains no coordinates, destruction time or source
+  caravan identity.
 
 ## Last known good commit
 
-- `bf236071831d83bc87c7c999bfaca10bf1684e63` — CONSEQUENCE-001 functional commit;
-  tree `d37f225acc5752f6a265d94d99da38ad1d17d7fe`.
-- Branch: `feature/consequence-001-caravan-remains`; PR/merge status is
+- `54403ca2af49b1daeb18fded2a46b29834d29523` — KNOWLEDGE-001 functional commit;
+  tree `82641de5c9c4dffccfa1177f1764a5bc8083ecf7`.
+- Branch: `feature/knowledge-001-evidence-ledger`; PR/merge status is
   updated after the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `402/402` PASS, zero failures, compiled
-  Checkpoint 47 demo PASS.
-- Targeted LIVING-004 / CONSEQUENCE-001 suite: `14/14` PASS.
+- Full `npm run verify:local`: `409/409` PASS, zero failures, compiled
+  Checkpoint 48 demo PASS.
+- Targeted track/remains/evidence suite: `20/20` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 47, then continue immediately to
-KNOWLEDGE-001.
+Complete the PR/CI/merge cycle for Checkpoint 48, then continue immediately to
+LIBRARY-001.
 
 ## Next action
 
-`KNOWLEDGE-001`: record track/remains observations in player knowledge and the
-event journal with source, observation time and confidence. Preserve coordinate
-secrecy and do not introduce persistent storage yet.
+`LIBRARY-001`: add local city archives and physical knowledge deposit/copy
+transfer without global synchronization. Preserve provenance/confidence and use
+only a minimal deterministic value stub instead of Trading Prototype economics.
 
 ## Scope boundary
 
