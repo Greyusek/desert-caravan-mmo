@@ -57,6 +57,7 @@ import {
   projectCitySettlementAtTime,
   projectCityStocksAtTime,
   quoteCityGoodPrice,
+  quoteKnowledgeBundleForLibrary,
   projectCaravanRemainsAtWorldTime,
   projectFallenCityLibraryAtWorldTime,
   projectSupplies,
@@ -85,7 +86,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 58 demo");
+console.log("Desert Caravan MMO — Checkpoint 59 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -231,8 +232,16 @@ if (demoNpcCaravan) {
     demoNpcCaravan.destinationCityId,
   );
   const deposit = depositKnowledgeBundle(originLibrary, bundle);
+  const informationQuote = quoteKnowledgeBundleForLibrary(
+    originLibrary,
+    bundle,
+    weathered.worldTimeSeconds,
+  );
   console.log(
     `LIBRARY-001 physical deposit: ${originLibrary.cityId}=${deposit.library.entries.length}; ${remoteLibrary.cityId}=${remoteLibrary.entries.length}; value-stub=${deposit.informationValueUnits}`,
+  );
+  console.log(
+    `INFO-TRADE-001 local quote: city=${originLibrary.cityId}; novelty=${informationQuote.entryQuotes[0]?.noveltyMultiplier}; accuracy=${informationQuote.entryQuotes[0]?.accuracyMultiplier}; age=${informationQuote.entryQuotes[0]?.ageMultiplier}; confirmation=${informationQuote.entryQuotes[0]?.confirmationMultiplier}; value=${informationQuote.totalValueCredits} credits`,
   );
   const originCity = world.cities.find(
     (city) => city.id === demoNpcCaravan.originCityId,
@@ -920,5 +929,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 58 TRADE-004 NPC trader complete: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 59 INFO-TRADE-001 information value complete: npm run debug-map -> http://127.0.0.1:4173",
 );
