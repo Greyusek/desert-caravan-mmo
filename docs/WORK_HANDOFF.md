@@ -2,13 +2,14 @@
 
 Updated: 27 August 2026
 
-This is the short operational recovery point for the autonomous MAIN3 series.
+This is the short operational recovery point for the autonomous MAIN4 series.
 Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
 MVP-1 «Living Path» is complete at Checkpoint 54 / MVP1-001 / version `0.0.54`.
-Trading Prototype and every later roadmap stage remain gated by a separate user
+MAIN4 is authorized to complete only Stage 3 — Trading Prototype. Tactical
+Combat Prototype and every later roadmap stage remain gated by a separate user
 command.
 
 ## Completed
@@ -26,39 +27,40 @@ command.
 - Checkpoints 43–53 retain their independent regression coverage, including
   persistent catch-up, creature intelligence and earned legendary history.
 
-## Last known good commit
+## Last known good main
 
-- `cc7624788adc98cb103d71aef15dd412dd7c2866` — MVP1-001 functional commit;
-  tree `6b654df10356119b614ec3dd4fb3d63ba95a87e1`.
-- Branch: `feature/mvp1-001-living-path`; final PR/merge status is
-  updated after the GitHub quality gate.
+- `cfa92c9009e1abe8685cfe78b80df785da6a7a54` — merge of PR #62;
+  tree `35c8b60ed3840723024043252bffe92bcd7ae29a`.
+- `main` exactly matches `origin/main`; PR #62 is merged and no PR is open.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `458/458` PASS, zero failures, compiled
-  Checkpoint 54 demo PASS.
+- Clean baseline `npm ci` and full `npm run verify:local`: `458/458` PASS,
+  zero failures, compiled Checkpoint 54 demo PASS.
 - Targeted MVP1-001 suite: `11/11` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 54, verify stable `main`, then
-stop the MAIN3 autonomous series.
+Publish the documentation-only Trading Prototype decomposition, then implement
+the queue in order: `TRADE-001`, `TRADE-002`, `TRADE-003`, `TRADE-004`,
+`INFO-TRADE-001`, `INFO-TRADE-002`, `UI-007`, `TRADING-001`.
 
 ## Next action
 
-None inside MAIN3. Do not begin Trading Prototype without a separate command.
+Complete the docs PR without a version bump, return to current `main`, then
+start `TRADE-001` in its own feature branch.
 
 ## Scope boundary
 
-No trading economy, production chains, tactical combat, PvP, multiplayer,
-database, full physical-map inventory, Magic/System 256 or neural agents.
+No tactical combat, PvP, multiplayer, production database, player settlements,
+full Magic/System 256, neural agents or broad production-chain simulation.
 
 ## Resume instruction
 
-Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, the MVP-1 section of
-`docs/ROADMAP.md`, `docs/MVP_SPEC.md`, this file and the latest checkpoint only.
-Verify the branch/PR/main state and finish the current quality gate if needed.
-If Checkpoint 54 is merged and `main` is green, remain stopped until the user
-selects a new roadmap stage.
+Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, Stage 3 of
+`docs/ROADMAP.md`, the relevant knowledge/economy parts of `docs/MVP_SPEC.md`,
+this file and the latest checkpoint only. Verify the active branch/PR/main
+state, finish any current quality gate, and resume at the first unchecked MAIN4
+queue item. Stop after `TRADING-001`; Tactical Combat requires a new command.
