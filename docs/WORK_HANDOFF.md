@@ -7,46 +7,46 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is in progress. Checkpoint 50 / LIBRARY-002 / version
-`0.0.50` adds permanent degrading fallen-city libraries.
+MVP-1 «Living Path» is in progress. Checkpoint 51 / HISTORY-001 / version
+`0.0.51` adds multiple coordinate-free rumor types and information quality.
 
 ## Completed
 
-- A city fall snapshots its local archive into a permanent world object at the
-  exact authoritative city position.
-- Information completeness declines continuously to zero over 30 game days;
-  readability changes clear → fragmentary → illegible.
-- Information becomes stale after seven days and obsolete at full loss;
-  confirmed confidence downgrades below 50% completeness.
-- Readable entries can leave only in an explicit physical carrier bundle.
-- The fallen object remains discoverable after all entries become unrecoverable.
-- Projection never mutates the original live/archive snapshot.
+- One public contract supports caravan-passage, caravan-loss,
+  creature-sighting and fallen-library rumors.
+- Quality rises deterministically through unverified, rough, reliable and
+  corroborated based on confidence and independent source count.
+- Age is exposed only as fresh, recent, old or ancient; exact observation time
+  remains outside the player-facing rumor.
+- Source ordering is normalized, so identical evidence reproduces identity and
+  content independently of input order.
+- Rumors contain no absolute coordinates.
 
 ## Last known good commit
 
-- `b7a4c982c5cf881b453906b50876e218b160a90b` — LIBRARY-002 functional commit;
-  tree `ff541a7d020f87a71ccaff4f3f485fb007177bed`.
-- Branch: `feature/library-002-fallen-archives`; PR/merge status is
+- `588333d8a9513efaf145f7ab3e7e78c5f432e047` — HISTORY-001 functional commit;
+  tree `7f849388d93aa6d3730e22d6ffd0e2b72e0a0357`.
+- Branch: `feature/history-001-rumor-quality`; PR/merge status is
   updated after the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `424/424` PASS, zero failures, compiled
-  Checkpoint 50 demo PASS.
-- Targeted live/fallen library suite: `15/15` PASS.
+- Full `npm run verify:local`: `430/430` PASS, zero failures, compiled
+  Checkpoint 51 demo PASS.
+- Targeted HISTORY-001 suite: `6/6` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 50, then continue immediately to
-HISTORY-001.
+Complete the PR/CI/merge cycle for Checkpoint 51, then continue immediately to
+HISTORY-002.
 
 ## Next action
 
-`HISTORY-001`: add rumor quality, persistent creature/population catch-up,
-coordinate-free creature intelligence and earned legendary history as small
-dependency-ordered slices without implementing full Magic/System 256.
+`HISTORY-002`: add persistent creatures/populations with explicit detail levels
+and deterministic catch-up for time outside detailed simulation. Do not add
+neural agents, tactical combat or production persistence.
 
 ## Scope boundary
 
