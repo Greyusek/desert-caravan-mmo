@@ -6,7 +6,16 @@ import type {
   WorldEvidenceProvenance,
 } from "./world-evidence.js";
 
-export type PhysicalKnowledgeSourceKind = "traveller" | "city-library";
+export const MAX_KNOWLEDGE_BUNDLE_ENTRIES = 3;
+export const MAX_KNOWLEDGE_COPY_GENERATION = 2;
+export const KNOWLEDGE_COPY_FIDELITY_MULTIPLIER = 0.8;
+export const CITY_LIBRARY_COPY_FIDELITY = 0.85;
+
+export type PhysicalKnowledgeSourceKind =
+  | "traveller"
+  | "city-library"
+  | "physical-copy"
+  | "fallen-city-library";
 
 export interface PhysicalKnowledgeBundle {
   readonly id: string;
@@ -16,6 +25,8 @@ export interface PhysicalKnowledgeBundle {
   readonly sourceId: string;
   readonly carrierId: string;
   readonly createdAtWorldTimeSeconds: DurationSeconds;
+  readonly copyGeneration: number;
+  readonly fidelityFraction: number;
   readonly entries: readonly PlayerWorldEvidenceEntry[];
 }
 
@@ -62,6 +73,8 @@ export function copyPlayerKnowledgeToBundle(
     state.entries,
     selectedEntryIds,
     createdAtWorldTimeSeconds,
+    0,
+    1,
   );
 }
 
@@ -81,6 +94,38 @@ export function copyCityLibraryKnowledgeToBundle(
     library.entries,
     selectedEntryIds,
     createdAtWorldTimeSeconds,
+    1,
+    CITY_LIBRARY_COPY_FIDELITY,
+  );
+}
+
+/**
+ * INFO-TRADE-002 copies an existing physical carrier without restoring source
+ * quality. Each generation loses fidelity and the chain stops after two copies.
+ */
+export function copyPhysicalKnowledgeBundle(
+  source: PhysicalKnowledgeBundle,
+  carrierId: string,
+  selectedEntryIds: readonly string[],
+  createdAtWorldTimeSeconds: DurationSeconds,
+): PhysicalKnowledgeBundle {
+  assertBundle(source);
+  if (source.copyGeneration >= MAX_KNOWLEDGE_COPY_GENERATION) {
+    throw new RangeError("physical knowledge copy generation limit reached");
+  }
+  if (createdAtWorldTimeSeconds < source.createdAtWorldTimeSeconds) {
+    throw new RangeError("physical copy cannot precede source bundle");
+  }
+  return createBundle(
+    source.worldSeed,
+    "physical-copy",
+    source.id,
+    carrierId,
+    source.entries,
+    selectedEntryIds,
+    createdAtWorldTimeSeconds,
+    source.copyGeneration + 1,
+    source.fidelityFraction * KNOWLEDGE_COPY_FIDELITY_MULTIPLIER,
   );
 }
 
@@ -152,6 +197,8 @@ function createBundle(
   availableEntries: readonly PlayerWorldEvidenceEntry[],
   selectedEntryIds: readonly string[],
   createdAtWorldTimeSeconds: DurationSeconds,
+  copyGeneration: number,
+  fidelityFraction: number,
 ): PhysicalKnowledgeBundle {
   assertNonEmptyString(worldSeed, "worldSeed");
   assertNonEmptyString(sourceId, "sourceId");
@@ -162,6 +209,25 @@ function createBundle(
   );
   if (!Array.isArray(selectedEntryIds) || selectedEntryIds.length === 0) {
     throw new RangeError("selectedEntryIds must contain at least one entry");
+  }
+  if (selectedEntryIds.length > MAX_KNOWLEDGE_BUNDLE_ENTRIES) {
+    throw new RangeError(
+      `selectedEntryIds cannot exceed ${MAX_KNOWLEDGE_BUNDLE_ENTRIES} physical entries`,
+    );
+  }
+  if (
+    !Number.isSafeInteger(copyGeneration) ||
+    copyGeneration < 0 ||
+    copyGeneration > MAX_KNOWLEDGE_COPY_GENERATION
+  ) {
+    throw new RangeError("copyGeneration is outside physical copy limits");
+  }
+  if (
+    !Number.isFinite(fidelityFraction) ||
+    fidelityFraction <= 0 ||
+    fidelityFraction > 1
+  ) {
+    throw new RangeError("fidelityFraction must be finite and in (0, 1]");
   }
   const uniqueIds = [...new Set(selectedEntryIds)].sort(compareRaw);
   if (uniqueIds.length !== selectedEntryIds.length) {
@@ -174,7 +240,8 @@ function createBundle(
     }
     return cloneEntry(entry);
   });
-  const identity = `${worldSeed}:${sourceKind}:${sourceId}:${carrierId}:${createdAtWorldTimeSeconds}:${uniqueIds.join(",")}`;
+  const roundedFidelity = Math.round(fidelityFraction * 1_000_000) / 1_000_000;
+  const identity = `${worldSeed}:${sourceKind}:${sourceId}:${carrierId}:${createdAtWorldTimeSeconds}:${copyGeneration}:${roundedFidelity}:${uniqueIds.join(",")}`;
   return {
     id: `knowledge-bundle-${hashSeed(identity).toString(16).padStart(8, "0")}`,
     kind: "physical-knowledge-bundle",
@@ -183,6 +250,8 @@ function createBundle(
     sourceId,
     carrierId,
     createdAtWorldTimeSeconds,
+    copyGeneration,
+    fidelityFraction: roundedFidelity,
     entries,
   };
 }
@@ -288,6 +357,20 @@ function assertBundle(bundle: PhysicalKnowledgeBundle): void {
   assertNonEmptyString(bundle.id, "bundle.id");
   assertNonEmptyString(bundle.worldSeed, "bundle.worldSeed");
   assertNonEmptyString(bundle.carrierId, "bundle.carrierId");
+  if (
+    !Number.isSafeInteger(bundle.copyGeneration) ||
+    bundle.copyGeneration < 0 ||
+    bundle.copyGeneration > MAX_KNOWLEDGE_COPY_GENERATION
+  ) {
+    throw new RangeError("bundle.copyGeneration is outside physical copy limits");
+  }
+  if (
+    !Number.isFinite(bundle.fidelityFraction) ||
+    bundle.fidelityFraction <= 0 ||
+    bundle.fidelityFraction > 1
+  ) {
+    throw new RangeError("bundle.fidelityFraction must be finite and in (0, 1]");
+  }
   if (!Array.isArray(bundle.entries) || bundle.entries.length === 0) {
     throw new RangeError("bundle.entries must contain at least one entry");
   }
