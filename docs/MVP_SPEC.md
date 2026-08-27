@@ -1,6 +1,6 @@
 # Desert Caravan MMO — MVP_SPEC v0.6
 
-**Дата:** 24 августа 2026
+**Дата:** 27 августа 2026
 
 **Цель:** первый играбельный прототип движения, поиска и выживания.
 
@@ -289,3 +289,22 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `GAME-024` — compose multi-patrol `AVOID | CONTINUE` with a scheduled discovery `STOP`, preserving exact world/route time, contact priority and all-patrol clearance after departure.
 - [x] `GAME-025` — expose stable multi-patrol contact selection through the authoritative expedition contact/outcome API without resolving more than one contact per slice.
 - [x] `LIVING-001` — project deterministic NPC caravans through the same route, speed and authoritative world-time primitives as player expeditions.
+
+## 15. Definition of Done MVP-1 «Живой путь»
+
+- [x] другой караван физически движется по authoritative route в том же seeded world;
+- [x] обнаружение может быть односторонним;
+- [x] реально пройденный путь оставляет след с приблизительной давностью без server coordinates;
+- [x] sighting допускает простой deterministic pursuit/evasion maneuver;
+- [x] погибший караван остаётся постоянными останками с минимальным loot;
+- [x] останки и loot деградируют от мирового времени;
+- [x] следы и останки создают coordinate-free knowledge/journal с provenance и confidence;
+- [x] носитель физически возвращает сведения в локальную библиотеку;
+- [x] другая библиотека не обновляется глобально и получает копию только после физической доставки;
+- [x] сохранённая история порождает новые типизированные слухи с quality;
+- [x] persistent creatures/populations поддерживают deterministic catch-up, а легендарность возникает из истории конкретной identity;
+- [x] одинаковый seed и действия воспроизводят полный Living Path scenario;
+- [x] Checkpoint 54 quality gate: `458/458` PASS.
+
+Полная торговая экономика, tactical combat, multiplayer, production database,
+Magic/System 256 и neural agents остаются за пределами MVP-1.

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.54 — Checkpoint 54
+
+- Closed MVP-1 «Living Path» with one deterministic end-to-end scenario.
+- Composed authoritative NPC travel, asymmetric sighting, approximately aged
+  tracks, pursuit, permanent degrading remains and minimal loot.
+- Carried provenance/confidence-aware knowledge physically back to city A and
+  then from A to B; B remains unchanged until the carrier arrives.
+- Produced a typed quality-rated rumor from the delivered world history while
+  keeping the complete player payload free of absolute coordinates.
+- Added eleven MVP1-001 regressions; repository verification now runs 458 tests.
+
 ## 0.0.43 — Checkpoint 43
 
 - Added `LIVING-001`: deterministic NPC caravans travel between seeded cities.
