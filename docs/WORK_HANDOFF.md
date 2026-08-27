@@ -1,50 +1,50 @@
 # Work handoff
 
-Updated: 26 August 2026
+Updated: 27 August 2026
 
 This is the short operational recovery point for the autonomous MAIN3 series.
 Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is in progress. Checkpoint 43 / LIVING-001 / version
-`0.0.43` adds the first deterministic route-backed NPC caravan without starting
+MVP-1 «Living Path» is in progress. Checkpoint 44 / LIVING-002 / version
+`0.0.44` adds independent observer-side caravan detection without starting
 Trading Prototype, tactical combat, multiplayer or persistent storage.
 
 ## Completed
 
-- Seeded worlds contain configurable NPC caravans travelling between cities.
-- NPC travel reuses `RoutePlan`, SIM-005, existing speed units and authoritative
-  world time; no parallel movement physics exists.
-- Delayed departures expose scheduled, moving and arrived states.
-- Existing city, static-object and wandering-monster deterministic streams are
-  preserved.
+- Each observer evaluates the same two authoritative motions with its own vision
+  radius, so detection can be one-way.
+- Detection reuses the continuous SIM-008 encounter solver instead of snapshot
+  sampling or alternative movement physics.
+- Seeded NPC caravans convert directly to finite `RouteMotion` subjects.
+- Player-facing sightings expose identity, time, separation and route elapsed
+  time, but no absolute coordinate or server position.
 
 ## Last known good commit
 
-- `9c9b8c39a9fbda37fe8fae20c75ee06db605f67b` — LIVING-001 functional commit;
-  tree `bf954bd4fad4334b86bce3f57117ec1520ec68c5`.
-- Branch: `feature/living-001-npc-caravans`; PR/merge status is updated after
-  the GitHub quality gate.
+- `2d4fbe06cd2457bbb4cdf2221b9dd6152f8da552` — LIVING-002 functional commit.
+- Branch: `feature/living-002-asymmetric-detection`; PR/merge status is updated
+  after the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full local equivalent of `npm run verify:local`: `377/377` PASS, zero
+- Full local equivalent of `npm run verify:local`: `382/382` PASS, zero
   failures, compiled demo PASS.
-- Targeted NPC/world/monster suite: `36/36` PASS.
+- Five new LIVING-002 detection regressions: PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 43, then continue immediately to
-LIVING-002.
+Complete the PR/CI/merge cycle for Checkpoint 44, then continue immediately to
+LIVING-003.
 
 ## Next action
 
-`LIVING-002`: implement asymmetric caravan detection using the existing
-continuous moving-encounter geometry while keeping each observer's vision
-radius independent. Player-facing output must not contain absolute coordinates.
+`LIVING-003`: derive deterministic coordinate-free tracks with approximate age
+from actual executed NPC travel. Keep authoritative coordinates internal and
+expose only bounded player-facing track information.
 
 ## Scope boundary
 
