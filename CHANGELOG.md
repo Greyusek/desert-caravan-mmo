@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.58 — Checkpoint 58
+
+- Added `TRADE-004`: deterministic NPC trade orders orchestrate the exact
+  player purchase, capacity, route, arrival and sale operations.
+- Projected loaded NPC cargo halfway through its physical RoutePlan and caught
+  destination production/consumption up to exact arrival time.
+- Made the NPC delivery alter the same destination stock and next quote visible
+  to the player.
+- Added six TRADE-004 regressions; repository verification now runs 488 tests.
+
 ## 0.0.57 — Checkpoint 57
 
 - Added `TRADE-003`: wallet-backed, capacity-limited caravan cargo with retained

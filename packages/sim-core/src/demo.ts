@@ -32,6 +32,7 @@ import {
   evaluateDiscoveryStopLifecycle,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
+  executeNpcTradeOrder,
   findFirstCityArrival,
   findFirstExpeditionMonsterDangerDetection,
   findFirstExpeditionMonsterDangerDetectionAmongPatrols,
@@ -84,7 +85,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 57 demo");
+console.log("Desert Caravan MMO — Checkpoint 58 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -397,6 +398,24 @@ if (firstCityStocks && firstCityPopulation) {
     );
     console.log(
       `TRADE-003 physical route: ${originCity.id}->${destinationCity.id}; ore=10; capacity=20/20; journal=${sale.caravan.journal.length}; profit=${sale.profitCredits} credits`,
+    );
+    const npcTrade = executeNpcTradeOrder(
+      originMarket,
+      scarceDestinationMarket,
+      {
+        npcTraderId: "demo-npc-trader",
+        goodId: "ore",
+        units: 20,
+        startingCredits: 2_000,
+        capacityCargoUnits: 40,
+        departsAtWorldTimeSeconds: 0,
+        originCity,
+        destinationCity,
+        route: physicalRoute,
+      },
+    );
+    console.log(
+      `TRADE-004 NPC market impact: route=${npcTrade.inTransit.status}; destination ore=${npcTrade.destinationQuoteBeforeSale.stockUnits.toFixed(1)}->${npcTrade.destinationQuoteAfterSale.stockUnits.toFixed(1)}; player bid=${npcTrade.destinationQuoteBeforeSale.cityBuyPriceCredits}->${npcTrade.destinationQuoteAfterSale.cityBuyPriceCredits}`,
     );
   }
 }
@@ -901,5 +920,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 57 TRADE-003 physical trade route complete: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 58 TRADE-004 NPC trader complete: npm run debug-map -> http://127.0.0.1:4173",
 );
