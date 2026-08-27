@@ -4,6 +4,7 @@ import {
   canSurviveDuration,
   copyPlayerKnowledgeToBundle,
   createCityLibraryArchive,
+  createFallenCityLibrary,
   createKnownObjectReturnNavigation,
   createNpcCaravanRemains,
   createPlayerDiscoveryLedger,
@@ -41,6 +42,7 @@ import {
   projectCitySettlementAtTime,
   projectCityStocksAtTime,
   projectCaravanRemainsAtWorldTime,
+  projectFallenCityLibraryAtWorldTime,
   projectSupplies,
   recordDirectDiscoveryObservation,
   recordObservedCaravanRemains,
@@ -64,7 +66,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 49 demo");
+console.log("Desert Caravan MMO — Checkpoint 50 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -213,6 +215,23 @@ if (demoNpcCaravan) {
   console.log(
     `LIBRARY-001 physical deposit: ${originLibrary.cityId}=${deposit.library.entries.length}; ${remoteLibrary.cityId}=${remoteLibrary.entries.length}; value-stub=${deposit.informationValueUnits}`,
   );
+  const originCity = world.cities.find(
+    (city) => city.id === demoNpcCaravan.originCityId,
+  );
+  if (originCity) {
+    const fallenLibrary = createFallenCityLibrary(
+      deposit.library,
+      originCity,
+      weathered.worldTimeSeconds,
+    );
+    const fallenProjection = projectFallenCityLibraryAtWorldTime(
+      fallenLibrary,
+      weathered.worldTimeSeconds + 20 * 24 * 60 * 60,
+    );
+    console.log(
+      `LIBRARY-002 fallen archive: condition=${fallenProjection.condition}; readability=${fallenProjection.entryStates[0]?.readability}; actuality=${fallenProjection.entryStates[0]?.actuality}; permanent=${fallenProjection.permanentlyPresent}`,
+    );
+  }
 }
 console.log("CITY-001 finite city stocks:");
 for (const stocks of world.cityStocks) {
@@ -697,5 +716,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 49 local physical city archives: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 50 fallen degrading city archives: npm run debug-map -> http://127.0.0.1:4173",
 );
