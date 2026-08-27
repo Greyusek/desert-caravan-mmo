@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 38 · GAME-021</p>
+          <p class="eyebrow">Checkpoint 61 · UI-007</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -615,6 +615,70 @@
           </label>
           <button id="outcome-action" type="button">DEV: к исходу</button>
           <p>На discovery STOP кнопка планирует указанную стоянку и продолжение; во время ожидания — переходит к моменту возобновления.</p>
+        </div>
+      </section>
+
+      <section class="trading-panel" aria-labelledby="trading-title">
+        <div class="trading-heading">
+          <div>
+            <p class="section-kicker">UI-007 · Trading Prototype</p>
+            <h2 id="trading-title">Физическая торговая проверка</h2>
+          </div>
+          <output id="trading-route-summary" class="trading-route-summary">
+            Расчёт маршрута…
+          </output>
+        </div>
+
+        <div class="trading-grid">
+          <article class="trading-card trading-card--market">
+            <div class="trading-card__heading">
+              <h3>Рынки городов</h3>
+              <p><span id="trading-origin-name">A</span> → <span id="trading-destination-name">B</span></p>
+            </div>
+            <div class="trading-table-frame">
+              <table class="trading-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Товар</th>
+                    <th scope="col">A: запас</th>
+                    <th scope="col">A: пр/потр</th>
+                    <th scope="col">A: продажа</th>
+                    <th scope="col">B: запас</th>
+                    <th scope="col">B: пр/потр</th>
+                    <th scope="col">B: покупка</th>
+                  </tr>
+                </thead>
+                <tbody id="trading-market-body"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="trading-card">
+            <div class="trading-card__heading">
+              <h3>Груз и результат игрока</h3>
+              <output id="trading-profit" class="trading-value">—</output>
+            </div>
+            <dl id="trading-cargo-summary" class="trading-summary"></dl>
+            <ol id="trading-journal" class="trading-journal"></ol>
+          </article>
+
+          <article class="trading-card">
+            <div class="trading-card__heading">
+              <h3>Влияние NPC</h3>
+              <output id="trading-npc-delta" class="trading-value">—</output>
+            </div>
+            <dl id="trading-npc-summary" class="trading-summary"></dl>
+            <p class="trading-note">NPC использует тот же груз, RoutePlan, журнал и рынок.</p>
+          </article>
+
+          <article class="trading-card">
+            <div class="trading-card__heading">
+              <h3>Ценность информации</h3>
+              <output id="trading-information-value" class="trading-value">—</output>
+            </div>
+            <dl id="trading-information-summary" class="trading-summary"></dl>
+            <p class="trading-note">Цена локальна: известная копия обнуляется, физическая копия теряет точность.</p>
+          </article>
         </div>
       </section>
 

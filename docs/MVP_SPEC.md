@@ -285,6 +285,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `TRADE-004` — route-backed NPC trader reusing player market operations and changing later player quotes.
 - [x] `INFO-TRADE-001` — local physical-knowledge quote from novelty, accuracy, age, confirmation and strategic type.
 - [x] `INFO-TRADE-002` — three-entry/two-generation physical copy limits with medium, copy and fallen-archive fidelity degradation.
+- [x] `UI-007` — one deterministic debug-map projection of city markets, physical player/NPC trade and local information value.
 - [x] `GAME-017` — execute `RETURN_TO_ORIGIN | CONTINUE` when food or water reaches 50% during uninterrupted movement.
 - [x] `GAME-018` — compose the 50% emergency boundary with discovery-STOP idle consumption and depart from the exact stop coordinate.
 - [x] `GAME-019` — establish the first detected-danger boundary and its ordering relative to contact before adding `AVOID | CONTINUE` route replanning.

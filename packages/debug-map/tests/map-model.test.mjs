@@ -36,6 +36,7 @@ import {
   createRumorSearchSnapshot,
   createSessionKnowledgeMapSnapshot,
   createStationaryStopPatrolPreset,
+  createTradingDebugSnapshot,
   projectCoordinate,
   splitPathAtAntimeridian,
 } from "../map-model.js";
@@ -4300,4 +4301,83 @@ test("GAME-016: a reached city projects only on its origin-city chart", () => {
   assert.equal(map.cityLandmarks[0]?.y, 150);
   assert.equal(JSON.stringify(map.cityLandmarks).includes("latitude"), false);
   assert.equal(JSON.stringify(map.cityLandmarks).includes("longitude"), false);
+});
+
+test("UI-007: trading snapshot exposes both seven-good city markets", () => {
+  const snapshot = createTradingDebugSnapshot("ui-007-world");
+
+  assert.equal(snapshot.cities.length, 2);
+  assert.equal(snapshot.cities[0]?.goods.length, 7);
+  assert.equal(snapshot.cities[1]?.goods.length, 7);
+  for (const city of snapshot.cities) {
+    for (const good of city.goods) {
+      assert.equal(typeof good.productionUnitsPerDay, "number");
+      assert.equal(typeof good.consumptionUnitsPerDay, "number");
+      assert.ok(good.cityBuyPriceCredits > 0);
+      assert.ok(good.citySellPriceCredits > good.cityBuyPriceCredits);
+    }
+  }
+});
+
+test("UI-007: player view proves capacity, route and realized result", () => {
+  const snapshot = createTradingDebugSnapshot("ui-007-world");
+
+  assert.equal(snapshot.route.goodId, "ore");
+  assert.equal(snapshot.route.units, 5);
+  assert.equal(snapshot.player.loadedCargoUnits, 10);
+  assert.equal(snapshot.player.capacityCargoUnits, 10);
+  assert.deepEqual(
+    snapshot.player.journal.map((event) => event.kind),
+    ["purchase", "departure", "arrival", "sale"],
+  );
+  assert.equal(snapshot.player.endingStacks.length, 0);
+  assert.ok(snapshot.player.profitCredits > 0);
+});
+
+test("UI-007: physical NPC delivery changes the next player quote", () => {
+  const snapshot = createTradingDebugSnapshot("ui-007-world");
+
+  assert.deepEqual(snapshot.npc.journalKinds, [
+    "purchase",
+    "departure",
+    "arrival",
+    "sale",
+  ]);
+  assert.equal(snapshot.npc.units, 10);
+  assert.ok(
+    snapshot.npc.quoteAfterSale.stockUnits >
+      snapshot.npc.quoteBeforeSale.stockUnits,
+  );
+  assert.ok(
+    snapshot.npc.quoteAfterSale.cityBuyPriceCredits <
+      snapshot.npc.quoteBeforeSale.cityBuyPriceCredits,
+  );
+});
+
+test("UI-007: information card exposes local novelty and copy loss", () => {
+  const snapshot = createTradingDebugSnapshot("ui-007-world");
+
+  assert.ok(snapshot.information.directValueCredits > 0);
+  assert.equal(snapshot.information.duplicateValueCredits, 0);
+  assert.ok(
+    snapshot.information.copiedValueCredits <
+      snapshot.information.directValueCredits,
+  );
+  assert.equal(snapshot.information.copyGeneration, 1);
+  assert.equal(snapshot.information.copiedFidelityFraction, 0.8);
+});
+
+test("UI-007: repeated seed reproduces the complete UI projection", () => {
+  assert.deepEqual(
+    createTradingDebugSnapshot("ui-007-world"),
+    createTradingDebugSnapshot("ui-007-world"),
+  );
+});
+
+test("UI-007: trading player projection reveals no exact coordinates", () => {
+  const serialized = JSON.stringify(createTradingDebugSnapshot("ui-007-world"));
+
+  assert.equal(serialized.includes("latitude"), false);
+  assert.equal(serialized.includes("longitude"), false);
+  assert.equal(serialized.includes("position"), false);
 });
