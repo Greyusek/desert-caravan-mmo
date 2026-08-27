@@ -56,7 +56,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `GAME-025`: promote stable multi-patrol contact selection into the authoritative expedition contact/outcome API, preserving first-boundary priority without resolving more than one contact per slice.
 - [x] `LIVING-001`: add deterministic route-backed NPC caravans that reuse SIM-004/SIM-005 and authoritative world time.
 - [x] `LIVING-002`: add asymmetric caravan detection without requiring reciprocal visibility.
-- [ ] `LIVING-003`: derive deterministic coordinate-free tracks with approximate age from executed NPC travel.
+- [x] `LIVING-003`: derive deterministic coordinate-free tracks with approximate age from executed NPC travel.
 - [ ] `LIVING-004`: add minimal deterministic pursuit/evasion over the existing route model.
 - [ ] `CONSEQUENCE-001`: retain destroyed caravans as degrading world remains with minimal loot.
 - [ ] `KNOWLEDGE-001`: record tracks/remains with source, observation time and confidence in player knowledge and the event journal.
