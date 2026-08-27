@@ -281,6 +281,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `CITY-003` — first shortage deterministically reduces population and later consumption.
 - [x] `TRADE-001` — seven finite city goods with deterministic production/consumption over authoritative world time.
 - [x] `TRADE-002` — transparent bounded local buy/sell prices from stock versus thirty-day demand.
+- [x] `TRADE-003` — capacity-limited cargo, physical route delivery, trade journal and realized route profit/loss.
 - [x] `GAME-017` — execute `RETURN_TO_ORIGIN | CONTINUE` when food or water reaches 50% during uninterrupted movement.
 - [x] `GAME-018` — compose the 50% emergency boundary with discovery-STOP idle consumption and depart from the exact stop coordinate.
 - [x] `GAME-019` — establish the first detected-danger boundary and its ordering relative to contact before adding `AVOID | CONTINUE` route replanning.

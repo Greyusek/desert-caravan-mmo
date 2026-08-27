@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.57 — Checkpoint 57
+
+- Added `TRADE-003`: wallet-backed, capacity-limited caravan cargo with retained
+  purchase cost basis.
+- Made purchase and sale mutate the same finite city economies used to quote
+  prices, with explicit stock, money and capacity rejection paths.
+- Required a physical city-to-city `RoutePlan` and exact ETA before unloading.
+- Added an ordered purchase/departure/arrival/sale journal and realized route
+  profit/loss.
+- Added ten TRADE-003 regressions; repository verification now runs 482 tests.
+
 ## 0.0.56 — Checkpoint 56
 
 - Added `TRADE-002`: deterministic city bid/ask quotes from current stock versus

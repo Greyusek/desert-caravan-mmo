@@ -72,7 +72,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 
 - [x] `TRADE-001`: add a seven-good catalog and deterministic city production/consumption projected from authoritative world time over finite stocks, reusing existing food/water stocks and populations.
 - [x] `TRADE-002`: derive transparent bounded buy/sell prices from each city's current stock and target demand without random price rolls.
-- [ ] `TRADE-003`: add capacity-limited caravan cargo, local buy/sell transactions, physical route delivery, a trade journal and route profit/loss.
+- [x] `TRADE-003`: add capacity-limited caravan cargo, local buy/sell transactions, physical route delivery, a trade journal and route profit/loss.
 - [ ] `TRADE-004`: make a route-backed NPC trader buy, physically carry and sell through the same market operations so later player prices change.
 - [ ] `INFO-TRADE-001`: quote a physical knowledge bundle for one target library from local novelty, accuracy, age, independent confirmation and strategic value.
 - [ ] `INFO-TRADE-002`: enforce small physical-copy limits and bundle fidelity/age degradation so repeated, copied or degraded information is worth less or zero.
