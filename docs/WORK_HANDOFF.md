@@ -7,47 +7,46 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is in progress. Checkpoint 49 / LIBRARY-001 / version
-`0.0.49` adds local city archives and physical knowledge transfer.
+MVP-1 «Living Path» is in progress. Checkpoint 50 / LIBRARY-002 / version
+`0.0.50` adds permanent degrading fallen-city libraries.
 
 ## Completed
 
-- Traveller or library knowledge is copied into an explicit physical bundle.
-- Depositing changes only the targeted city archive; unrelated city archives
-  remain byte-for-byte unchanged until a carrier delivers a bundle.
-- Archive merge retains all unique provenance, strongest confidence and latest
-  deterministic facts.
-- Re-depositing the same physical bundle is idempotent, and copying knowledge
-  out never removes the local archive original.
-- `informationValueUnits` equals novel provenance count as an explicit
-  temporary exchange stub, not money or a market price.
-- Bundles and archives remain coordinate-free.
+- A city fall snapshots its local archive into a permanent world object at the
+  exact authoritative city position.
+- Information completeness declines continuously to zero over 30 game days;
+  readability changes clear → fragmentary → illegible.
+- Information becomes stale after seven days and obsolete at full loss;
+  confirmed confidence downgrades below 50% completeness.
+- Readable entries can leave only in an explicit physical carrier bundle.
+- The fallen object remains discoverable after all entries become unrecoverable.
+- Projection never mutates the original live/archive snapshot.
 
 ## Last known good commit
 
-- `0ec287a24c433f5016a161075d9cb5a8074ed2ac` — LIBRARY-001 functional commit;
-  tree `a73127dcda3e389bf9dc467dd7c0ef7de2a762db`.
-- Branch: `feature/library-001-local-archives`; PR/merge status is
+- `b7a4c982c5cf881b453906b50876e218b160a90b` — LIBRARY-002 functional commit;
+  tree `ff541a7d020f87a71ccaff4f3f485fb007177bed`.
+- Branch: `feature/library-002-fallen-archives`; PR/merge status is
   updated after the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `417/417` PASS, zero failures, compiled
-  Checkpoint 49 demo PASS.
-- Targeted knowledge/library suite: `15/15` PASS.
+- Full `npm run verify:local`: `424/424` PASS, zero failures, compiled
+  Checkpoint 50 demo PASS.
+- Targeted live/fallen library suite: `15/15` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 49, then continue immediately to
-LIBRARY-002.
+Complete the PR/CI/merge cycle for Checkpoint 50, then continue immediately to
+HISTORY-001.
 
 ## Next action
 
-`LIBRARY-002`: keep a fallen-city library as a discoverable world object and
-degrade archive information deterministically over world time. Preserve physical
-locality and do not add production persistence or global synchronization.
+`HISTORY-001`: add rumor quality, persistent creature/population catch-up,
+coordinate-free creature intelligence and earned legendary history as small
+dependency-ordered slices without implementing full Magic/System 256.
 
 ## Scope boundary
 
