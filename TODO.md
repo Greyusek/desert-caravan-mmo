@@ -65,7 +65,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `HISTORY-001`: add several coordinate-free rumor types with deterministic information quality.
 - [x] `HISTORY-002`: add persistent creatures/populations with deterministic simulation-detail catch-up.
 - [x] `HISTORY-003`: add coordinate-free creature intelligence and earned legendary history without full Magic/System 256.
-- [ ] `MVP1-001`: prove the complete deterministic Living Path scenario and close MVP-1.
+- [x] `MVP1-001`: prove the complete deterministic Living Path scenario and close MVP-1.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
 ## Future R&D anchors

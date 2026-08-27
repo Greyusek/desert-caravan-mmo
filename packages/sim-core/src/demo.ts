@@ -9,6 +9,7 @@ import {
   createCreatureLegendHistory,
   createFallenCityLibrary,
   createKnownObjectReturnNavigation,
+  createLivingPathScenario,
   createNpcCaravanRemains,
   createPlayerDiscoveryLedger,
   createPlayerWorldEvidenceState,
@@ -73,7 +74,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 53 demo");
+console.log("Desert Caravan MMO — Checkpoint 54 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -778,6 +779,18 @@ console.log(
     : "  idle emergency return was not triggered",
 );
 
+const livingPath = createLivingPathScenario("checkpoint-54-living-path");
+console.log("\nMVP1-001 Living Path:");
 console.log(
-  "\nCheckpoint 53 creature intelligence and earned legends: npm run debug-map -> http://127.0.0.1:4173",
+  `  sighting=one-way; track=${livingPath.playerView.track.approximateAge}/${livingPath.playerView.track.approximateDirection}; maneuver=${livingPath.playerView.maneuver.kind}`,
+);
+console.log(
+  `  remains=${livingPath.serverTruth.remainsAtObservation.condition}; loot=${JSON.stringify(livingPath.playerView.recoveredLoot)}; knowledge=${livingPath.playerView.knowledge.entries.length}/${livingPath.playerView.knowledge.journal.length}`,
+);
+console.log(
+  `  libraries=${livingPath.playerView.originLibrary.entries.length}->${livingPath.playerView.destinationLibraryBeforeDelivery.entries.length}->${livingPath.playerView.destinationLibraryAfterDelivery.entries.length}; rumor=${livingPath.playerView.rumor.type}/${livingPath.playerView.rumor.quality}; coordinates=not-stored`,
+);
+
+console.log(
+  "\nCheckpoint 54 MVP-1 Living Path complete: npm run debug-map -> http://127.0.0.1:4173",
 );
