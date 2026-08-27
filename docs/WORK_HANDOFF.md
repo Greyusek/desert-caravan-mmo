@@ -7,9 +7,9 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 57 /
-TRADE-003 / version `0.0.57`: player cargo now completes a capacity-limited
-physical buy-route-sell loop with journaled profit/loss. Tactical
+MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 58 /
+TRADE-004 / version `0.0.58`: an NPC trader now physically changes the same
+markets and later player quote. Tactical
 Combat Prototype and every later roadmap stage remain gated by a separate user
 command.
 
@@ -33,6 +33,8 @@ command.
   stock, `0.5x..3x` scarcity bounds and a fixed 10% spread.
 - TRADE-003 changes the same markets through capacity-limited purchase and sale,
   requires physical route completion and retains cost basis for route profit.
+- TRADE-004 orchestrates those same operations for an NPC and proves its
+  destination delivery changes the price subsequently quoted to the player.
 
 ## Last known good main
 
@@ -43,20 +45,21 @@ command.
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `482/482` PASS, zero failures, compiled
-  Checkpoint 57 demo PASS.
-- Targeted TRADE-003 suite: `10/10` PASS.
+- Full `npm run verify:local`: `488/488` PASS, zero failures, compiled
+  Checkpoint 58 demo PASS.
+- Targeted TRADE-004 suite: `6/6` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 57, then implement `TRADE-004`.
+Complete the PR/CI/merge cycle for Checkpoint 58, then implement
+`INFO-TRADE-001`.
 
 ## Next action
 
-After stable `main`, start `TRADE-004` in its own feature branch. An NPC trader
-must reuse the same buy, cargo, route, arrival and sale operations so its action
-changes the later quote seen by the player.
+After stable `main`, start `INFO-TRADE-001` in its own feature branch. Quote an
+existing physical knowledge bundle against one target library from novelty,
+accuracy, age, independent sources/confirmation and strategic evidence type.
 
 ## Scope boundary
 
