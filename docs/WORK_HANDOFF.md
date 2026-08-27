@@ -7,44 +7,45 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is in progress. Checkpoint 44 / LIVING-002 / version
-`0.0.44` adds independent observer-side caravan detection without starting
-Trading Prototype, tactical combat, multiplayer or persistent storage.
+MVP-1 «Living Path» is in progress. Checkpoint 45 / LIVING-003 / version
+`0.0.45` adds deterministic physical NPC tracks with coordinate-free clues.
 
 ## Completed
 
-- Each observer evaluates the same two authoritative motions with its own vision
-  radius, so detection can be one-way.
-- Detection reuses the continuous SIM-008 encounter solver instead of snapshot
-  sampling or alternative movement physics.
-- Seeded NPC caravans convert directly to finite `RouteMotion` subjects.
-- Player-facing sightings expose identity, time, separation and route elapsed
-  time, but no absolute coordinate or server position.
+- NPC travel creates authoritative track marks every 500 m only along the
+  prefix physically executed by authoritative world time.
+- Marks are distance-anchored, so advancing time appends a deterministic suffix
+  without rewriting existing world history.
+- Server-side marks retain their world position, source and passage time.
+- Player-facing clues expose only an opaque track identity, observation time,
+  eight-way travel direction and coarse `fresh | recent | old | weathered` age.
+- Player clues contain no coordinate, exact passage time or source-caravan ID.
 
 ## Last known good commit
 
-- `2d4fbe06cd2457bbb4cdf2221b9dd6152f8da552` — LIVING-002 functional commit.
-- Branch: `feature/living-002-asymmetric-detection`; PR/merge status is updated
-  after the GitHub quality gate.
+- `83d5b99ed67c2d4a097c324f1d47cea8b46a7621` — LIVING-003 functional commit;
+  tree `3c8906b960bf08a7bf3a863c9955279bd6f5d233`.
+- Branch: `feature/living-003-coordinate-free-tracks`; PR/merge status is
+  updated after the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full local equivalent of `npm run verify:local`: `382/382` PASS, zero
-  failures, compiled demo PASS.
-- Five new LIVING-002 detection regressions: PASS.
+- Full `npm run verify:local`: `388/388` PASS, zero failures, compiled
+  Checkpoint 45 demo PASS.
+- Targeted LIVING-001/002/003 suite: `16/16` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 44, then continue immediately to
-LIVING-003.
+Complete the PR/CI/merge cycle for Checkpoint 45, then continue immediately to
+LIVING-004.
 
 ## Next action
 
-`LIVING-003`: derive deterministic coordinate-free tracks with approximate age
-from actual executed NPC travel. Keep authoritative coordinates internal and
-expose only bounded player-facing track information.
+`LIVING-004`: add minimal deterministic pursuit/evasion over the existing
+route model. Reuse authoritative route, speed, world time and encounter
+primitives; do not create tactical combat or a second movement system.
 
 ## Scope boundary
 
