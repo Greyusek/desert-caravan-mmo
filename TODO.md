@@ -62,7 +62,9 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `KNOWLEDGE-001`: record tracks/remains with source, observation time and confidence in player knowledge and the event journal.
 - [x] `LIBRARY-001`: add local city archives and physical knowledge deposit/copy transfer without global synchronization.
 - [x] `LIBRARY-002`: keep fallen-city libraries discoverable and degrade their information deterministically.
-- [ ] `HISTORY-001`: add rumor quality, persistent creature/population catch-up, creature intelligence and earned legendary history.
+- [x] `HISTORY-001`: add several coordinate-free rumor types with deterministic information quality.
+- [ ] `HISTORY-002`: add persistent creatures/populations with deterministic simulation-detail catch-up.
+- [ ] `HISTORY-003`: add coordinate-free creature intelligence and earned legendary history without full Magic/System 256.
 - [ ] `MVP1-001`: prove the complete deterministic Living Path scenario and close MVP-1.
 - [x] Add a checkpoint demo for reproducing a world from its seed.
 
