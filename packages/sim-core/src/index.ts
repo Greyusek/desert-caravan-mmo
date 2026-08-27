@@ -28,3 +28,4 @@ export * from "./world-evidence.js";
 export * from "./city-library.js";
 export * from "./fallen-library.js";
 export * from "./world-rumor.js";
+export * from "./creature-persistence.js";
