@@ -5,6 +5,7 @@ import {
   createKnownObjectReturnNavigation,
   createNpcCaravanRemains,
   createPlayerDiscoveryLedger,
+  createPlayerWorldEvidenceState,
   createRumorSearchScenario,
   createRoutePlan,
   createWorldCoordinate,
@@ -39,6 +40,7 @@ import {
   projectCaravanRemainsAtWorldTime,
   projectSupplies,
   recordDirectDiscoveryObservation,
+  recordObservedCaravanRemains,
   resolveMonsterPowerContact,
   resumeStaticObjectDiscoveryDoctrine,
   timeToFirstDepletion,
@@ -59,7 +61,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 47 demo");
+console.log("Desert Caravan MMO — Checkpoint 48 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -182,6 +184,13 @@ if (demoNpcCaravan) {
   );
   console.log(
     `CONSEQUENCE-001 ${remains.id}: condition=${weathered.condition}; integrity=${weathered.integrityFraction.toFixed(3)}; loot=${weathered.availableLoot.foodUnits}/${weathered.availableLoot.waterUnits}/${weathered.availableLoot.salvageUnits}; permanent=${weathered.permanentlyPresent}`,
+  );
+  const evidence = recordObservedCaravanRemains(
+    createPlayerWorldEvidenceState(world.seed),
+    weathered,
+  );
+  console.log(
+    `KNOWLEDGE-001 evidence: source=${evidence.entry.provenance[0]?.source}; confidence=${evidence.entry.confidence}; journal=${evidence.state.journal.length}; coordinates=not-stored`,
   );
 }
 console.log("CITY-001 finite city stocks:");
@@ -667,5 +676,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 47 permanent degrading caravan remains: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 48 provenance-aware evidence journal: npm run debug-map -> http://127.0.0.1:4173",
 );
