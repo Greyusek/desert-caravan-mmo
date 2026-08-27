@@ -60,7 +60,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `LIVING-004`: add minimal deterministic pursuit/evasion over the existing route model.
 - [x] `CONSEQUENCE-001`: retain destroyed caravans as degrading world remains with minimal loot.
 - [x] `KNOWLEDGE-001`: record tracks/remains with source, observation time and confidence in player knowledge and the event journal.
-- [ ] `LIBRARY-001`: add local city archives and physical knowledge deposit/copy transfer without global synchronization.
+- [x] `LIBRARY-001`: add local city archives and physical knowledge deposit/copy transfer without global synchronization.
 - [ ] `LIBRARY-002`: keep fallen-city libraries discoverable and degrade their information deterministically.
 - [ ] `HISTORY-001`: add rumor quality, persistent creature/population catch-up, creature intelligence and earned legendary history.
 - [ ] `MVP1-001`: prove the complete deterministic Living Path scenario and close MVP-1.

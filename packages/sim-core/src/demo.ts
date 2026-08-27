@@ -2,6 +2,8 @@ import {
   DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
+  copyPlayerKnowledgeToBundle,
+  createCityLibraryArchive,
   createKnownObjectReturnNavigation,
   createNpcCaravanRemains,
   createPlayerDiscoveryLedger,
@@ -12,6 +14,7 @@ import {
   destinationPoint,
   deriveNpcCaravanTrackMarks,
   discoverStaticObjectsAlongRoute,
+  depositKnowledgeBundle,
   evaluateDiscoveryStopLifecycle,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
@@ -61,7 +64,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 48 demo");
+console.log("Desert Caravan MMO — Checkpoint 49 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -191,6 +194,24 @@ if (demoNpcCaravan) {
   );
   console.log(
     `KNOWLEDGE-001 evidence: source=${evidence.entry.provenance[0]?.source}; confidence=${evidence.entry.confidence}; journal=${evidence.state.journal.length}; coordinates=not-stored`,
+  );
+  const bundle = copyPlayerKnowledgeToBundle(
+    evidence.state,
+    demoNpcCaravan.id,
+    [evidence.entry.id],
+    weathered.worldTimeSeconds,
+  );
+  const originLibrary = createCityLibraryArchive(
+    world.seed,
+    demoNpcCaravan.originCityId,
+  );
+  const remoteLibrary = createCityLibraryArchive(
+    world.seed,
+    demoNpcCaravan.destinationCityId,
+  );
+  const deposit = depositKnowledgeBundle(originLibrary, bundle);
+  console.log(
+    `LIBRARY-001 physical deposit: ${originLibrary.cityId}=${deposit.library.entries.length}; ${remoteLibrary.cityId}=${remoteLibrary.entries.length}; value-stub=${deposit.informationValueUnits}`,
   );
 }
 console.log("CITY-001 finite city stocks:");
@@ -676,5 +697,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 48 provenance-aware evidence journal: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 49 local physical city archives: npm run debug-map -> http://127.0.0.1:4173",
 );
