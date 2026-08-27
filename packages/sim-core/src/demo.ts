@@ -2,6 +2,7 @@ import {
   DEFAULT_CITY_ARRIVAL_RADIUS_METERS,
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
+  catchUpPersistentCreature,
   copyPlayerKnowledgeToBundle,
   createCityLibraryArchive,
   createFallenCityLibrary,
@@ -9,6 +10,7 @@ import {
   createNpcCaravanRemains,
   createPlayerDiscoveryLedger,
   createPlayerWorldEvidenceState,
+  createPersistentCreatureState,
   createRumorSearchScenario,
   createRoutePlan,
   createWorldCoordinate,
@@ -67,7 +69,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 51 demo");
+console.log("Desert Caravan MMO — Checkpoint 52 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -433,6 +435,14 @@ for (const monster of world.wanderingMonsters) {
   console.log(
     `    T=1.25 loops: cycle=${samplePosition.cycleIndex}, segment=${samplePosition.segmentIndex + 1}, position=${samplePosition.coordinate.latitudeDeg.toFixed(6)}, ${samplePosition.coordinate.longitudeDeg.toFixed(6)}`,
   );
+  const persistent = catchUpPersistentCreature(
+    createPersistentCreatureState(monster, "demo-species"),
+    sampleTime,
+    "population",
+  );
+  console.log(
+    `HISTORY-002 ${persistent.id}: detail=${persistent.detailLevel}; survived=${persistent.survivalSeconds.toFixed(0)} s; identity-preserved=true`,
+  );
 }
 
 const encounterPoint = createWorldCoordinate(0, 0);
@@ -734,5 +744,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 51 multi-type rumor quality: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 52 persistent creature/population catch-up: npm run debug-map -> http://127.0.0.1:4173",
 );

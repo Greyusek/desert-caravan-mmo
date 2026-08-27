@@ -7,46 +7,45 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is in progress. Checkpoint 51 / HISTORY-001 / version
-`0.0.51` adds multiple coordinate-free rumor types and information quality.
+MVP-1 «Living Path» is in progress. Checkpoint 52 / HISTORY-002 / version
+`0.0.52` adds persistent creature/population LOD and deterministic catch-up.
 
 ## Completed
 
-- One public contract supports caravan-passage, caravan-loss,
-  creature-sighting and fallen-library rumors.
-- Quality rises deterministically through unverified, rough, reliable and
-  corroborated based on confidence and independent source count.
-- Age is exposed only as fresh, recent, old or ancient; exact observation time
-  remains outside the player-facing rumor.
-- Source ordering is normalized, so identical evidence reproduces identity and
-  content independently of input order.
-- Rumors contain no absolute coordinates.
+- One creature identity survives detailed, regional and population simulation.
+- Catch-up projects its original cyclic patrol directly from absolute world
+  time, preserving ID, species, survival time and travelled distance.
+- Direct and staged catch-up are byte-identical after returning to the same
+  detail level.
+- Observer distance selects explicit 5 km detailed / 50 km regional boundaries.
+- Aggregate population catch-up uses composable closed-form logistic growth.
+- A zero population stays extinct instead of silently respawning.
 
 ## Last known good commit
 
-- `588333d8a9513efaf145f7ab3e7e78c5f432e047` — HISTORY-001 functional commit;
-  tree `7f849388d93aa6d3730e22d6ffd0e2b72e0a0357`.
-- Branch: `feature/history-001-rumor-quality`; PR/merge status is
+- `2f1b3064f403f961c04c01db465fb2c5c1a78f72` — HISTORY-002 functional commit;
+  tree `0e0ae8738571102b18384e989ce71233863aaf01`.
+- Branch: `feature/history-002-creature-catchup`; PR/merge status is
   updated after the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `430/430` PASS, zero failures, compiled
-  Checkpoint 51 demo PASS.
-- Targeted HISTORY-001 suite: `6/6` PASS.
+- Full `npm run verify:local`: `437/437` PASS, zero failures, compiled
+  Checkpoint 52 demo PASS.
+- Targeted HISTORY-002 suite: `7/7` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 51, then continue immediately to
-HISTORY-002.
+Complete the PR/CI/merge cycle for Checkpoint 52, then continue immediately to
+HISTORY-003.
 
 ## Next action
 
-`HISTORY-002`: add persistent creatures/populations with explicit detail levels
-and deterministic catch-up for time outside detailed simulation. Do not add
-neural agents, tactical combat or production persistence.
+`HISTORY-003`: add coordinate-free creature intelligence with observation time,
+approximate direction, strength and three design-contract color channels, then
+earn legendary status only from persistent survival/victory/control history.
 
 ## Scope boundary
 
