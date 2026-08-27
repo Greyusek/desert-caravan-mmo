@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.59 — Checkpoint 59
+
+- Added `INFO-TRADE-001`: deterministic physical-bundle quotes scoped to one
+  target city library.
+- Exposed novelty, fact accuracy, age, confirmation/provenance and strategic
+  evidence type as separate price factors.
+- Made identical known information worth zero locally while preserving value at
+  another uninformed library; sale reuses the existing local deposit operation.
+- Added eight INFO-TRADE-001 regressions; repository verification now runs 496
+  tests.
+
 ## 0.0.58 — Checkpoint 58
 
 - Added `TRADE-004`: deterministic NPC trade orders orchestrate the exact

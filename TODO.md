@@ -74,7 +74,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `TRADE-002`: derive transparent bounded buy/sell prices from each city's current stock and target demand without random price rolls.
 - [x] `TRADE-003`: add capacity-limited caravan cargo, local buy/sell transactions, physical route delivery, a trade journal and route profit/loss.
 - [x] `TRADE-004`: make a route-backed NPC trader buy, physically carry and sell through the same market operations so later player prices change.
-- [ ] `INFO-TRADE-001`: quote a physical knowledge bundle for one target library from local novelty, accuracy, age, independent confirmation and strategic value.
+- [x] `INFO-TRADE-001`: quote a physical knowledge bundle for one target library from local novelty, accuracy, age, independent confirmation and strategic value.
 - [ ] `INFO-TRADE-002`: enforce small physical-copy limits and bundle fidelity/age degradation so repeated, copied or degraded information is worth less or zero.
 - [ ] `UI-007`: expose city goods, production/consumption, prices, cargo, transactions, route result, NPC market impact and information value in the existing debug map.
 - [ ] `TRADING-001`: prove the complete deterministic Trading Prototype in one seeded end-to-end scenario and close Stage 3.

@@ -7,9 +7,9 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 58 /
-TRADE-004 / version `0.0.58`: an NPC trader now physically changes the same
-markets and later player quote. Tactical
+MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 59 /
+INFO-TRADE-001 / version `0.0.59`: physical knowledge now has a transparent
+value scoped to one target library. Tactical
 Combat Prototype and every later roadmap stage remain gated by a separate user
 command.
 
@@ -35,6 +35,8 @@ command.
   requires physical route completion and retains cost basis for route profit.
 - TRADE-004 orchestrates those same operations for an NPC and proves its
   destination delivery changes the price subsequently quoted to the player.
+- INFO-TRADE-001 quotes a physical bundle from target-library novelty, accuracy,
+  age, confirmations/provenance and strategic evidence kind; exact repeats pay 0.
 
 ## Last known good main
 
@@ -45,21 +47,21 @@ command.
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `488/488` PASS, zero failures, compiled
-  Checkpoint 58 demo PASS.
-- Targeted TRADE-004 suite: `6/6` PASS.
+- Full `npm run verify:local`: `496/496` PASS, zero failures, compiled
+  Checkpoint 59 demo PASS.
+- Targeted INFO-TRADE-001 suite: `8/8` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 58, then implement
-`INFO-TRADE-001`.
+Complete the PR/CI/merge cycle for Checkpoint 59, then implement
+`INFO-TRADE-002`.
 
 ## Next action
 
-After stable `main`, start `INFO-TRADE-001` in its own feature branch. Quote an
-existing physical knowledge bundle against one target library from novelty,
-accuracy, age, independent sources/confirmation and strategic evidence type.
+After stable `main`, start `INFO-TRADE-002` in its own feature branch. Limit
+small physical copies and add fidelity/age degradation so copied, stale and
+fallen-library fragments cannot reset themselves to pristine full value.
 
 ## Scope boundary
 
