@@ -26,3 +26,4 @@ export * from "./caravan-pursuit.js";
 export * from "./caravan-remains.js";
 export * from "./world-evidence.js";
 export * from "./city-library.js";
+export * from "./fallen-library.js";
