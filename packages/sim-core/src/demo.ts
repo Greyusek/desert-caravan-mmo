@@ -12,6 +12,7 @@ import {
   createRumorSearchScenario,
   createRoutePlan,
   createWorldCoordinate,
+  createWorldRumor,
   destinationPoint,
   deriveNpcCaravanTrackMarks,
   discoverStaticObjectsAlongRoute,
@@ -66,7 +67,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 50 demo");
+console.log("Desert Caravan MMO — Checkpoint 51 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -230,6 +231,23 @@ if (demoNpcCaravan) {
     );
     console.log(
       `LIBRARY-002 fallen archive: condition=${fallenProjection.condition}; readability=${fallenProjection.entryStates[0]?.readability}; actuality=${fallenProjection.entryStates[0]?.actuality}; permanent=${fallenProjection.permanentlyPresent}`,
+    );
+    const archiveRumor = createWorldRumor({
+      worldSeed: world.seed,
+      originCityId: remoteLibrary.cityId,
+      subjectId: fallenLibrary.id,
+      observedAtWorldTimeSeconds: fallenLibrary.fellAtWorldTimeSeconds,
+      createdAtWorldTimeSeconds: fallenProjection.worldTimeSeconds,
+      sourceEvidenceIds: [evidence.entry.id],
+      sourceConfidence: evidence.entry.confidence,
+      facts: {
+        type: "fallen-library",
+        readability:
+          fallenProjection.entryStates[0]?.readability ?? "illegible",
+      },
+    });
+    console.log(
+      `HISTORY-001 rumor: type=${archiveRumor.type}; quality=${archiveRumor.quality}; age=${archiveRumor.approximateAge}; coordinates=not-stored`,
     );
   }
 }
@@ -716,5 +734,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 50 fallen degrading city archives: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 51 multi-type rumor quality: npm run debug-map -> http://127.0.0.1:4173",
 );
