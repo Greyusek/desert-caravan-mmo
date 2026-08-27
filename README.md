@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 54 — MVP1-001: MVP-1 «Living Path» complete and covered by automated tests.**
+**Checkpoint 55 — TRADE-001: seven finite city goods with deterministic production and consumption.**
 
 Implemented and covered by the automated test suite:
 
@@ -65,10 +65,11 @@ Also implemented:
 - CITY-001 — every seeded city has deterministic finite food and water stocks exposed in DEV details, without trading or consumption yet.
 - CITY-002 — deterministic aggregate NPC populations consume those stocks from authoritative world time at explicit provisional per-person rates; exact depletion is visible in DEV details.
 - CITY-003 — the first food or water shortage reduces aggregate population by a deterministic 1% per game day; declining population also slows later consumption of any remaining stock.
+- TRADE-001 — seven finite city goods reuse seeded food/water and population, then project deterministic production, consumption, shortage and surplus from authoritative world time.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
-Not implemented yet (intentionally): automatic resupply, production pursuit behaviors, repeated sequential contacts, cross-session/server-persisted player knowledge, full trading economy, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, multiplayer, full Magic/System 256, and autonomous neural NPC / City / Species agents.
+Not implemented yet (intentionally): prices, transactions, physical cargo trading, NPC market actions, information pricing, automatic resupply, production chains, repeated sequential contacts, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, multiplayer, full Magic/System 256, and autonomous neural NPC / City / Species agents.
 
 ## Requirements
 
@@ -103,15 +104,15 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 54:
+Expected for Checkpoint 55:
 
 ```text
-# tests 458
-# pass 458
+# tests 466
+# pass 466
 # fail 0
 ```
 
-This total includes the 11-test end-to-end MVP1-001 Living Path regression suite.
+This total includes the 8-test TRADE-001 city-economy regression suite.
 
 GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_54.md` for final MVP-1 details.
 
@@ -138,6 +139,6 @@ Then open `http://127.0.0.1:4173`. The world map is intentionally a developer ov
 
 `sim-core` remains deliberately independent from UI, database and networking code.
 
-The agreed MVP 0.1 implementation block is complete at GAME-025, and MVP-1
-«Living Path» is complete at MVP1-001. Trading Prototype and later stages remain
-out of scope until separately requested.
+The agreed MVP 0.1 implementation block is complete at GAME-025, MVP-1
+«Living Path» is complete at MVP1-001, and Trading Prototype is now in progress
+at TRADE-001. Tactical Combat and later stages remain gated.

@@ -3,8 +3,11 @@ import {
   DEFAULT_CONCEALED_DISCOVERY_RADIUS_METERS,
   canSurviveDuration,
   catchUpPersistentCreature,
+  advanceCityEconomyToWorldTime,
+  cityGood,
   copyPlayerKnowledgeToBundle,
   createCityLibraryArchive,
+  createCityEconomyState,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -74,7 +77,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 54 demo");
+console.log("Desert Caravan MMO — Checkpoint 55 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -290,6 +293,20 @@ if (firstCityStocks && firstCityPopulation) {
       `CITY-003 ${firstCityStocks.cityId} after 10 shortage days: population=${afterTenShortageDays.inhabitants}/${afterTenShortageDays.initialPopulation}, lost=${afterTenShortageDays.populationLost}, food=${afterTenShortageDays.foodUnits.toFixed(1)}, water=${afterTenShortageDays.waterUnits.toFixed(1)}, status=${afterTenShortageDays.status}`,
     );
   }
+  const economy = createCityEconomyState(
+    world.seed,
+    firstCityStocks,
+    firstCityPopulation,
+  );
+  const economyAfterTenDays = advanceCityEconomyToWorldTime(
+    economy,
+    10 * SECONDS_PER_CITY_DAY,
+  );
+  const foodMarket = cityGood(economyAfterTenDays, "food");
+  const saltMarket = cityGood(economyAfterTenDays, "salt");
+  console.log(
+    `TRADE-001 ${economy.cityId}: goods=${economy.goods.length}; food=${foodMarket.stockUnits.toFixed(1)} (${foodMarket.productionUnitsPerDay.toFixed(1)} produced/day, ${foodMarket.consumptionUnitsPerDay.toFixed(1)} consumed/day); salt=${saltMarket.stockUnits.toFixed(1)}`,
+  );
 }
 console.log(`WORLD-002 hidden static objects: ${world.staticObjects.length}`);
 for (const object of world.staticObjects) {
@@ -792,5 +809,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 54 MVP-1 Living Path complete: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 55 TRADE-001 city goods complete: npm run debug-map -> http://127.0.0.1:4173",
 );
