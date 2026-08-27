@@ -50,6 +50,7 @@ import {
   positionAtTime,
   projectCitySettlementAtTime,
   projectCityStocksAtTime,
+  quoteCityGoodPrice,
   projectCaravanRemainsAtWorldTime,
   projectFallenCityLibraryAtWorldTime,
   projectSupplies,
@@ -77,7 +78,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 55 demo");
+console.log("Desert Caravan MMO — Checkpoint 56 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -306,6 +307,10 @@ if (firstCityStocks && firstCityPopulation) {
   const saltMarket = cityGood(economyAfterTenDays, "salt");
   console.log(
     `TRADE-001 ${economy.cityId}: goods=${economy.goods.length}; food=${foodMarket.stockUnits.toFixed(1)} (${foodMarket.productionUnitsPerDay.toFixed(1)} produced/day, ${foodMarket.consumptionUnitsPerDay.toFixed(1)} consumed/day); salt=${saltMarket.stockUnits.toFixed(1)}`,
+  );
+  const foodQuote = quoteCityGoodPrice(economyAfterTenDays, "food");
+  console.log(
+    `TRADE-002 ${economy.cityId} food: stock=${foodQuote.stockUnits.toFixed(1)}; target=${foodQuote.targetStockUnits.toFixed(1)}; pressure=${foodQuote.scarcityMultiplier.toFixed(3)}x; city buys/sells=${foodQuote.cityBuyPriceCredits}/${foodQuote.citySellPriceCredits} credits`,
   );
 }
 console.log(`WORLD-002 hidden static objects: ${world.staticObjects.length}`);
@@ -809,5 +814,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 55 TRADE-001 city goods complete: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 56 TRADE-002 stock prices complete: npm run debug-map -> http://127.0.0.1:4173",
 );

@@ -7,9 +7,9 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 55 /
-TRADE-001 / version `0.0.55`: seven finite city goods now produce and consume
-from authoritative world time. Tactical
+MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 56 /
+TRADE-002 / version `0.0.56`: seven finite city goods now have bounded local
+stock/demand prices. Tactical
 Combat Prototype and every later roadmap stage remain gated by a separate user
 command.
 
@@ -29,6 +29,8 @@ command.
   persistent catch-up, creature intelligence and earned legendary history.
 - TRADE-001 reuses seeded food/water and population, adds five more finite goods
   and guarantees one deterministic surplus and deficit flow per city.
+- TRADE-002 derives city buy/sell quotes from thirty-day target demand, current
+  stock, `0.5x..3x` scarcity bounds and a fixed 10% spread.
 
 ## Last known good main
 
@@ -39,19 +41,19 @@ command.
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `466/466` PASS, zero failures, compiled
-  Checkpoint 55 demo PASS.
-- Targeted TRADE-001 suite: `8/8` PASS.
+- Full `npm run verify:local`: `472/472` PASS, zero failures, compiled
+  Checkpoint 56 demo PASS.
+- Targeted TRADE-002 suite: `6/6` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 55, then implement `TRADE-002`.
+Complete the PR/CI/merge cycle for Checkpoint 56, then implement `TRADE-003`.
 
 ## Next action
 
-After stable `main`, start `TRADE-002` in its own feature branch and derive
-transparent bounded local prices from the current stock/target-demand ratio.
+After stable `main`, start `TRADE-003` in its own feature branch: capacity-bound
+cargo, local buy/sell operations, physical route delivery, journal and profit.
 
 ## Scope boundary
 

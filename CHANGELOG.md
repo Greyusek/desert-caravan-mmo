@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.56 — Checkpoint 56
+
+- Added `TRADE-002`: deterministic city bid/ask quotes from current stock versus
+  thirty days of local demand.
+- Bounded scarcity pressure to `0.5x..3x` and applied one fixed 10% spread
+  around transparent per-good reference values.
+- Connected later TRADE-001 production/consumption state to the next quote and
+  kept the formula free of random price rolls.
+- Added six TRADE-002 regressions; repository verification now runs 472 tests.
+
 ## 0.0.55 — Checkpoint 55
 
 - Added `TRADE-001`: a seven-good catalog with explicit roles and cargo sizes.
