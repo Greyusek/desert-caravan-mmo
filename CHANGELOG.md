@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.55 — Checkpoint 55
+
+- Added `TRADE-001`: a seven-good catalog with explicit roles and cargo sizes.
+- Reused seeded food/water stocks and aggregate city populations as the base of
+  deterministic production and consumption instead of creating a parallel
+  survival economy.
+- Added finite namespaced stocks plus guaranteed surplus/deficit profiles and
+  cadence-independent authoritative world-time catch-up.
+- Added eight TRADE-001 regressions; repository verification now runs 466 tests.
+
 ## 0.0.54 — Checkpoint 54
 
 - Closed MVP-1 «Living Path» with one deterministic end-to-end scenario.
