@@ -5,6 +5,8 @@ import {
   catchUpPersistentCreature,
   copyPlayerKnowledgeToBundle,
   createCityLibraryArchive,
+  createCreatureIntelligenceReport,
+  createCreatureLegendHistory,
   createFallenCityLibrary,
   createKnownObjectReturnNavigation,
   createNpcCaravanRemains,
@@ -48,12 +50,14 @@ import {
   projectFallenCityLibraryAtWorldTime,
   projectSupplies,
   recordDirectDiscoveryObservation,
+  recordCreatureLegendEvent,
   recordObservedCaravanRemains,
   resolveMonsterPowerContact,
   resumeStaticObjectDiscoveryDoctrine,
   timeToFirstDepletion,
   wanderingMonsterPositionAtTime,
   SECONDS_PER_CITY_DAY,
+  LEGENDARY_SURVIVAL_SECONDS,
 } from "./index.js";
 
 const start = createWorldCoordinate(55.755864, 37.617698);
@@ -69,7 +73,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 52 demo");
+console.log("Desert Caravan MMO — Checkpoint 53 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -443,6 +447,37 @@ for (const monster of world.wanderingMonsters) {
   console.log(
     `HISTORY-002 ${persistent.id}: detail=${persistent.detailLevel}; survived=${persistent.survivalSeconds.toFixed(0)} s; identity-preserved=true`,
   );
+  const intelligence = createCreatureIntelligenceReport({
+    state: persistent,
+    recordedAtWorldTimeSeconds: persistent.lastSimulatedAtWorldTimeSeconds,
+    abilities: ["ambush", "burrow"],
+    colors: {
+      armorColor: "green",
+      physicalAttackColor: "orange",
+      magicColor: "blue",
+    },
+  });
+  let legend = createCreatureLegendHistory(persistent);
+  for (let victory = 1; victory <= 3; victory += 1) {
+    legend = recordCreatureLegendEvent(legend, {
+      id: `demo-victory-${victory}`,
+      type: "victory",
+      worldTimeSeconds: LEGENDARY_SURVIVAL_SECONDS,
+      defeatedEntityId: `demo-rival-${victory}`,
+    });
+  }
+  legend = recordCreatureLegendEvent(legend, {
+    id: "demo-object-control",
+    type: "object-controlled",
+    worldTimeSeconds: LEGENDARY_SURVIVAL_SECONDS,
+    objectId: "oasis-01",
+  });
+  console.log(
+    `HISTORY-003 intelligence: age=${intelligence.approximateAge}; direction=${intelligence.approximateDirection}; strength=${intelligence.strength}; channels=${intelligence.colors.armorColor}/${intelligence.colors.physicalAttackColor}/${intelligence.colors.magicColor}; coordinates=not-stored`,
+  );
+  console.log(
+    `HISTORY-003 legend: identity=${legend.creatureId}; victories=${legend.victoryCount}; controls=${legend.controlledObjectIds.join(",")}; earned=${legend.isLegendary}`,
+  );
 }
 
 const encounterPoint = createWorldCoordinate(0, 0);
@@ -744,5 +779,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 52 persistent creature/population catch-up: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 53 creature intelligence and earned legends: npm run debug-map -> http://127.0.0.1:4173",
 );

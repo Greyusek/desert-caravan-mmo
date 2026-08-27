@@ -7,45 +7,46 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is in progress. Checkpoint 52 / HISTORY-002 / version
-`0.0.52` adds persistent creature/population LOD and deterministic catch-up.
+MVP-1 «Living Path» is in progress. Checkpoint 53 / HISTORY-003 / version
+`0.0.53` adds coordinate-free creature intelligence and earned legendary
+history.
 
 ## Completed
 
-- One creature identity survives detailed, regional and population simulation.
-- Catch-up projects its original cyclic patrol directly from absolute world
-  time, preserving ID, species, survival time and travelled distance.
-- Direct and staged catch-up are byte-identical after returning to the same
-  detail level.
-- Observer distance selects explicit 5 km detailed / 50 km regional boundaries.
-- Aggregate population catch-up uses composable closed-form logistic growth.
-- A zero population stays extinct instead of silently respawning.
+- Creature reports preserve observation/record time, approximate age and
+  direction, strength, abilities and the three canonical color channels.
+- Player-facing reports contain no position, route or absolute coordinates.
+- Strength bands are deterministic over the existing Power stub; no tactical
+  combat or System 256 interaction math is added.
+- A creature begins ordinary and earns legendary status only after persistent
+  survival, three recorded victories and current control of a world object.
+- Legend events are ordered and idempotent. Final death retains the complete
+  history and rejects all later events instead of respawning the identity.
 
 ## Last known good commit
 
-- `2f1b3064f403f961c04c01db465fb2c5c1a78f72` — HISTORY-002 functional commit;
-  tree `0e0ae8738571102b18384e989ce71233863aaf01`.
-- Branch: `feature/history-002-creature-catchup`; PR/merge status is
+- `ad73b91b99e717420c869e8c2b74f36683c9a95b` — HISTORY-003 functional commit;
+  tree `305ff4ea804e9025aa9b5e26a34a60ae0befd821`.
+- Branch: `feature/history-003-creature-intel-legend`; PR/merge status is
   updated after the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `437/437` PASS, zero failures, compiled
-  Checkpoint 52 demo PASS.
-- Targeted HISTORY-002 suite: `7/7` PASS.
+- Full `npm run verify:local`: `447/447` PASS, zero failures, compiled
+  Checkpoint 53 demo PASS.
+- Targeted HISTORY-002/003 suites: `17/17` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 52, then continue immediately to
-HISTORY-003.
+Complete the PR/CI/merge cycle for Checkpoint 53, then continue immediately to
+MVP1-001.
 
 ## Next action
 
-`HISTORY-003`: add coordinate-free creature intelligence with observation time,
-approximate direction, strength and three design-contract color channels, then
-earn legendary status only from persistent survival/victory/control history.
+`MVP1-001`: compose the existing Living Path primitives into one reproducible
+end-to-end scenario, prove every MVP-1 exit criterion and close the milestone.
 
 ## Scope boundary
 
