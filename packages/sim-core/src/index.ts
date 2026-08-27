@@ -23,3 +23,4 @@ export * from "./npc-caravan.js";
 export * from "./caravan-detection.js";
 export * from "./caravan-track.js";
 export * from "./caravan-pursuit.js";
+export * from "./caravan-remains.js";

@@ -7,46 +7,45 @@ Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is in progress. Checkpoint 46 / LIVING-004 / version
-`0.0.46` adds deterministic route-backed pursuit and evasion.
+MVP-1 «Living Path» is in progress. Checkpoint 47 / CONSEQUENCE-001 / version
+`0.0.47` adds permanent degrading caravan remains with minimal loot.
 
 ## Completed
 
-- A detected target creates a finite pursuit `RoutePlan` from the observer's
-  authoritative position, existing speed and sighting world time.
-- Immediate reciprocal detection creates an evasion route directly away from
-  the pursuer; one-way detection creates no target evasion.
-- Both plans expose normal finite `RouteMotion` values consumable by SIM-008.
-- Existing continuous encounter geometry proves deterministic catch/no-catch
-  outcomes for faster pursuer and faster evader scenarios.
-- A later sighting on the abandoned original path is not reused after a route
-  change; it must be recomputed from current authoritative motion.
+- NPC destruction creates a permanent authoritative object at the exact
+  world-time-projected caravan position.
+- A deterministic temporary stub generates small food, water and salvage loot
+  without introducing a production inventory or economy.
+- Integrity and naturally remaining loot degrade linearly to zero over seven
+  game days; the ruined object itself remains permanently present.
+- Recovery takes only currently available loot, records recovered totals and
+  cannot duplicate resources on repeated calls.
 
 ## Last known good commit
 
-- `fc555b7736628b1fc8ec2934d4578fea83d0c3ba` — LIVING-004 functional commit;
-  tree `0b5c918dd3ed57da5c74de7f160e45336b008330`.
-- Branch: `feature/living-004-pursuit-evasion`; PR/merge status is
+- `bf236071831d83bc87c7c999bfaca10bf1684e63` — CONSEQUENCE-001 functional commit;
+  tree `d37f225acc5752f6a265d94d99da38ad1d17d7fe`.
+- Branch: `feature/consequence-001-caravan-remains`; PR/merge status is
   updated after the GitHub quality gate.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `395/395` PASS, zero failures, compiled
-  Checkpoint 46 demo PASS.
-- Targeted LIVING-002/003/004 suite: `18/18` PASS.
+- Full `npm run verify:local`: `402/402` PASS, zero failures, compiled
+  Checkpoint 47 demo PASS.
+- Targeted LIVING-004 / CONSEQUENCE-001 suite: `14/14` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 46, then continue immediately to
-CONSEQUENCE-001.
+Complete the PR/CI/merge cycle for Checkpoint 47, then continue immediately to
+KNOWLEDGE-001.
 
 ## Next action
 
-`CONSEQUENCE-001`: retain a destroyed caravan as permanent world remains with
-minimal loot and deterministic world-time degradation. Do not add tactical
-combat, full inventory simulation or a production economy.
+`KNOWLEDGE-001`: record track/remains observations in player knowledge and the
+event journal with source, observation time and confidence. Preserve coordinate
+secrecy and do not introduce persistent storage yet.
 
 ## Scope boundary
 
