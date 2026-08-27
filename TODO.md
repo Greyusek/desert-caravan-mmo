@@ -58,7 +58,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `LIVING-002`: add asymmetric caravan detection without requiring reciprocal visibility.
 - [x] `LIVING-003`: derive deterministic coordinate-free tracks with approximate age from executed NPC travel.
 - [x] `LIVING-004`: add minimal deterministic pursuit/evasion over the existing route model.
-- [ ] `CONSEQUENCE-001`: retain destroyed caravans as degrading world remains with minimal loot.
+- [x] `CONSEQUENCE-001`: retain destroyed caravans as degrading world remains with minimal loot.
 - [ ] `KNOWLEDGE-001`: record tracks/remains with source, observation time and confidence in player knowledge and the event journal.
 - [ ] `LIBRARY-001`: add local city archives and physical knowledge deposit/copy transfer without global synchronization.
 - [ ] `LIBRARY-002`: keep fallen-city libraries discoverable and degrade their information deterministically.
