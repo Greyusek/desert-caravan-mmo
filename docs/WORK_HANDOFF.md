@@ -2,16 +2,16 @@
 
 Updated: 28 August 2026
 
-This is the short operational recovery point for the autonomous MAIN4 series.
+This is the short operational recovery point for the autonomous Stage 4 series.
 Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» and Trading Prototype Stage 3 are complete. MAIN4 has
-implemented Checkpoint 62 / TRADING-001 / version `0.0.62`: one deterministic
-scenario now composes the player goods route, later NPC market impact and a
-physically delivered locally valued knowledge bundle. Tactical Combat Prototype
-and every later roadmap stage remain gated by a separate user command.
+MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
+62 / version `0.0.62`. The user has explicitly opened Stage 4. Tactical Combat
+Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
+the final `COMBAT-001` proof. Multiplayer Vertical Slice and later stages remain
+gated by a separate user command.
 
 ## Completed
 
@@ -65,22 +65,26 @@ and every later roadmap stage remain gated by a separate user command.
 
 ## Current task
 
-No active MAIN4 gameplay task. Checkpoint 62 / PR #71 / CI run #155 is complete
-and Trading Prototype Stage 3 is closed.
+Docs-only Stage 4 decomposition is the current stable planning change. No
+functional checkpoint or version has advanced. The next implementation task is
+`TACTICAL-001`: deterministic discrete battlefield geometry and deployment
+zones only.
 
 ## Next action
 
-Await a new user command. Do not start Tactical Combat or another roadmap stage
-from this handoff automatically.
+Complete the docs-only decomposition PR, then autonomously start `TACTICAL-001`
+from updated `main` and continue through the Stage 4 queue while verification
+remains green and resources allow.
 
 ## Scope boundary
 
-No tactical combat, PvP, multiplayer, production database, player settlements,
-full Magic/System 256, neural agents or broad production-chain simulation.
+Tactical Combat Prototype only. No real-player PvP, multiplayer, production
+database, player settlements, full Magic/System 256, neural agents, broad
+production-chain simulation or Stage 5 work.
 
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_62.md`. Verify repository/PR/CI state. MAIN4 has no unchecked
-queue item; choose and decompose any next stage only after an explicit new user
-command.
+`docs/CHECKPOINT_62.md`. Verify repository/PR/CI state. Continue with the first
+unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
+explicit user command.
