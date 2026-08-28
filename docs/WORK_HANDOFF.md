@@ -8,7 +8,7 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-64 / version `0.0.64`. The user has explicitly opened Stage 4. Tactical Combat
+65 / version `0.0.65`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
 the final `COMBAT-001` proof. Multiplayer Vertical Slice and later stages remain
 gated by a separate user command.
@@ -48,28 +48,28 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `849d379da3ba5593787c1360796a5c14d58dc5d6` — merge of handoff PR #75.
-- PR #75 is merged; GitHub `CI / verify` run #163 completed successfully on
-  exact head `015891444f4df827437bd09c295ffccfd8a4ece4`.
+- `223ebb96cb06e33847c4c983a04fe16de92fd138` — merge of PR #76.
+- PR #76 is merged; GitHub `CI / verify` run #165 completed successfully on
+  exact functional head `da53173261b137334e0bd709336fe7e31e6f2e4a`.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `534/534` PASS, zero failures, compiled
-  Checkpoint 64 demo PASS.
-- Dedicated TACTICAL-002 suite: `7/7` PASS.
+- Full `npm run verify:local`: `542/542` PASS, zero failures, compiled
+  Checkpoint 65 demo PASS.
+- Dedicated TACTICAL-003 suite: `8/8` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 64 / `TACTICAL-002` adds physical combatants with persistent source
-identities, stable deployment and minimal guard/skirmisher/monster profiles.
+Checkpoint 65 / `TACTICAL-003` adds immutable turn-based movement, attack,
+damage, defeat, winner and ordered combat events over physical units.
 
 ## Next action
 
-Complete the `TACTICAL-002` PR, then start `TACTICAL-003` from updated `main`:
-validated turn-based movement, range-limited attacks, damage, defeat and battle
-completion only.
+Complete the `TACTICAL-003` PR, then start `TACTICAL-004` from updated `main`:
+physical baggage units backed by existing trade cargo and conserved
+survive/destroy/capture outcomes only.
 
 ## Scope boundary
 
@@ -80,6 +80,6 @@ production-chain simulation or Stage 5 work.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_64.md`. Verify repository/PR/CI state. Continue with the first
+`docs/CHECKPOINT_65.md`. Verify repository/PR/CI state. Continue with the first
 unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
 explicit user command.
