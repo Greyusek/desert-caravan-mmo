@@ -38,3 +38,4 @@ export * from "./creature-intelligence.js";
 export * from "./creature-legend.js";
 export * from "./living-path-scenario.js";
 export * from "./trading-prototype-scenario.js";
+export * from "./tactical-battlefield.js";

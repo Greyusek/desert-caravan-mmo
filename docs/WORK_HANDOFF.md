@@ -8,7 +8,7 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-62 / version `0.0.62`. The user has explicitly opened Stage 4. Tactical Combat
+63 / version `0.0.63`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
 the final `COMBAT-001` proof. Multiplayer Vertical Slice and later stages remain
 gated by a separate user command.
@@ -48,33 +48,29 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `8e5eac328839c90473ddbc36b3836d1ba1616404` — merge of PR #71;
-  functional head `ca186aa4145292d5f25b1a4d80ddb59d6725dc30`, tree
-  `a1460521bd840f90fec091ef4730fa38d76446bc`.
-- PR #71 is merged; GitHub `CI / verify` run #155 completed successfully on the
-  exact functional head. `main` matched `origin/main` when this final handoff
-  branch was created.
+- `65ca212b1a1a61a115868e24ad62631aa56601ef` — merge of docs-only PR #73.
+- PR #73 is merged; GitHub `CI / verify` run #159 completed successfully on
+  head `64fb915ba4f924e108c72905e7e563b195993212`.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `521/521` PASS, zero failures, compiled
-  Checkpoint 62 demo PASS.
-- Dedicated TRADING-001 suite: `11/11` PASS; debug-map remains `132/132` PASS.
+- Full `npm run verify:local`: `527/527` PASS, zero failures, compiled
+  Checkpoint 63 demo PASS.
+- Dedicated TACTICAL-001 suite: `6/6` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Docs-only Stage 4 decomposition is the current stable planning change. No
-functional checkpoint or version has advanced. The next implementation task is
-`TACTICAL-001`: deterministic discrete battlefield geometry and deployment
-zones only.
+Checkpoint 63 / `TACTICAL-001` adds deterministic discrete battlefield geometry
+and stable deployment zones. The next task is `TACTICAL-002`: physical tactical
+units and minimal functionally distinct classes.
 
 ## Next action
 
-Complete the docs-only decomposition PR, then autonomously start `TACTICAL-001`
-from updated `main` and continue through the Stage 4 queue while verification
-remains green and resources allow.
+Complete the `TACTICAL-001` PR, then autonomously start `TACTICAL-002` from
+updated `main` and continue through the Stage 4 queue while verification remains
+green and resources allow.
 
 ## Scope boundary
 
@@ -85,6 +81,6 @@ production-chain simulation or Stage 5 work.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_62.md`. Verify repository/PR/CI state. Continue with the first
+`docs/CHECKPOINT_63.md`. Verify repository/PR/CI state. Continue with the first
 unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
 explicit user command.
