@@ -79,6 +79,18 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `UI-007`: expose city goods, production/consumption, prices, cargo, transactions, route result, NPC market impact and information value in the existing debug map.
 - [x] `TRADING-001`: prove the complete deterministic Trading Prototype in one seeded end-to-end scenario and close Stage 3.
 
+## Tactical Combat Prototype queue
+
+- [ ] `TACTICAL-001`: add a deterministic discrete battlefield with explicit bounds, terrain-free cells and stable side deployment zones.
+- [ ] `TACTICAL-002`: place persistent combatants as physical tactical units with minimal functionally distinct guard, skirmisher and monster classes.
+- [ ] `TACTICAL-003`: execute validated turn-based movement, range-limited attacks, damage, defeat and battle completion through deterministic commands.
+- [ ] `TACTICAL-004`: place the existing caravan cargo in physical baggage units and resolve conserved surviving, destroyed or captured stacks from battlefield control.
+- [ ] `TACTICAL-005`: resolve tactical retreat only after a side opens the required edge separation, returning escaped units without declaring them casualties.
+- [ ] `TACTICAL-006`: apply tactical survivors, casualties and conserved cargo exactly once to authoritative caravan and persistent-creature state.
+- [ ] `TACTICAL-007`: route existing PvE monster contacts through the stable tactical core while retaining the Power resolver as an explicit legacy compatibility path.
+- [ ] `UI-008`: project battlefield cells, sides, classes, baggage, commands, events, casualties, winner, cargo outcome and world return in the debug map without browser combat logic.
+- [ ] `COMBAT-001`: prove the complete deterministic global-contact → tactical battle → persistent world-consequence scenario and close Stage 4.
+
 ## Future R&D anchors
 
 - [x] `DESIGN-AI-001`: integrate the autonomous «Искины» direction into GDD/ROADMAP as a future simulation layer. The accepted contract and experiments live in [`docs/AI_ISKINS_CONCEPT.md`](docs/AI_ISKINS_CONCEPT.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md); implementation remains behind the current MVP checkpoints and its dependency gate.
