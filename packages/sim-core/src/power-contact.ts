@@ -36,6 +36,9 @@ export interface PowerContactResolution {
  * stronger or equal monster requires the explicit pre-combat doctrine: FLEE
  * uses GAME-006 movement inputs when supplied (or preserves the GAME-005 pause
  * when they are omitted), while ACCEPT_FIGHT is fatal.
+ *
+ * @deprecated New PvE contacts use resolvePveMonsterContact. Call this only for
+ * explicit GAME-005/006 legacy compatibility and regression coverage.
  */
 export function resolveMonsterPowerContact(
   monsterPower: number,
