@@ -1,17 +1,17 @@
 # Work handoff
 
-Updated: 27 August 2026
+Updated: 28 August 2026
 
 This is the short operational recovery point for the autonomous MAIN4 series.
 Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» is complete. MAIN4 has implemented Checkpoint 61 / UI-007 /
-version `0.0.61`: the existing debug map now projects the material and
-information economy as one deterministic Trading Prototype QA scenario.
-Tactical Combat Prototype and every later roadmap stage remain gated by a
-separate user command.
+MVP-1 «Living Path» and Trading Prototype Stage 3 are complete. MAIN4 has
+implemented Checkpoint 62 / TRADING-001 / version `0.0.62`: one deterministic
+scenario now composes the player goods route, later NPC market impact and a
+physically delivered locally valued knowledge bundle. Tactical Combat Prototype
+and every later roadmap stage remain gated by a separate user command.
 
 ## Completed
 
@@ -42,32 +42,34 @@ separate user command.
 - UI-007 exposes both seven-good markets, production/consumption, cargo and the
   player journal/profit, physical NPC price impact and differentiated local
   information quotes without duplicating sim-core formulas in the DOM.
+- TRADING-001 composes those primitives in one authoritative seeded scenario,
+  preserves exact state in `serverTruth`, exposes a coordinate-free
+  `playerView`, and makes UI-007 a projection of that final view.
 
 ## Last known good main
 
-- `99c392ff9c156d340195a0c5c4910e40209226a9` — merge of PR #69;
-  tree `cf476cc4fbbbfabb28688062f15955c5220df40e`.
-- `main` exactly matched `origin/main` before the UI-007 feature branch; PR #69
-  is merged and its GitHub CI run #151 succeeded.
+- `c289a2aa280246be25676cf8a511016b119daa85` — merge of PR #70;
+  tree `ebaaaaa4f3c4511bfff76cddc2bc34311492c21a`.
+- `main` exactly matched `origin/main` before the TRADING-001 feature branch;
+  PR #70 is merged and its GitHub CI run #153 succeeded.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `510/510` PASS, zero failures, compiled
-  Checkpoint 61 demo PASS.
-- Debug-map suite: `132/132` PASS, including `6/6` new UI-007 regressions.
+- Full `npm run verify:local`: `521/521` PASS, zero failures, compiled
+  Checkpoint 62 demo PASS.
+- Dedicated TRADING-001 suite: `11/11` PASS; debug-map remains `132/132` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 61, then implement `TRADING-001`.
+Complete the PR/CI/merge cycle for Checkpoint 62, then publish the final MAIN4
+handoff record with the exact merge commit, PR and green CI run.
 
 ## Next action
 
-After stable `main`, start `TRADING-001` in its own feature branch. Add one
-authoritative seeded end-to-end scenario that composes the player goods route,
-later NPC market impact and physically delivered library information, then close
-Stage 3 and stop before Tactical Combat.
+After stable `main`, make no gameplay changes. Finalize only the exact handoff
+metadata if needed, then stop. Tactical Combat requires a new user command.
 
 ## Scope boundary
 

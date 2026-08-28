@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.62 — Checkpoint 62
+
+- Added `TRADING-001`: one deterministic seeded scenario composes two complete
+  markets, a capacity-limited player trade and physical route profit.
+- Sent a later NPC through the same market/cargo/RoutePlan operations and
+  retained its stock-driven change to the next player quote.
+- Physically delivered one knowledge bundle to the destination library and
+  contrasted novel, copied, old and already-known local values.
+- Kept complete coordinate-bearing state in `serverTruth` and exposed a
+  reproducible coordinate-free `playerView`; UI-007 now projects this scenario.
+- Added eleven TRADING-001 regressions; repository verification now runs 521
+  tests and closes Trading Prototype Stage 3.
+
 ## 0.0.61 — Checkpoint 61
 
 - Added `UI-007`: a compact Trading Prototype panel in the existing
