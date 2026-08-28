@@ -24,6 +24,9 @@ import {
   executeTacticalRetreat,
   createTacticalWorldState,
   applyTacticalBattleToWorld,
+  pveCaravanUnitId,
+  pveCreatureUnitId,
+  resolvePveMonsterContact,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -98,7 +101,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 68 demo");
+console.log("Desert Caravan MMO — Checkpoint 69 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1082,6 +1085,45 @@ console.log(
   `  applied=${returnedWorld.appliedBattleIds.join(",")}; members=${returnedWorld.members.map((member) => `${member.id}:${member.status}:${member.health}hp`).join(",")}; creature=${returnedWorld.creature.status}; cargo=${returnedWorld.caravan.cargo.stacks.map((stack) => `${stack.goodId}x${stack.units}`).join(",")}`,
 );
 
+if (!expeditionContact) throw new Error("demo requires an authoritative monster contact");
+const pveCreature = createPersistentCreatureState(demoMonster, "demo-contact-species");
+const pveSourceUnits = deployTacticalUnits(tacticalBattlefield, [
+  { id: "pve-source-guard", side: "caravan", unitClass: "guard", source: { kind: "caravan-member", id: "pve-member" } },
+  { id: "pve-source-monster", side: "hostile", unitClass: "monster", source: { kind: "persistent-creature", id: pveCreature.id } },
+]);
+const pveGuardId = pveCaravanUnitId("pve-member");
+const pveMonsterId = pveCreatureUnitId(pveCreature.id);
+const pveResolution = resolvePveMonsterContact({
+  contact: expeditionContact,
+  battleId: "demo-contact-battle-69",
+  battlefieldSeed: "checkpoint-69-contact",
+  worldState: createTacticalWorldState(returnCaravan, pveSourceUnits, pveCreature),
+  commands: [
+    { kind: "MOVE", unitId: pveGuardId, to: { x: 2, y: 0 } },
+    { kind: "MOVE", unitId: pveMonsterId, to: { x: 8, y: 0 } },
+    { kind: "MOVE", unitId: pveGuardId, to: { x: 4, y: 0 } },
+    { kind: "MOVE", unitId: pveMonsterId, to: { x: 6, y: 0 } },
+    { kind: "MOVE", unitId: pveGuardId, to: { x: 5, y: 0 } },
+    { kind: "ATTACK", unitId: pveMonsterId, targetUnitId: pveGuardId },
+    { kind: "ATTACK", unitId: pveGuardId, targetUnitId: pveMonsterId },
+    { kind: "ATTACK", unitId: pveMonsterId, targetUnitId: pveGuardId },
+    { kind: "ATTACK", unitId: pveGuardId, targetUnitId: pveMonsterId },
+    { kind: "ATTACK", unitId: pveMonsterId, targetUnitId: pveGuardId },
+    { kind: "ATTACK", unitId: pveGuardId, targetUnitId: pveMonsterId },
+  ],
+});
+const legacyResolution = resolvePveMonsterContact({
+  mode: "LEGACY_POWER",
+  contact: expeditionContact,
+});
+if (pveResolution.mode !== "TACTICAL") {
+  throw new Error("default PvE contact mode must be tactical");
+}
+console.log("\nTACTICAL-007 PvE contact migration:");
 console.log(
-  "\nCheckpoint 68 TACTICAL-006 complete; next TACTICAL-007: npm run debug-map -> http://127.0.0.1:4173",
+  `  default=${pveResolution.mode}; contact=${pveResolution.contact.monsterId}; winner=${pveResolution.battle.winner}; applied=${pveResolution.worldState.appliedBattleIds.join(",")}; legacy=${legacyResolution.mode}:${legacyResolution.status}`,
+);
+
+console.log(
+  "\nCheckpoint 69 TACTICAL-007 complete; next UI-008: npm run debug-map -> http://127.0.0.1:4173",
 );

@@ -8,80 +8,60 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-68 / version `0.0.68`. The user has explicitly opened Stage 4. Tactical Combat
+69 / version `0.0.69`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
-the final `COMBAT-001` proof. Stage 4.5 Player-facing UI Vertical Slice is now
+the final `COMBAT-001` proof. Stage 4.5 Player-facing UI Vertical Slice is
 recorded in ROADMAP but remains gated until Stage 4 closes; its first action is
 the separate `UI-VERTICAL-DECOMP` docs-only PR. Multiplayer and later stages
 remain gated.
 
 ## Completed
 
-- One end-to-end scenario composes an authoritative travelling NPC caravan,
-  one-way sighting, approximate-age track, route-backed pursuit, permanent
-  degrading remains and deterministic minimal loot.
-- Track/remains observations become coordinate-free knowledge and journal
-  records with provenance, observation time and confidence.
-- A physical carrier returns that knowledge to city A. City B remains empty
-  until a copied bundle physically travels the full A-to-B route.
-- Delivered remains evidence produces a typed, quality-rated world rumor.
-- The complete server truth and player view reproduce for identical seed and
-  actions; the player view contains no coordinates or source-caravan identity.
-- Checkpoints 43–53 retain their independent regression coverage, including
-  persistent catch-up, creature intelligence and earned legendary history.
-- TRADE-001 reuses seeded food/water and population, adds five more finite goods
-  and guarantees one deterministic surplus and deficit flow per city.
-- TRADE-002 derives city buy/sell quotes from thirty-day target demand, current
-  stock, `0.5x..3x` scarcity bounds and a fixed 10% spread.
-- TRADE-003 changes the same markets through capacity-limited purchase and sale,
-  requires physical route completion and retains cost basis for route profit.
-- TRADE-004 orchestrates those same operations for an NPC and proves its
-  destination delivery changes the price subsequently quoted to the player.
-- INFO-TRADE-001 quotes a physical bundle from target-library novelty, accuracy,
-  age, confirmations/provenance and strategic evidence kind; exact repeats pay 0.
-- INFO-TRADE-002 limits bundles to three entries/two copy generations and carries
-  copy, medium-age and fallen-archive fidelity into the local price.
-- UI-007 exposes both seven-good markets, production/consumption, cargo and the
-  player journal/profit, physical NPC price impact and differentiated local
-  information quotes without duplicating sim-core formulas in the DOM.
-- TRADING-001 composes those primitives in one authoritative seeded scenario,
-  preserves exact state in `serverTruth`, exposes a coordinate-free
-  `playerView`, and makes UI-007 a projection of that final view.
+- Checkpoints 43–53 retain independent regression coverage for the complete
+  Living Path, persistent creatures, physical knowledge and earned history.
+- Checkpoints 54–62 retain the complete seven-good Trading Prototype, physical
+  player/NPC routes, market effects, information valuation and UI projection.
+- TACTICAL-001–003 provide a seeded battlefield, physical source-linked units
+  and deterministic validated MOVE/ATTACK/WAIT commands through completion.
+- TACTICAL-004–006 make existing cargo physical, resolve retreat and apply
+  health, permanent casualties and conserved cargo exactly once to world state.
+- TACTICAL-007 makes tactical combat the default resolver for an existing
+  authoritative PvE monster contact. It validates the contact against the same
+  persistent creature, preserves current source health, executes tactical
+  commands and returns winner/casualties/cargo to the global state.
+- The unchanged GAME-005/006 Power stub is available through the new resolver
+  only when callers explicitly select `LEGACY_POWER`.
 
 ## Last known good main
 
-- `853e93f63fb102096779ca160be09f85830151e8` — merge of PR #84.
-- PR #84 is merged; GitHub `CI / verify` run #181 completed successfully on
-  exact functional head `ccfc594edd1402e1f3ca8ecebd0f37dd1251fa20`.
+- `77dab34237cc7de736845e5ff8d620187aae2be5` — merge of PR #85.
+- PR #84 functional head `ccfc594edd1402e1f3ca8ecebd0f37dd1251fa20`
+  passed GitHub `CI / verify`; PR #85 recorded the resource handoff only.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `565/565` PASS, zero failures, compiled
-  Checkpoint 68 demo PASS.
-- Dedicated TACTICAL-006 suite: `7/7` PASS.
-- User local acceptance of Checkpoint 66: `550/550` PASS; manual cargo scenarios
-  all PASS on commit `f9340db`.
+- Full `npm run verify:local`: `574/574` PASS, zero failures, compiled
+  Checkpoint 69 demo PASS.
+- Dedicated TACTICAL-007 suite: `9/9` PASS.
+- GAME-005/006 plus TACTICAL-006/007 regression group: `29/29` PASS.
+- Manual tactical PvE win/loss/legacy scenarios: PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 68 / `TACTICAL-006` applies tactical health, permanent casualties and
-conserved cargo exactly once to the existing trade caravan, caravan-member IDs
-and persistent creature identity. It is complete and no Stage 4 task is active.
+Checkpoint 69 / `TACTICAL-007` is complete. Existing global PvE contacts now
+enter tactical combat by default and return persistent consequences; legacy
+Power behavior remains explicit and regression-safe. No Stage 4 task is active.
 Stage 4.5 remains gated.
-
-`RESOURCE LIMIT CHECKPOINT`: `TACTICAL-007` was not started because a safe PvE
-contact migration must include tactical encounter creation, legacy Power
-compatibility, old GAME-005/006 regression and full PR/CI in one stable slice.
 
 ## Next action
 
-From updated `main`, start `TACTICAL-007`: add an explicit `TACTICAL | LEGACY_POWER`
-PvE resolution mode, make tactical the new path from an existing authoritative
-monster contact through battlefield/units/combat/world return, and keep
-`resolveMonsterPowerContact` only as the tested legacy path. Do not add UI or
-the final COMBAT-001 composition in this slice.
+From updated `main`, start `UI-008`: project battlefield cells, sides, source
+units, physical baggage, commands/events, casualties, winner, cargo outcome and
+world return from this same sim-core result in the existing debug map. Do not
+add browser-side combat rules or start the final COMBAT-001 composition in that
+slice.
 
 ## Scope boundary
 
@@ -92,6 +72,6 @@ production-chain simulation, Stage 4.5 implementation or Stage 5 work.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_68.md`. Verify repository/PR/CI state. Continue with the first
+`docs/CHECKPOINT_69.md`. Verify repository/PR/CI state. Continue with the first
 unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
 explicit user command.

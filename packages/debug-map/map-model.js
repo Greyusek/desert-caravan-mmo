@@ -38,7 +38,7 @@ import {
   planEmergencySupplyReturnDuringIdleStop,
   projectCitySettlementAtTime,
   projectMixedActivitySupplies,
-  resolveMonsterPowerContact,
+  resolvePveMonsterContact,
   resumeStaticObjectDiscoveryDoctrine,
   routeTimeToExpeditionTime,
   timeToFirstDepletion,
@@ -2090,12 +2090,13 @@ export function createExpeditionOutcomeSnapshot(
         }
       : null;
   const contactResolution = contact
-    ? resolveMonsterPowerContact(
-        contact.monsterPower,
-        strongMonsterDoctrine,
-        DEFAULT_PLAYER_POWER,
+    ? resolvePveMonsterContact({
+        mode: "LEGACY_POWER",
+        contact,
+        doctrine: strongMonsterDoctrine,
+        playerPower: DEFAULT_PLAYER_POWER,
         fleeAttempt,
-      )
+      }).legacyPowerResolution
     : null;
   let contactExecutes =
     monsterPauseAtSeconds !== null &&
