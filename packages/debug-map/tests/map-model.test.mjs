@@ -37,6 +37,7 @@ import {
   createSessionKnowledgeMapSnapshot,
   createStationaryStopPatrolPreset,
   createTradingDebugSnapshot,
+  createTacticalDebugSnapshot,
   projectCoordinate,
   splitPathAtAntimeridian,
 } from "../map-model.js";
@@ -4380,4 +4381,104 @@ test("UI-007: trading player projection reveals no exact coordinates", () => {
   assert.equal(serialized.includes("latitude"), false);
   assert.equal(serialized.includes("longitude"), false);
   assert.equal(serialized.includes("position"), false);
+});
+
+test("UI-008: tactical snapshot projects the complete battlefield geometry", () => {
+  const snapshot = createTacticalDebugSnapshot("ui-008-world");
+
+  assert.equal(snapshot.mode, "TACTICAL");
+  assert.equal(snapshot.battlefield.width, 12);
+  assert.equal(snapshot.battlefield.height, 8);
+  assert.equal(snapshot.battlefield.deploymentDepth, 2);
+  assert.deepEqual(snapshot.battlefield.deploymentZones, {
+    caravan: { minX: 0, maxX: 1 },
+    hostile: { minX: 10, maxX: 11 },
+  });
+});
+
+test("UI-008: physical source units retain sides, classes, positions and health", () => {
+  const snapshot = createTacticalDebugSnapshot("ui-008-world");
+
+  assert.deepEqual(
+    snapshot.units.map((unit) => [
+      unit.side,
+      unit.unitClass,
+      unit.source.kind,
+      unit.initialPosition,
+      unit.position,
+      unit.health,
+      unit.status,
+    ]),
+    [
+      ["caravan", "guard", "caravan-member", { x: 0, y: 0 }, { x: 5, y: 0 }, 6, "alive"],
+      ["caravan", "skirmisher", "caravan-member", { x: 0, y: 1 }, { x: 6, y: 1 }, 0, "defeated"],
+      ["hostile", "monster", "persistent-creature", { x: 10, y: 0 }, { x: 6, y: 0 }, 0, "defeated"],
+    ],
+  );
+});
+
+test("UI-008: physical baggage projects the existing conserved cargo", () => {
+  const snapshot = createTacticalDebugSnapshot("ui-008-world");
+
+  assert.deepEqual(
+    snapshot.baggage.map((unit) => [unit.cargoStack.goodId, unit.position, unit.durability]),
+    [
+      ["ore", { x: 0, y: 2 }, 6],
+      ["medicine", { x: 0, y: 3 }, 6],
+    ],
+  );
+  assert.deepEqual(snapshot.cargo.caravanCargo.stacks, snapshot.baggage.map((unit) => unit.cargoStack));
+  assert.deepEqual(snapshot.cargo.capturedCargo.stacks, []);
+  assert.deepEqual(snapshot.cargo.destroyedStacks, []);
+  assert.equal(snapshot.cargo.conservation.every((entry) => entry.conserved), true);
+});
+
+test("UI-008: commands and resolved events are both visible without UI combat rules", () => {
+  const snapshot = createTacticalDebugSnapshot("ui-008-world");
+
+  assert.equal(snapshot.commands.length, 17);
+  assert.equal(snapshot.events.length, 17);
+  assert.deepEqual(
+    snapshot.commands.map((command) => command.kind),
+    ["MOVE", "MOVE", "MOVE", "MOVE", "MOVE", "ATTACK", "ATTACK", "ATTACK", "ATTACK", "ATTACK", "MOVE", "WAIT", "MOVE", "ATTACK", "ATTACK", "ATTACK", "ATTACK"],
+  );
+  assert.deepEqual(
+    snapshot.events.map((event) => event.kind),
+    ["moved", "moved", "moved", "moved", "moved", "attacked", "attacked", "attacked", "attacked", "attacked", "moved", "waited", "moved", "attacked", "attacked", "attacked", "attacked"],
+  );
+});
+
+test("UI-008: result projects casualties, winner and one authoritative world return", () => {
+  const snapshot = createTacticalDebugSnapshot("ui-008-world");
+
+  assert.equal(snapshot.result.winner, "caravan");
+  assert.equal(snapshot.result.status, "monster-defeated");
+  assert.equal(snapshot.result.routeDisposition, "continue");
+  assert.deepEqual(snapshot.result.survivorSourceIds, ["ui-member-guard"]);
+  assert.deepEqual(snapshot.result.casualtySourceIds, [
+    "ui-member-skirmisher",
+    "persistent-ui-tactical-monster",
+  ]);
+  assert.deepEqual(snapshot.worldReturn.appliedBattleIds, ["ui-008-battle:ui-008-world"]);
+  assert.equal(snapshot.worldReturn.members[0]?.status, "alive");
+  assert.equal(snapshot.worldReturn.members[1]?.status, "dead");
+  assert.equal(snapshot.worldReturn.creature.status, "dead");
+});
+
+test("UI-008: identical seed reproduces the complete tactical projection", () => {
+  assert.deepEqual(
+    createTacticalDebugSnapshot("ui-008-world"),
+    createTacticalDebugSnapshot("ui-008-world"),
+  );
+});
+
+test("UI-008: seed changes identities without changing the fixed action contract", () => {
+  const first = createTacticalDebugSnapshot("ui-008-world-a");
+  const second = createTacticalDebugSnapshot("ui-008-world-b");
+
+  assert.notEqual(first.battlefield.id, second.battlefield.id);
+  assert.notEqual(first.worldReturn.appliedBattleIds[0], second.worldReturn.appliedBattleIds[0]);
+  assert.deepEqual(first.units, second.units);
+  assert.deepEqual(first.commands, second.commands);
+  assert.deepEqual(first.events, second.events);
 });

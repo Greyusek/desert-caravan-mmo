@@ -7,12 +7,18 @@ import {
   DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
   DEFAULT_PLAYER_POWER,
   DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
+  createPersistentCreatureState,
   createRoutePlan,
+  createTacticalBattlefield,
+  createTacticalWorldState,
+  createTradeCaravanState,
   createTradingPrototypeScenario,
+  createWorldCoordinate,
   createKnownObjectReturnNavigation,
   createRumorSearchScenario,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
+  deployTacticalUnits,
   evaluateDiscoveryStopLifecycle,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
@@ -38,6 +44,8 @@ import {
   planEmergencySupplyReturnDuringIdleStop,
   projectCitySettlementAtTime,
   projectMixedActivitySupplies,
+  pveCaravanUnitId,
+  pveCreatureUnitId,
   resolvePveMonsterContact,
   resumeStaticObjectDiscoveryDoctrine,
   routeTimeToExpeditionTime,
@@ -380,6 +388,210 @@ export function createTradingDebugSnapshot(seed) {
       copiedValueCredits: view.informationTrade.copiedValueCredits,
       copiedFidelityFraction: view.informationTrade.copiedFidelityFraction,
       copyGeneration: view.informationTrade.copyGeneration,
+    },
+  };
+}
+
+/**
+ * UI-008 composes one fixed-action TACTICAL-007 result and exposes a pure debug
+ * projection. The browser renderer receives resolved state only: it does not
+ * reproduce movement, attack, cargo or world-return rules.
+ * @param {string} seed
+ */
+export function createTacticalDebugSnapshot(seed) {
+  if (typeof seed !== "string" || seed.trim().length === 0) {
+    throw new TypeError("seed must be a non-empty string");
+  }
+  const crossing = createWorldCoordinate(0, 0);
+  const patrolStart = destinationPoint(crossing, 270, 1_000);
+  const caravanStart = destinationPoint(crossing, 180, 1_000);
+  const monster = {
+    id: "ui-tactical-monster",
+    kind: /** @type {const} */ ("wandering-monster"),
+    power: 90,
+    visionRadiusMeters: 300,
+    interactionRadiusMeters: 100,
+    patrolRoute: createRoutePlan(
+      patrolStart,
+      [
+        { bearingDeg: 90, distanceMeters: 2_000 },
+        { bearingDeg: 270, distanceMeters: 2_000 },
+      ],
+      10,
+    ),
+  };
+  const contact = findFirstExpeditionMonsterContact(
+    createRoutePlan(
+      caravanStart,
+      [{ bearingDeg: 0, distanceMeters: 2_000 }],
+      10,
+    ),
+    monster,
+  );
+  if (!contact) throw new Error("UI-008 debug scenario requires a real contact");
+
+  const creature = createPersistentCreatureState(monster, "ui-sand-beast");
+  const sourceField = createTacticalBattlefield(`ui-008-source:${seed}`);
+  const sourceUnits = deployTacticalUnits(sourceField, [
+    {
+      id: "ui-source-guard",
+      side: "caravan",
+      unitClass: "guard",
+      source: { kind: "caravan-member", id: "ui-member-guard" },
+    },
+    {
+      id: "ui-source-skirmisher",
+      side: "caravan",
+      unitClass: "skirmisher",
+      source: { kind: "caravan-member", id: "ui-member-skirmisher" },
+    },
+    {
+      id: "ui-source-monster",
+      side: "hostile",
+      unitClass: "monster",
+      source: { kind: "persistent-creature", id: creature.id },
+    },
+  ]);
+  const caravan = createTradeCaravanState("ui-tactical-caravan", "city-01", 250, 20);
+  const worldState = createTacticalWorldState(
+    {
+      ...caravan,
+      cargo: {
+        capacityCargoUnits: 20,
+        stacks: [
+          { goodId: "ore", units: 5, costBasisCredits: 110 },
+          { goodId: "medicine", units: 2, costBasisCredits: 80 },
+        ],
+      },
+    },
+    sourceUnits,
+    creature,
+  );
+  const guardId = pveCaravanUnitId("ui-member-guard");
+  const skirmisherId = pveCaravanUnitId("ui-member-skirmisher");
+  const monsterId = pveCreatureUnitId(creature.id);
+  const commands = [
+    { kind: /** @type {const} */ ("MOVE"), unitId: guardId, to: { x: 2, y: 0 } },
+    { kind: /** @type {const} */ ("MOVE"), unitId: monsterId, to: { x: 8, y: 0 } },
+    { kind: /** @type {const} */ ("MOVE"), unitId: skirmisherId, to: { x: 3, y: 1 } },
+    { kind: /** @type {const} */ ("MOVE"), unitId: monsterId, to: { x: 6, y: 0 } },
+    { kind: /** @type {const} */ ("MOVE"), unitId: skirmisherId, to: { x: 6, y: 1 } },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: skirmisherId },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: skirmisherId, targetUnitId: monsterId },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: skirmisherId },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: skirmisherId, targetUnitId: monsterId },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: skirmisherId },
+    { kind: /** @type {const} */ ("MOVE"), unitId: guardId, to: { x: 4, y: 0 } },
+    { kind: /** @type {const} */ ("WAIT"), unitId: monsterId },
+    { kind: /** @type {const} */ ("MOVE"), unitId: guardId, to: { x: 5, y: 0 } },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: guardId },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: guardId, targetUnitId: monsterId },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: guardId },
+    { kind: /** @type {const} */ ("ATTACK"), unitId: guardId, targetUnitId: monsterId },
+  ];
+  const resolution = resolvePveMonsterContact({
+    contact,
+    battleId: `ui-008-battle:${seed}`,
+    battlefieldSeed: `ui-008-battlefield:${seed}`,
+    worldState,
+    commands,
+  });
+  if (resolution.mode !== "TACTICAL") {
+    throw new Error("UI-008 debug scenario must use tactical resolution");
+  }
+  const initialUnits = new Map(
+    resolution.initialBattle.units.map((unit) => [unit.id, unit]),
+  );
+
+  return {
+    seed,
+    mode: resolution.mode,
+    contact: {
+      monsterId: resolution.contact.monsterId,
+      monsterPower: resolution.contact.monsterPower,
+      expeditionElapsedSeconds: resolution.contact.expeditionElapsedSeconds,
+      caravanActivity: resolution.contact.caravanActivity,
+      separationMeters: resolution.contact.separationMeters,
+    },
+    battlefield: {
+      id: resolution.battlefield.id,
+      width: resolution.battlefield.width,
+      height: resolution.battlefield.height,
+      deploymentDepth: resolution.battlefield.deploymentDepth,
+      deploymentZones: {
+        caravan: {
+          minX: resolution.battlefield.deploymentZones.caravan.minX,
+          maxX: resolution.battlefield.deploymentZones.caravan.maxX,
+        },
+        hostile: {
+          minX: resolution.battlefield.deploymentZones.hostile.minX,
+          maxX: resolution.battlefield.deploymentZones.hostile.maxX,
+        },
+      },
+    },
+    units: resolution.battle.units.map((unit) => {
+      const initial = initialUnits.get(unit.id);
+      if (!initial) throw new Error(`UI-008 initial unit missing: ${unit.id}`);
+      return {
+        id: unit.id,
+        side: unit.side,
+        unitClass: unit.unitClass,
+        source: { ...unit.source },
+        initialPosition: { ...initial.position },
+        position: { ...unit.position },
+        initialHealth: initial.health,
+        health: unit.health,
+        maxHealth: unit.stats.maxHealth,
+        movementCells: unit.stats.movementCells,
+        attackRangeCells: unit.stats.attackRangeCells,
+        attackDamage: unit.stats.attackDamage,
+        status: unit.health > 0 ? "alive" : "defeated",
+      };
+    }),
+    baggage: resolution.cargoDeployment.baggageUnits.map((unit) => ({
+      id: unit.id,
+      position: { ...unit.position },
+      durability: unit.durability,
+      maxDurability: unit.maxDurability,
+      cargoStack: { ...unit.cargoStack },
+    })),
+    commands: commands.map((command) =>
+      command.kind === "MOVE"
+        ? { ...command, to: { ...command.to } }
+        : { ...command },
+    ),
+    events: resolution.battle.events.map((event) =>
+      event.kind === "moved"
+        ? { ...event, from: { ...event.from }, to: { ...event.to } }
+        : { ...event },
+    ),
+    result: {
+      status: resolution.status,
+      winner: resolution.battle.winner,
+      routeDisposition: resolution.routeDisposition,
+      turns: resolution.battle.turn - 1,
+      casualtySourceIds:
+        resolution.worldState.battleResults[0]?.casualtySourceIds ?? [],
+      survivorSourceIds:
+        resolution.worldState.battleResults[0]?.survivorSourceIds ?? [],
+    },
+    cargo: {
+      sourceUsedCargoUnits: resolution.cargoDeployment.sourceUsedCargoUnits,
+      caravanCargo: resolution.cargoOutcome.caravanCargo,
+      capturedCargo: resolution.cargoOutcome.capturedCargo,
+      destroyedStacks: resolution.cargoOutcome.destroyedStacks,
+      conservation: resolution.cargoOutcome.conservation,
+    },
+    worldReturn: {
+      appliedBattleIds: resolution.worldState.appliedBattleIds,
+      members: resolution.worldState.members,
+      creature: {
+        id: resolution.worldState.creature.creature.id,
+        health: resolution.worldState.creature.health,
+        maxHealth: resolution.worldState.creature.maxHealth,
+        status: resolution.worldState.creature.status,
+      },
+      battleResults: resolution.worldState.battleResults,
     },
   };
 }

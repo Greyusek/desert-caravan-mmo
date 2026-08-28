@@ -57,3 +57,29 @@ test("UI-001 tooling: server returns browser-safe content types", () => {
   assert.equal(contentTypeForDebugMap("source.map"), "application/json; charset=utf-8");
   assert.equal(contentTypeForDebugMap("unknown.bin"), "application/octet-stream");
 });
+
+test("UI-008 tooling: tactical panel is wired as a projection-only browser view", async () => {
+  const html = await readFile(
+    path.join(actualRepositoryRoot, "packages", "debug-map", "index.html"),
+    "utf8",
+  );
+  const main = await readFile(
+    path.join(actualRepositoryRoot, "packages", "debug-map", "main.js"),
+    "utf8",
+  );
+
+  for (const id of [
+    "tactical-result",
+    "tactical-field",
+    "tactical-unit-list",
+    "tactical-event-list",
+    "tactical-outcome-summary",
+  ]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`));
+  }
+  assert.match(main, /createTacticalDebugSnapshot/);
+  assert.doesNotMatch(main, /executeTacticalCommand/);
+  assert.doesNotMatch(main, /resolvePveMonsterContact/);
+  assert.doesNotMatch(main, /applyTacticalBattleToWorld/);
+  assert.doesNotMatch(main, /resolveTacticalCargoOutcome/);
+});

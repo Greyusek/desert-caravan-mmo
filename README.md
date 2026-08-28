@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 62 — TRADING-001: Trading Prototype Stage 3 is complete end to end.**
+**Checkpoint 70 — UI-008: the authoritative tactical PvE result is visible in the debug map.**
 
 Implemented and covered by the automated test suite:
 
@@ -73,10 +73,14 @@ Also implemented:
 - INFO-TRADE-002 — bundles carry at most three entries, direct copying stops at generation two, and copy/medium/fallen-archive fidelity lowers later local value.
 - UI-007 — the existing debug map projects city production/consumption and prices, player cargo and journal, physical route profit, NPC market impact and local information value.
 - TRADING-001 — one deterministic seeded scenario composes the player goods route, later NPC market impact and physically delivered knowledge with novel/copied/old/duplicate local values; its player view contains no exact coordinates.
+- TACTICAL-001/002/003 — a seeded discrete battlefield places source-linked guard, skirmisher and monster units and executes validated deterministic movement, attack, damage and completion commands.
+- TACTICAL-004/005/006 — existing caravan cargo becomes physical baggage; retreat, survivors, casualties and conserved cargo return exactly once to authoritative world state.
+- TACTICAL-007 — an existing authoritative PvE monster contact uses tactical resolution by default while GAME-005/006 remains an explicit `LEGACY_POWER` compatibility path.
+- UI-008 — the dependency-free debug map projects battlefield cells, deployment zones, physical units and baggage, the command/event journal, casualties, winner, cargo conservation and world return without browser combat rules.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
-Not implemented yet (intentionally): automatic resupply, production chains, repeated sequential contacts, cross-session/server-persisted player knowledge, rewards and expedition persistence, the production physical player map and full terrain fog of war, server/database, tactical combat, multiplayer, full Magic/System 256, and autonomous neural NPC / City / Species agents.
+Not implemented yet (intentionally): automatic resupply, production chains, repeated sequential contacts, cross-session/server-persisted player knowledge, rewards and expedition persistence, the final COMBAT-001 Stage 4 proof, the production physical player map and full terrain fog of war, server/database, multiplayer, full Magic/System 256, and autonomous neural NPC / City / Species agents.
 
 ## Requirements
 
@@ -111,15 +115,15 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 62:
+Expected for Checkpoint 70:
 
 ```text
-# tests 521
-# pass 521
+# tests 582
+# pass 582
 # fail 0
 ```
 
-This total includes the 11-test TRADING-001 end-to-end regression suite.
+This total includes the eight UI-008 projection and browser-boundary regressions.
 
 GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_54.md` for final MVP-1 details.
 
