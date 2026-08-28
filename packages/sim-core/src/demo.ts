@@ -14,6 +14,7 @@ import {
   createCityEconomyState,
   createTradeCaravanState,
   createTradingPrototypeScenario,
+  createTacticalBattlefield,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -88,7 +89,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 62 demo");
+console.log("Desert Caravan MMO — Checkpoint 63 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -955,6 +956,12 @@ console.log(
   `  NPC bid=${tradingPrototype.playerView.npcImpact.playerBidBeforeSaleCredits}->${tradingPrototype.playerView.npcImpact.playerBidAfterSaleCredits}; information novel/copied/old/duplicate=${tradingPrototype.playerView.informationTrade.novelValueCredits}/${tradingPrototype.playerView.informationTrade.copiedValueCredits}/${tradingPrototype.playerView.informationTrade.oldValueCredits}/${tradingPrototype.playerView.informationTrade.duplicateValueCredits}; coordinates=not-exposed`,
 );
 
+const tacticalBattlefield = createTacticalBattlefield("checkpoint-63");
+console.log("\nTACTICAL-001 deterministic battlefield:");
 console.log(
-  "\nCheckpoint 62 TRADING-001 Stage 3 complete; Tactical Combat gated: npm run debug-map -> http://127.0.0.1:4173",
+  `  ${tacticalBattlefield.id}: ${tacticalBattlefield.width}x${tacticalBattlefield.height}; deployment=${tacticalBattlefield.deploymentDepth} columns/side; neutral=${tacticalBattlefield.width - tacticalBattlefield.deploymentDepth * 2} columns`,
+);
+
+console.log(
+  "\nCheckpoint 63 TACTICAL-001 complete; next TACTICAL-002: npm run debug-map -> http://127.0.0.1:4173",
 );
