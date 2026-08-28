@@ -368,6 +368,57 @@ safe до завершения миграции, а все предыдущие 
 
 ---
 
+## Этап 4.5 — Player-facing UI Vertical Slice
+
+**Статус:** следующий gated-этап. Не начинается до полного закрытия
+`COMBAT-001` и Stage 4.
+
+**Цель:** превратить существующий технический интерфейс в первый целостный
+desktop browser client, через который игрок проходит основной цикл без знания
+внутреннего устройства simulation core.
+
+Архитектурная граница этапа:
+
+**authoritative simulation → player-facing projection → Player UI**.
+
+Player UI только отображает разрешённую игроку проекцию и отправляет допустимые
+actions. Экономика, маршрут, обнаружение, расход припасов, бой и последствия не
+пересчитываются в DOM. Отдельный Developer / Debug UI сохраняет server truth,
+seed, внутренние ID, точные координаты и breakdown формул и не смешивается с
+обычным представлением игрока.
+
+Минимальные экраны будущей декомпозиции:
+
+- Global Map / Caravan Command: известная карта, слои, маршрут, положение,
+  припасы, груз, участники, ETA, warnings и сворачиваемый event journal.
+- City: один player-facing вход к реально существующим рынку, библиотеке,
+  knowledge bundles и караванным операциям.
+- Caravan Preparation / Tactical Formation: участники, припасы, товары,
+  capacity, бойцы, стартовая зона, обоз и доступные клетки.
+- Battle: читаемое 2D-поле, выбор юнита, разрешённые клетки/цели, authoritative
+  move/attack, HP, смерть, победа/поражение/отход и минимальное auto/manual
+  представление без новой большой AI-системы.
+- Battle Result: выжившие, погибшие, сохранённый/уничтоженный/захваченный груз и
+  понятное продолжение глобального пути.
+
+Обязательные сквозные элементы: единый dependency-light visual language,
+переключаемые слои карты, компактный player event feed, progressive disclosure,
+desktop-first usability и базовая accessibility. Финальная графика, сложные
+анимации, WebGL/3D, mobile-complete UI и Multiplayer не входят.
+
+Перед реализацией Stage 4.5 выполняется отдельный docs-only decomposition PR:
+малые UI/projection checkpoints, automated acceptance и один стабильный seeded
+manual scenario от global map через encounter/battle/result до города и сделки.
+
+**Exit criteria:** реальный игрок проходит через Player UI подготовку каравана,
+маршрут и путешествие, encounter и хотя бы одно ручное tactical action,
+результат боя с потерями/грузом, возврат на карту, прибытие в город и реальную
+торговую либо информационную операцию. Player projection не раскрывает hidden
+server truth; Debug UI остаётся отдельным; одинаковый seed/actions воспроизводят
+то же состояние; все прежние checkpoints проходят.
+
+---
+
 ## Этап 5 — Multiplayer Vertical Slice
 
 - [ ] Несколько реальных аккаунтов в одном постоянном мире.
