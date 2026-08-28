@@ -48,9 +48,9 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `65ca212b1a1a61a115868e24ad62631aa56601ef` — merge of docs-only PR #73.
-- PR #73 is merged; GitHub `CI / verify` run #159 completed successfully on
-  head `64fb915ba4f924e108c72905e7e563b195993212`.
+- `00afc1a27bb828cd6e155da4dd9a4c6c2c99042c` — merge of PR #74.
+- PR #74 is merged; GitHub `CI / verify` run #161 completed successfully on
+  exact functional head `933b9881d7a922fa5571292825fcf8d9e920ddf8`.
 
 ## Verification
 
@@ -63,14 +63,18 @@ gated by a separate user command.
 ## Current task
 
 Checkpoint 63 / `TACTICAL-001` adds deterministic discrete battlefield geometry
-and stable deployment zones. The next task is `TACTICAL-002`: physical tactical
-units and minimal functionally distinct classes.
+and stable deployment zones. It is complete and no Stage 4 task is active.
+
+`RESOURCE LIMIT CHECKPOINT`: the next checkpoint was not started because the
+remaining Work resource could not safely cover implementation, full regression,
+PR and CI. The repository is stable at the merge of PR #74.
 
 ## Next action
 
-Complete the `TACTICAL-001` PR, then autonomously start `TACTICAL-002` from
-updated `main` and continue through the Stage 4 queue while verification remains
-green and resources allow.
+From updated `main`, start `TACTICAL-002`: place persistent combatants as
+physical tactical units in the TACTICAL-001 deployment zones and give guard,
+skirmisher and monster minimal functionally distinct stat profiles. Do not add
+movement/attack execution, cargo, retreat or world reintegration in that slice.
 
 ## Scope boundary
 
