@@ -50,9 +50,9 @@ remain gated.
 
 ## Last known good main
 
-- `904c68caa18abfae28108acda24d1bfc3a24a7b5` — merge of docs PR #83.
-- PR #83 is merged; GitHub `CI / verify` run #179 completed successfully on
-  exact head `36db073d01171afa7ed2cdadccb2d22e63c23ed3`.
+- `853e93f63fb102096779ca160be09f85830151e8` — merge of PR #84.
+- PR #84 is merged; GitHub `CI / verify` run #181 completed successfully on
+  exact functional head `ccfc594edd1402e1f3ca8ecebd0f37dd1251fa20`.
 
 ## Verification
 
@@ -68,13 +68,20 @@ remain gated.
 
 Checkpoint 68 / `TACTICAL-006` applies tactical health, permanent casualties and
 conserved cargo exactly once to the existing trade caravan, caravan-member IDs
-and persistent creature identity. Stage 4.5 remains gated.
+and persistent creature identity. It is complete and no Stage 4 task is active.
+Stage 4.5 remains gated.
+
+`RESOURCE LIMIT CHECKPOINT`: `TACTICAL-007` was not started because a safe PvE
+contact migration must include tactical encounter creation, legacy Power
+compatibility, old GAME-005/006 regression and full PR/CI in one stable slice.
 
 ## Next action
 
-Complete the `TACTICAL-006` PR, then start `TACTICAL-007` from updated `main`:
-route existing PvE monster contacts through the stable tactical core while
-retaining the Power resolver as an explicit legacy compatibility path.
+From updated `main`, start `TACTICAL-007`: add an explicit `TACTICAL | LEGACY_POWER`
+PvE resolution mode, make tactical the new path from an existing authoritative
+monster contact through battlefield/units/combat/world return, and keep
+`resolveMonsterPowerContact` only as the tested legacy path. Do not add UI or
+the final COMBAT-001 composition in this slice.
 
 ## Scope boundary
 
