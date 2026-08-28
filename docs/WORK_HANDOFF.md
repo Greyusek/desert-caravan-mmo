@@ -8,7 +8,7 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-66 / version `0.0.66`. The user has explicitly opened Stage 4. Tactical Combat
+67 / version `0.0.67`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
 the final `COMBAT-001` proof. Multiplayer Vertical Slice and later stages remain
 gated by a separate user command.
@@ -48,30 +48,31 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `3cc75ca54a281e404abbda991b7a289bb9c49f15` — merge of PR #79.
-- PR #79 is merged; GitHub `CI / verify` run #171 completed successfully on
-  exact functional head `ffcf9ee565dd7c8ac6617c06b49b5f2a91402636`.
+- `f9340dbd0732a7bc220485606d8940304d66d536` — merge of handoff PR #80.
+- PR #80 is merged; GitHub `CI / verify` run #173 completed successfully on
+  exact head `f0749ca4d276c2cc3b7becce9ac056fa153dfde6`.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `550/550` PASS, zero failures, compiled
-  Checkpoint 66 demo PASS.
-- Dedicated TACTICAL-004 suite: `7/7` PASS; manual runner test `1/1` PASS.
-- Manual survive/destroy/capture scenarios: all conservation checks PASS.
+- Full `npm run verify:local`: `558/558` PASS, zero failures, compiled
+  Checkpoint 67 demo PASS.
+- Dedicated TACTICAL-005 suite: `8/8` PASS.
+- User local acceptance of Checkpoint 66: `550/550` PASS; manual cargo scenarios
+  all PASS on commit `f9340db`.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 66 / `TACTICAL-004` adds physical baggage backed by existing cargo
-stacks and conserved survive/destroy/capture outcomes. The autonomous series is
-paused for the user's requested intermediate local acceptance. No feature
-branch or Stage 4 implementation task is active.
+Checkpoint 67 / `TACTICAL-005` adds retreat only from the correct edge with safe
+enemy separation. Escaped living units preserve health and are not casualties.
+Checkpoint 66 manual acceptance passed: `550/550` and all cargo scenarios PASS.
 
 ## Next action
 
-Run the scenarios in `docs/MANUAL_TEST_CHECKPOINT_66.md`. After user acceptance,
-start `TACTICAL-005`: retreat through required separation and battlefield edge.
+Complete the `TACTICAL-005` PR, then start `TACTICAL-006` from updated `main`:
+apply survivors, casualties and conserved cargo exactly once to authoritative
+caravan and persistent-creature state.
 
 ## Scope boundary
 
@@ -82,6 +83,6 @@ production-chain simulation or Stage 5 work.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_66.md`. Verify repository/PR/CI state. Continue with the first
+`docs/CHECKPOINT_67.md`. Verify repository/PR/CI state. Continue with the first
 unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
 explicit user command.

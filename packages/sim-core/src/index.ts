@@ -42,3 +42,4 @@ export * from "./tactical-battlefield.js";
 export * from "./tactical-unit.js";
 export * from "./tactical-combat.js";
 export * from "./tactical-cargo.js";
+export * from "./tactical-retreat.js";
