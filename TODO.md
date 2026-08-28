@@ -85,7 +85,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `TACTICAL-002`: place persistent combatants as physical tactical units with minimal functionally distinct guard, skirmisher and monster classes.
 - [x] `TACTICAL-003`: execute validated turn-based movement, range-limited attacks, damage, defeat and battle completion through deterministic commands.
 - [x] `TACTICAL-004`: place the existing caravan cargo in physical baggage units and resolve conserved surviving, destroyed or captured stacks from battlefield control.
-- [ ] `TACTICAL-005`: resolve tactical retreat only after a side opens the required edge separation, returning escaped units without declaring them casualties.
+- [x] `TACTICAL-005`: resolve tactical retreat only after a side opens the required edge separation, returning escaped units without declaring them casualties.
 - [ ] `TACTICAL-006`: apply tactical survivors, casualties and conserved cargo exactly once to authoritative caravan and persistent-creature state.
 - [ ] `TACTICAL-007`: route existing PvE monster contacts through the stable tactical core while retaining the Power resolver as an explicit legacy compatibility path.
 - [ ] `UI-008`: project battlefield cells, sides, classes, baggage, commands, events, casualties, winner, cargo outcome and world return in the debug map without browser combat logic.

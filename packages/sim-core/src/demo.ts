@@ -21,6 +21,7 @@ import {
   deployTacticalCargo,
   damageTacticalBaggage,
   resolveTacticalCargoOutcome,
+  executeTacticalRetreat,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -95,7 +96,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 66 demo");
+console.log("Desert Caravan MMO — Checkpoint 67 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1041,6 +1042,15 @@ console.log(
   `  baggage=${cargoDeployment.baggageUnits.length}; caravan=${cargoOutcome.caravanCargo.stacks.map((stack) => `${stack.goodId}x${stack.units}`).join(",") || "empty"}; destroyed=${cargoOutcome.destroyedStacks.map((stack) => `${stack.goodId}x${stack.units}`).join(",") || "empty"}; conserved=${cargoOutcome.conservation.every((entry) => entry.conserved)}`,
 );
 
+const retreat = executeTacticalRetreat(
+  createTacticalBattleState(tacticalBattlefield, tacticalUnits),
+  "caravan",
+);
+console.log("\nTACTICAL-005 edge-separation retreat:");
 console.log(
-  "\nCheckpoint 66 TACTICAL-004 ready for manual acceptance; see docs/MANUAL_TEST_CHECKPOINT_66.md",
+  `  status=${retreat.status}; edge=${retreat.exitEdge}; separation=${retreat.minimumSeparationCells}/${retreat.requiredSeparationCells}; escaped=${retreat.escapedUnits.map((unit) => `${unit.id}:${unit.health}hp`).join(",")}; casualties=${retreat.casualties.length}; field-winner=${retreat.winningSide}`,
+);
+
+console.log(
+  "\nCheckpoint 67 TACTICAL-005 complete; next TACTICAL-006: npm run debug-map -> http://127.0.0.1:4173",
 );
