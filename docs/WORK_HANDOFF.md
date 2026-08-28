@@ -48,9 +48,9 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `f9340dbd0732a7bc220485606d8940304d66d536` — merge of handoff PR #80.
-- PR #80 is merged; GitHub `CI / verify` run #173 completed successfully on
-  exact head `f0749ca4d276c2cc3b7becce9ac056fa153dfde6`.
+- `1f15dcfe96707b286943d43e305a3c309c2b2d0f` — merge of PR #81.
+- PR #81 is merged; GitHub `CI / verify` run #175 completed successfully on
+  exact functional head `b6cadeac887c4567753581ca2794d708b1f4b9ea`.
 
 ## Verification
 
@@ -67,12 +67,21 @@ gated by a separate user command.
 Checkpoint 67 / `TACTICAL-005` adds retreat only from the correct edge with safe
 enemy separation. Escaped living units preserve health and are not casualties.
 Checkpoint 66 manual acceptance passed: `550/550` and all cargo scenarios PASS.
+Checkpoint 67 is complete and no Stage 4 task is active.
+
+`RESOURCE LIMIT CHECKPOINT`: `TACTICAL-006` was not started. It requires one
+authoritative participant-state layer for caravan members, the existing trade
+caravan and persistent creature, plus idempotent battle-result application;
+that complete slice did not safely fit the remaining Work resource.
 
 ## Next action
 
-Complete the `TACTICAL-005` PR, then start `TACTICAL-006` from updated `main`:
-apply survivors, casualties and conserved cargo exactly once to authoritative
-caravan and persistent-creature state.
+From updated `main`, start `TACTICAL-006`: define the minimal authoritative
+participant state composed from the existing trade caravan, caravan-member
+source IDs and existing `PersistentCreatureState`; apply tactical health,
+casualties and TACTICAL-004 cargo outcome exactly once by battle ID. Prove dead
+participants cannot reappear and repeated application is rejected. Do not add
+PvE contact migration or UI in this slice.
 
 ## Scope boundary
 
