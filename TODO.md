@@ -82,7 +82,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 ## Tactical Combat Prototype queue
 
 - [x] `TACTICAL-001`: add a deterministic discrete battlefield with explicit bounds, terrain-free cells and stable side deployment zones.
-- [ ] `TACTICAL-002`: place persistent combatants as physical tactical units with minimal functionally distinct guard, skirmisher and monster classes.
+- [x] `TACTICAL-002`: place persistent combatants as physical tactical units with minimal functionally distinct guard, skirmisher and monster classes.
 - [ ] `TACTICAL-003`: execute validated turn-based movement, range-limited attacks, damage, defeat and battle completion through deterministic commands.
 - [ ] `TACTICAL-004`: place the existing caravan cargo in physical baggage units and resolve conserved surviving, destroyed or captured stacks from battlefield control.
 - [ ] `TACTICAL-005`: resolve tactical retreat only after a side opens the required edge separation, returning escaped units without declaring them casualties.

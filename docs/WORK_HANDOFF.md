@@ -8,7 +8,7 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-63 / version `0.0.63`. The user has explicitly opened Stage 4. Tactical Combat
+64 / version `0.0.64`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
 the final `COMBAT-001` proof. Multiplayer Vertical Slice and later stages remain
 gated by a separate user command.
@@ -48,33 +48,28 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `00afc1a27bb828cd6e155da4dd9a4c6c2c99042c` — merge of PR #74.
-- PR #74 is merged; GitHub `CI / verify` run #161 completed successfully on
-  exact functional head `933b9881d7a922fa5571292825fcf8d9e920ddf8`.
+- `849d379da3ba5593787c1360796a5c14d58dc5d6` — merge of handoff PR #75.
+- PR #75 is merged; GitHub `CI / verify` run #163 completed successfully on
+  exact head `015891444f4df827437bd09c295ffccfd8a4ece4`.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `527/527` PASS, zero failures, compiled
-  Checkpoint 63 demo PASS.
-- Dedicated TACTICAL-001 suite: `6/6` PASS.
+- Full `npm run verify:local`: `534/534` PASS, zero failures, compiled
+  Checkpoint 64 demo PASS.
+- Dedicated TACTICAL-002 suite: `7/7` PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 63 / `TACTICAL-001` adds deterministic discrete battlefield geometry
-and stable deployment zones. It is complete and no Stage 4 task is active.
-
-`RESOURCE LIMIT CHECKPOINT`: the next checkpoint was not started because the
-remaining Work resource could not safely cover implementation, full regression,
-PR and CI. The repository is stable at the merge of PR #74.
+Checkpoint 64 / `TACTICAL-002` adds physical combatants with persistent source
+identities, stable deployment and minimal guard/skirmisher/monster profiles.
 
 ## Next action
 
-From updated `main`, start `TACTICAL-002`: place persistent combatants as
-physical tactical units in the TACTICAL-001 deployment zones and give guard,
-skirmisher and monster minimal functionally distinct stat profiles. Do not add
-movement/attack execution, cargo, retreat or world reintegration in that slice.
+Complete the `TACTICAL-002` PR, then start `TACTICAL-003` from updated `main`:
+validated turn-based movement, range-limited attacks, damage, defeat and battle
+completion only.
 
 ## Scope boundary
 
@@ -85,6 +80,6 @@ production-chain simulation or Stage 5 work.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_63.md`. Verify repository/PR/CI state. Continue with the first
+`docs/CHECKPOINT_64.md`. Verify repository/PR/CI state. Continue with the first
 unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
 explicit user command.
