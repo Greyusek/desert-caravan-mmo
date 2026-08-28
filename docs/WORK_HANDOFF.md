@@ -48,9 +48,9 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `f85040f5723a95443921348a35f4ea10d0b6f1d7` — merge of handoff PR #78.
-- PR #78 is merged; GitHub `CI / verify` run #169 completed successfully on
-  exact head `7c74aef8970f8e0b1d8033e385d4e0e521c926cb`.
+- `3cc75ca54a281e404abbda991b7a289bb9c49f15` — merge of PR #79.
+- PR #79 is merged; GitHub `CI / verify` run #171 completed successfully on
+  exact functional head `ffcf9ee565dd7c8ac6617c06b49b5f2a91402636`.
 
 ## Verification
 
@@ -65,7 +65,8 @@ gated by a separate user command.
 
 Checkpoint 66 / `TACTICAL-004` adds physical baggage backed by existing cargo
 stacks and conserved survive/destroy/capture outcomes. The autonomous series is
-paused for the user's requested intermediate local acceptance.
+paused for the user's requested intermediate local acceptance. No feature
+branch or Stage 4 implementation task is active.
 
 ## Next action
 
