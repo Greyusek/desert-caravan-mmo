@@ -40,3 +40,4 @@ export * from "./living-path-scenario.js";
 export * from "./trading-prototype-scenario.js";
 export * from "./tactical-battlefield.js";
 export * from "./tactical-unit.js";
+export * from "./tactical-combat.js";

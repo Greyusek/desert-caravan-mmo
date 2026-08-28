@@ -16,6 +16,8 @@ import {
   createTradingPrototypeScenario,
   createTacticalBattlefield,
   deployTacticalUnits,
+  createTacticalBattleState,
+  executeTacticalCommand,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -90,7 +92,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 64 demo");
+console.log("Desert Caravan MMO — Checkpoint 65 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -990,6 +992,33 @@ for (const unit of tacticalUnits) {
   );
 }
 
+const combatField = createTacticalBattlefield("checkpoint-65", {
+  width: 3,
+  height: 2,
+  deploymentDepth: 1,
+});
+let combat = createTacticalBattleState(
+  combatField,
+  deployTacticalUnits(combatField, [
+    { id: "combat-guard", side: "caravan", unitClass: "guard", source: { kind: "caravan-member", id: "combat-member-guard" } },
+    { id: "combat-skirmisher", side: "caravan", unitClass: "skirmisher", source: { kind: "caravan-member", id: "combat-member-skirmisher" } },
+    { id: "combat-monster", side: "hostile", unitClass: "monster", source: { kind: "persistent-creature", id: "combat-creature" } },
+  ]),
+);
+for (const command of [
+  { kind: "ATTACK" as const, unitId: "combat-skirmisher", targetUnitId: "combat-monster" },
+  { kind: "MOVE" as const, unitId: "combat-monster", to: { x: 1, y: 0 } },
+  { kind: "ATTACK" as const, unitId: "combat-guard", targetUnitId: "combat-monster" },
+  { kind: "ATTACK" as const, unitId: "combat-monster", targetUnitId: "combat-guard" },
+  { kind: "ATTACK" as const, unitId: "combat-guard", targetUnitId: "combat-monster" },
+]) {
+  combat = executeTacticalCommand(combat, command);
+}
+console.log("\nTACTICAL-003 deterministic combat:");
 console.log(
-  "\nCheckpoint 64 TACTICAL-002 complete; next TACTICAL-003: npm run debug-map -> http://127.0.0.1:4173",
+  `  status=${combat.status}; winner=${combat.winner}; turns=${combat.turn - 1}; events=${combat.events.length}; defeated=${combat.units.filter((unit) => unit.health === 0).map((unit) => unit.id).join(",")}`,
+);
+
+console.log(
+  "\nCheckpoint 65 TACTICAL-003 complete; next TACTICAL-004: npm run debug-map -> http://127.0.0.1:4173",
 );
