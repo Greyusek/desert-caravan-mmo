@@ -15,6 +15,7 @@ import {
   createTradeCaravanState,
   createTradingPrototypeScenario,
   createTacticalBattlefield,
+  deployTacticalUnits,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -89,7 +90,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 63 demo");
+console.log("Desert Caravan MMO — Checkpoint 64 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -962,6 +963,33 @@ console.log(
   `  ${tacticalBattlefield.id}: ${tacticalBattlefield.width}x${tacticalBattlefield.height}; deployment=${tacticalBattlefield.deploymentDepth} columns/side; neutral=${tacticalBattlefield.width - tacticalBattlefield.deploymentDepth * 2} columns`,
 );
 
+const tacticalUnits = deployTacticalUnits(tacticalBattlefield, [
+  {
+    id: "demo-guard",
+    side: "caravan",
+    unitClass: "guard",
+    source: { kind: "caravan-member", id: "demo-member-guard" },
+  },
+  {
+    id: "demo-skirmisher",
+    side: "caravan",
+    unitClass: "skirmisher",
+    source: { kind: "caravan-member", id: "demo-member-skirmisher" },
+  },
+  {
+    id: "demo-monster",
+    side: "hostile",
+    unitClass: "monster",
+    source: { kind: "persistent-creature", id: "demo-creature" },
+  },
+]);
+console.log("\nTACTICAL-002 physical combatants:");
+for (const unit of tacticalUnits) {
+  console.log(
+    `  ${unit.id}: ${unit.unitClass}/${unit.side} at ${unit.position.x},${unit.position.y}; hp=${unit.health}; move/range/damage=${unit.stats.movementCells}/${unit.stats.attackRangeCells}/${unit.stats.attackDamage}; source=${unit.source.kind}:${unit.source.id}`,
+  );
+}
+
 console.log(
-  "\nCheckpoint 63 TACTICAL-001 complete; next TACTICAL-002: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 64 TACTICAL-002 complete; next TACTICAL-003: npm run debug-map -> http://127.0.0.1:4173",
 );
