@@ -10,8 +10,10 @@ Repository history and checkpoint documents contain the full record.
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
 67 / version `0.0.67`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
-the final `COMBAT-001` proof. Multiplayer Vertical Slice and later stages remain
-gated by a separate user command.
+the final `COMBAT-001` proof. Stage 4.5 Player-facing UI Vertical Slice is now
+recorded in ROADMAP but remains gated until Stage 4 closes; its first action is
+the separate `UI-VERTICAL-DECOMP` docs-only PR. Multiplayer and later stages
+remain gated.
 
 ## Completed
 
@@ -87,7 +89,7 @@ PvE contact migration or UI in this slice.
 
 Tactical Combat Prototype only. No real-player PvP, multiplayer, production
 database, player settlements, full Magic/System 256, neural agents, broad
-production-chain simulation or Stage 5 work.
+production-chain simulation, Stage 4.5 implementation or Stage 5 work.
 
 ## Resume instruction
 
