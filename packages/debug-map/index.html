@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Checkpoint 62 · TRADING-001</p>
+          <p class="eyebrow">Checkpoint 70 · UI-008</p>
           <h1>World Debug Map</h1>
           <p class="hero__copy">
             Север всегда сверху. Все координаты и скрытые объекты показаны только
@@ -678,6 +678,75 @@
             </div>
             <dl id="trading-information-summary" class="trading-summary"></dl>
             <p class="trading-note">Цена локальна: известная копия обнуляется, физическая копия теряет точность.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="tactical-panel" aria-labelledby="tactical-title">
+        <div class="tactical-heading">
+          <div>
+            <p class="section-kicker">UI-008 · Tactical Combat Projection</p>
+            <h2 id="tactical-title">Авторитетный PvE-бой</h2>
+          </div>
+          <output id="tactical-result" class="tactical-result">Расчёт боя…</output>
+        </div>
+
+        <div class="tactical-grid">
+          <article class="tactical-card tactical-card--field">
+            <div class="tactical-card__heading">
+              <div>
+                <h3>Поле и физические объекты</h3>
+                <p id="tactical-field-caption">—</p>
+              </div>
+              <div class="tactical-legend" aria-label="Легенда поля">
+                <span data-kind="caravan">Караван</span>
+                <span data-kind="hostile">Монстр</span>
+                <span data-kind="baggage">Обоз</span>
+                <span data-kind="defeated">Выведен</span>
+              </div>
+            </div>
+            <div class="tactical-field-frame">
+              <svg
+                id="tactical-field"
+                class="tactical-field"
+                role="img"
+                aria-label="Детерминированное тактическое поле боя"
+              ></svg>
+            </div>
+          </article>
+
+          <article class="tactical-card">
+            <div class="tactical-card__heading">
+              <div>
+                <h3>Бойцы и источники</h3>
+                <p>Начальное → итоговое состояние</p>
+              </div>
+            </div>
+            <ul id="tactical-unit-list" class="tactical-unit-list"></ul>
+          </article>
+
+          <article class="tactical-card tactical-card--events">
+            <div class="tactical-card__heading">
+              <div>
+                <h3>Команды → события</h3>
+                <p>DOM показывает готовый журнал sim-core</p>
+              </div>
+              <output id="tactical-event-count" class="tactical-value">0</output>
+            </div>
+            <ol id="tactical-event-list" class="tactical-event-list"></ol>
+          </article>
+
+          <article class="tactical-card tactical-card--outcome">
+            <div class="tactical-card__heading">
+              <div>
+                <h3>Последствия и возврат в мир</h3>
+                <p id="tactical-contact-summary">—</p>
+              </div>
+            </div>
+            <dl id="tactical-outcome-summary" class="tactical-summary"></dl>
+            <p class="tactical-note">
+              Боевые правила, урон, груз и потери рассчитаны sim-core; этот блок только проецирует snapshot.
+            </p>
           </article>
         </div>
       </section>

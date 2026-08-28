@@ -8,7 +8,7 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-69 / version `0.0.69`. The user has explicitly opened Stage 4. Tactical Combat
+70 / version `0.0.70`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
 the final `COMBAT-001` proof. Stage 4.5 Player-facing UI Vertical Slice is
 recorded in ROADMAP but remains gated until Stage 4 closes; its first action is
@@ -31,37 +31,40 @@ remain gated.
   commands and returns winner/casualties/cargo to the global state.
 - The unchanged GAME-005/006 Power stub is available through the new resolver
   only when callers explicitly select `LEGACY_POWER`.
+- UI-008 projects that same resolved tactical snapshot in the dependency-free
+  debug map: cells/zones, source-linked units, baggage, commands/events,
+  casualties, winner, conserved cargo and exactly-once world return. Browser
+  rendering contains no combat, cargo or world-return solver.
 
 ## Last known good main
 
-- `77dab34237cc7de736845e5ff8d620187aae2be5` — merge of PR #85.
-- PR #84 functional head `ccfc594edd1402e1f3ca8ecebd0f37dd1251fa20`
-  passed GitHub `CI / verify`; PR #85 recorded the resource handoff only.
+- `306c18676f708ff70ff0153f5314428423a58713` — merge of PR #86.
+- PR #86 functional head `cde249f0e1354664b565172abce1cacc6ee853ef`
+  passed GitHub `CI / verify` run #185.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `574/574` PASS, zero failures, compiled
-  Checkpoint 69 demo PASS.
-- Dedicated TACTICAL-007 suite: `9/9` PASS.
-- GAME-005/006 plus TACTICAL-006/007 regression group: `29/29` PASS.
-- Manual tactical PvE win/loss/legacy scenarios: PASS.
+- Full `npm run verify:local`: `582/582` PASS, zero failures, compiled
+  Checkpoint 70 demo PASS.
+- Dedicated UI-008 snapshot/browser-boundary additions: `8/8` PASS.
+- Debug-map plus tooling group: `142/142` PASS.
+- Local debug server asset/content-type smoke test: PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 69 / `TACTICAL-007` is complete. Existing global PvE contacts now
-enter tactical combat by default and return persistent consequences; legacy
-Power behavior remains explicit and regression-safe. No Stage 4 task is active.
-Stage 4.5 remains gated.
+Checkpoint 70 / `UI-008` is complete. The existing debug map now projects the
+same tactical contact, physical state, command/event history, cargo outcome and
+world return without browser simulation rules. No Stage 4 task is active. Stage
+4.5 remains gated.
 
 ## Next action
 
-From updated `main`, start `UI-008`: project battlefield cells, sides, source
-units, physical baggage, commands/events, casualties, winner, cargo outcome and
-world return from this same sim-core result in the existing debug map. Do not
-add browser-side combat rules or start the final COMBAT-001 composition in that
-slice.
+From updated `main`, start `COMBAT-001`: add one deterministic seeded end-to-end
+proof from a real global PvE contact through tactical battle and persistent
+world consequences into continued global simulation, then close Stage 4. Do
+not start Stage 4.5 in the same functional PR.
 
 ## Scope boundary
 
@@ -72,6 +75,6 @@ production-chain simulation, Stage 4.5 implementation or Stage 5 work.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_69.md`. Verify repository/PR/CI state. Continue with the first
+`docs/CHECKPOINT_70.md`. Verify repository/PR/CI state. Continue with the first
 unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
 explicit user command.

@@ -35,6 +35,7 @@ import {
   createSessionKnowledgeMapSnapshot,
   createStationaryStopPatrolPreset,
   createTradingDebugSnapshot,
+  createTacticalDebugSnapshot,
   projectCoordinate,
 } from "./map-model.js";
 import {
@@ -86,6 +87,29 @@ const tradingInformationValue = requireElement(
 );
 const tradingInformationSummary = requireElement(
   "trading-information-summary",
+  HTMLElement,
+);
+const tacticalResult = requireElement("tactical-result", HTMLOutputElement);
+const tacticalFieldCaption = requireElement(
+  "tactical-field-caption",
+  HTMLParagraphElement,
+);
+const tacticalField = requireElement("tactical-field", SVGSVGElement);
+const tacticalUnitList = requireElement("tactical-unit-list", HTMLUListElement);
+const tacticalEventCount = requireElement(
+  "tactical-event-count",
+  HTMLOutputElement,
+);
+const tacticalEventList = requireElement(
+  "tactical-event-list",
+  HTMLOListElement,
+);
+const tacticalContactSummary = requireElement(
+  "tactical-contact-summary",
+  HTMLParagraphElement,
+);
+const tacticalOutcomeSummary = requireElement(
+  "tactical-outcome-summary",
   HTMLElement,
 );
 const mapTitle = requireElement("map-title", HTMLHeadingElement);
@@ -754,6 +778,7 @@ function render() {
       2,
     );
     const trading = createTradingDebugSnapshot(snapshot.seed);
+    const tactical = createTacticalDebugSnapshot(snapshot.seed);
     if (discoveryLedger.worldSeed !== snapshot.seed) {
       discoveryLedger = createPlayerDiscoveryLedger(snapshot.seed);
       travelLedger = createPlayerTravelLedger(snapshot.seed);
@@ -1164,6 +1189,7 @@ function render() {
     );
     renderDiscoveryLedger(discoveryLedger, travelLedger, snapshot);
     renderTradingPrototype(trading);
+    renderTacticalCombat(tactical);
     renderCaravanStatus(caravanStatus);
     renderSupplyEmergencyDoctrine(supplyEmergency, startCity, outcome);
     renderMultiPatrolDangerDetection(multiPatrolDangerDetection);
@@ -1317,6 +1343,213 @@ function renderTradingSummary(list, rows) {
       return row;
     }),
   );
+}
+
+/**
+ * UI-008 renders only the resolved snapshot created through sim-core.
+ * @param {ReturnType<typeof createTacticalDebugSnapshot>} snapshot
+ */
+function renderTacticalCombat(snapshot) {
+  const winnerLabel = snapshot.result.winner === "caravan" ? "Караван" : "Монстр";
+  tacticalResult.textContent = `${winnerLabel} победил · ${snapshot.result.turns} команд`;
+  tacticalFieldCaption.textContent = `${snapshot.battlefield.id} · ${snapshot.battlefield.width}×${snapshot.battlefield.height} · deployment ${snapshot.battlefield.deploymentDepth}`;
+  tacticalContactSummary.textContent = `${snapshot.contact.monsterId} · PWR ${snapshot.contact.monsterPower} · контакт ${formatElapsed(snapshot.contact.expeditionElapsedSeconds)}`;
+  renderTacticalField(snapshot);
+
+  tacticalUnitList.replaceChildren(
+    ...snapshot.units.map((unit) => {
+      const item = document.createElement("li");
+      item.className = "tactical-unit-item";
+      item.dataset.side = unit.side;
+      item.dataset.status = unit.status;
+      const badge = document.createElement("span");
+      badge.className = "tactical-unit-badge";
+      badge.textContent = tacticalUnitGlyph(unit.unitClass);
+      const copy = document.createElement("span");
+      copy.className = "tactical-unit-copy";
+      const title = document.createElement("strong");
+      title.textContent = `${tacticalUnitClassLabel(unit.unitClass)} · ${unit.side}`;
+      const source = document.createElement("small");
+      source.textContent = `${unit.source.kind}:${unit.source.id}`;
+      copy.append(title, source);
+      const state = document.createElement("span");
+      state.className = "tactical-unit-state";
+      state.textContent = `${unit.initialHealth}→${unit.health}/${unit.maxHealth} HP · (${unit.initialPosition.x},${unit.initialPosition.y})→(${unit.position.x},${unit.position.y})`;
+      item.append(badge, copy, state);
+      return item;
+    }),
+  );
+
+  tacticalEventCount.textContent = `${snapshot.commands.length} / ${snapshot.events.length}`;
+  tacticalEventList.replaceChildren(
+    ...snapshot.commands.map((command, index) => {
+      const event = snapshot.events[index];
+      if (!event) throw new Error(`UI-008 event missing for command ${index + 1}`);
+      const item = document.createElement("li");
+      item.className = "tactical-event-item";
+      const copy = document.createElement("span");
+      const commandText = document.createElement("strong");
+      commandText.textContent = formatTacticalCommand(command);
+      copy.append(commandText, document.createTextNode(` → ${formatTacticalEvent(event)}`));
+      item.append(copy);
+      return item;
+    }),
+  );
+
+  const cargoConserved = snapshot.cargo.conservation.every((entry) => entry.conserved);
+  renderTacticalSummary(tacticalOutcomeSummary, [
+    ["Статус", `${snapshot.result.status} / ${snapshot.result.routeDisposition}`],
+    ["Выжившие", snapshot.result.survivorSourceIds.join(", ") || "нет"],
+    ["Потери", snapshot.result.casualtySourceIds.join(", ") || "нет"],
+    ["Обоз", `${snapshot.baggage.length} units · ${formatNumber(snapshot.cargo.sourceUsedCargoUnits)} cargo`],
+    ["Груз каравана", formatTacticalCargo(snapshot.cargo.caravanCargo.stacks)],
+    ["Захвачено", formatTacticalCargo(snapshot.cargo.capturedCargo.stacks)],
+    ["Уничтожено", formatTacticalCargo(snapshot.cargo.destroyedStacks)],
+    ["Conservation", cargoConserved ? "PASS" : "FAIL"],
+    ["World apply", snapshot.worldReturn.appliedBattleIds.join(", ")],
+    ["Существо", `${snapshot.worldReturn.creature.status} · ${snapshot.worldReturn.creature.health}/${snapshot.worldReturn.creature.maxHealth} HP`],
+  ]);
+}
+
+/** @param {ReturnType<typeof createTacticalDebugSnapshot>} snapshot */
+function renderTacticalField(snapshot) {
+  const cellSize = 40;
+  tacticalField.setAttribute(
+    "viewBox",
+    `0 0 ${snapshot.battlefield.width * cellSize} ${snapshot.battlefield.height * cellSize}`,
+  );
+  tacticalField.replaceChildren();
+  for (let y = 0; y < snapshot.battlefield.height; y += 1) {
+    for (let x = 0; x < snapshot.battlefield.width; x += 1) {
+      const zone =
+        x >= snapshot.battlefield.deploymentZones.caravan.minX &&
+        x <= snapshot.battlefield.deploymentZones.caravan.maxX
+          ? "caravan"
+          : x >= snapshot.battlefield.deploymentZones.hostile.minX &&
+              x <= snapshot.battlefield.deploymentZones.hostile.maxX
+            ? "hostile"
+            : "neutral";
+      tacticalField.append(
+        svgElement("rect", {
+          class: "tactical-cell",
+          "data-zone": zone,
+          x: x * cellSize,
+          y: y * cellSize,
+          width: cellSize,
+          height: cellSize,
+        }),
+      );
+    }
+  }
+  for (const baggage of snapshot.baggage) {
+    const rect = svgElement("rect", {
+      class: "tactical-baggage",
+      x: baggage.position.x * cellSize + 9,
+      y: baggage.position.y * cellSize + 9,
+      width: 22,
+      height: 22,
+      rx: 4,
+    });
+    rect.append(
+      svgTitle(
+        `${baggage.cargoStack.goodId} ×${baggage.cargoStack.units} · ${baggage.durability}/${baggage.maxDurability}`,
+      ),
+    );
+    const label = svgElement("text", {
+      class: "tactical-baggage-label",
+      x: baggage.position.x * cellSize + 20,
+      y: baggage.position.y * cellSize + 20,
+    });
+    label.textContent = "B";
+    tacticalField.append(rect, label);
+  }
+  for (const unit of snapshot.units) {
+    const centerX = unit.position.x * cellSize + 20;
+    const centerY = unit.position.y * cellSize + 20;
+    const marker = svgElement("circle", {
+      class: "tactical-unit",
+      "data-side": unit.side,
+      "data-status": unit.status,
+      cx: centerX,
+      cy: centerY,
+      r: 14,
+    });
+    marker.append(
+      svgTitle(
+        `${unit.id} · ${unit.unitClass} · ${unit.health}/${unit.maxHealth} HP · ${unit.source.kind}:${unit.source.id}`,
+      ),
+    );
+    const label = svgElement("text", {
+      class: "tactical-unit-label",
+      x: centerX,
+      y: centerY - 4,
+    });
+    label.textContent = unit.status === "defeated" ? "×" : tacticalUnitGlyph(unit.unitClass);
+    const health = svgElement("text", {
+      class: "tactical-unit-health",
+      x: centerX,
+      y: centerY + 8,
+    });
+    health.textContent = `${unit.health}/${unit.maxHealth}`;
+    tacticalField.append(marker, label, health);
+  }
+}
+
+/**
+ * @param {HTMLElement} list
+ * @param {readonly (readonly [string, string])[]} rows
+ */
+function renderTacticalSummary(list, rows) {
+  list.replaceChildren(
+    ...rows.map(([label, value]) => {
+      const row = document.createElement("div");
+      const term = document.createElement("dt");
+      const detail = document.createElement("dd");
+      term.textContent = label;
+      detail.textContent = value;
+      row.append(term, detail);
+      return row;
+    }),
+  );
+}
+
+/** @param {import("../sim-core/dist/src/index.js").TacticalCommand} command */
+function formatTacticalCommand(command) {
+  if (command.kind === "MOVE") return `MOVE ${command.unitId} → (${command.to.x},${command.to.y})`;
+  if (command.kind === "ATTACK") return `ATTACK ${command.unitId} → ${command.targetUnitId}`;
+  return `WAIT ${command.unitId}`;
+}
+
+/** @param {import("../sim-core/dist/src/index.js").TacticalCombatEvent} event */
+function formatTacticalEvent(event) {
+  if (event.kind === "moved") {
+    return `moved (${event.from.x},${event.from.y}) → (${event.to.x},${event.to.y})`;
+  }
+  if (event.kind === "attacked") {
+    return `damage ${event.damage}; target ${event.targetHealth} HP${event.targetDefeated ? "; defeated" : ""}`;
+  }
+  return "waited; turn advanced";
+}
+
+/** @param {import("../sim-core/dist/src/index.js").TacticalUnitClass} unitClass */
+function tacticalUnitGlyph(unitClass) {
+  if (unitClass === "guard") return "G";
+  if (unitClass === "skirmisher") return "S";
+  return "M";
+}
+
+/** @param {import("../sim-core/dist/src/index.js").TacticalUnitClass} unitClass */
+function tacticalUnitClassLabel(unitClass) {
+  if (unitClass === "guard") return "Страж";
+  if (unitClass === "skirmisher") return "Застрельщик";
+  return "Монстр";
+}
+
+/** @param {readonly import("../sim-core/dist/src/index.js").TradeCargoStack[]} stacks */
+function formatTacticalCargo(stacks) {
+  return stacks.length === 0
+    ? "пусто"
+    : stacks.map((stack) => `${stack.goodId} ×${stack.units}`).join(", ");
 }
 
 /** @returns {void} */

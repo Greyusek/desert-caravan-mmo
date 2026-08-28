@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.70 — Checkpoint 70
+
+- Added `UI-008`: one dependency-free tactical panel projects the complete
+  resolved TACTICAL-007 PvE snapshot.
+- Rendered the 12×8 battlefield and deployment zones, source-linked units,
+  physical baggage, all fixed commands and their authoritative events.
+- Exposed winner, survivors, casualties, conserved/captured/destroyed cargo and
+  the exactly-once world return without adding combat formulas to `main.js`.
+- Added eight UI-008 regressions; repository verification now runs 582 tests.
+
 ## 0.0.62 — Checkpoint 62
 
 - Added `TRADING-001`: one deterministic seeded scenario composes two complete

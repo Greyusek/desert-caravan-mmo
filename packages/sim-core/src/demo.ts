@@ -101,7 +101,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 69 demo");
+console.log("Desert Caravan MMO — Checkpoint 70 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1125,5 +1125,5 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 69 TACTICAL-007 complete; next UI-008: npm run debug-map -> http://127.0.0.1:4173",
+  "\nCheckpoint 70 UI-008 tactical projection complete; next COMBAT-001: npm run debug-map -> http://127.0.0.1:4173",
 );
