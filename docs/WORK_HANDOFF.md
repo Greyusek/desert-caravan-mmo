@@ -8,7 +8,7 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-65 / version `0.0.65`. The user has explicitly opened Stage 4. Tactical Combat
+66 / version `0.0.66`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
 the final `COMBAT-001` proof. Multiplayer Vertical Slice and later stages remain
 gated by a separate user command.
@@ -48,35 +48,29 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `b77fcec24aa7b8fb1fbb3f59aaa5a7e046723542` — merge of PR #77.
-- PR #77 is merged; GitHub `CI / verify` run #167 completed successfully on
-  exact functional head `e6ad28d979d6c9ef0a4598617a227175a2d75a09`.
+- `f85040f5723a95443921348a35f4ea10d0b6f1d7` — merge of handoff PR #78.
+- PR #78 is merged; GitHub `CI / verify` run #169 completed successfully on
+  exact head `7c74aef8970f8e0b1d8033e385d4e0e521c926cb`.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `542/542` PASS, zero failures, compiled
-  Checkpoint 65 demo PASS.
-- Dedicated TACTICAL-003 suite: `8/8` PASS.
+- Full `npm run verify:local`: `550/550` PASS, zero failures, compiled
+  Checkpoint 66 demo PASS.
+- Dedicated TACTICAL-004 suite: `7/7` PASS; manual runner test `1/1` PASS.
+- Manual survive/destroy/capture scenarios: all conservation checks PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 65 / `TACTICAL-003` adds immutable turn-based movement, attack,
-damage, defeat, winner and ordered combat events over physical units. It is
-complete and no Stage 4 task is active.
-
-`RESOURCE LIMIT CHECKPOINT`: `TACTICAL-004` was not started because the
-remaining Work resource could not safely cover the physical cargo model, all
-three conserved outcomes, full regression, PR and CI. The repository is stable
-at the merge of PR #77.
+Checkpoint 66 / `TACTICAL-004` adds physical baggage backed by existing cargo
+stacks and conserved survive/destroy/capture outcomes. The autonomous series is
+paused for the user's requested intermediate local acceptance.
 
 ## Next action
 
-From updated `main`, start `TACTICAL-004`: create physical baggage units from
-existing `TradeCargoHold` stacks and resolve conserved survive/destroy/capture
-outcomes from battlefield state. Do not add retreat, global-state application,
-PvE migration or UI in that slice.
+Run the scenarios in `docs/MANUAL_TEST_CHECKPOINT_66.md`. After user acceptance,
+start `TACTICAL-005`: retreat through required separation and battlefield edge.
 
 ## Scope boundary
 
@@ -87,6 +81,6 @@ production-chain simulation or Stage 5 work.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_65.md`. Verify repository/PR/CI state. Continue with the first
+`docs/CHECKPOINT_66.md`. Verify repository/PR/CI state. Continue with the first
 unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
 explicit user command.

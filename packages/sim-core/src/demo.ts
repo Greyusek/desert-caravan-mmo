@@ -18,6 +18,9 @@ import {
   deployTacticalUnits,
   createTacticalBattleState,
   executeTacticalCommand,
+  deployTacticalCargo,
+  damageTacticalBaggage,
+  resolveTacticalCargoOutcome,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -92,7 +95,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 65 demo");
+console.log("Desert Caravan MMO — Checkpoint 66 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1019,6 +1022,25 @@ console.log(
   `  status=${combat.status}; winner=${combat.winner}; turns=${combat.turn - 1}; events=${combat.events.length}; defeated=${combat.units.filter((unit) => unit.health === 0).map((unit) => unit.id).join(",")}`,
 );
 
+const demoCargo = {
+  capacityCargoUnits: 20,
+  stacks: [
+    { goodId: "ore" as const, units: 5, costBasisCredits: 110 },
+    { goodId: "medicine" as const, units: 2, costBasisCredits: 80 },
+  ],
+};
+const cargoDeployment = deployTacticalCargo(combatField, demoCargo);
+const damagedCargo = damageTacticalBaggage(
+  cargoDeployment,
+  cargoDeployment.baggageUnits[0]?.id ?? "missing",
+  6,
+);
+const cargoOutcome = resolveTacticalCargoOutcome(damagedCargo, "caravan");
+console.log("\nTACTICAL-004 physical cargo:");
 console.log(
-  "\nCheckpoint 65 TACTICAL-003 complete; next TACTICAL-004: npm run debug-map -> http://127.0.0.1:4173",
+  `  baggage=${cargoDeployment.baggageUnits.length}; caravan=${cargoOutcome.caravanCargo.stacks.map((stack) => `${stack.goodId}x${stack.units}`).join(",") || "empty"}; destroyed=${cargoOutcome.destroyedStacks.map((stack) => `${stack.goodId}x${stack.units}`).join(",") || "empty"}; conserved=${cargoOutcome.conservation.every((entry) => entry.conserved)}`,
+);
+
+console.log(
+  "\nCheckpoint 66 TACTICAL-004 ready for manual acceptance; see docs/MANUAL_TEST_CHECKPOINT_66.md",
 );
