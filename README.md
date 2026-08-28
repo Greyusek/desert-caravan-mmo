@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 61 — UI-007: the complete Trading Prototype state is visible in the debug map.**
+**Checkpoint 62 — TRADING-001: Trading Prototype Stage 3 is complete end to end.**
 
 Implemented and covered by the automated test suite:
 
@@ -72,6 +72,7 @@ Also implemented:
 - INFO-TRADE-001 — a physical knowledge bundle is quoted per target library from novelty, accuracy, age, confirmations and strategic evidence type; an identical known observation is worth zero.
 - INFO-TRADE-002 — bundles carry at most three entries, direct copying stops at generation two, and copy/medium/fallen-archive fidelity lowers later local value.
 - UI-007 — the existing debug map projects city production/consumption and prices, player cargo and journal, physical route profit, NPC market impact and local information value.
+- TRADING-001 — one deterministic seeded scenario composes the player goods route, later NPC market impact and physically delivered knowledge with novel/copied/old/duplicate local values; its player view contains no exact coordinates.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
@@ -110,15 +111,15 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 61:
+Expected for Checkpoint 62:
 
 ```text
-# tests 510
-# pass 510
+# tests 521
+# pass 521
 # fail 0
 ```
 
-This total includes the 6-test UI-007 Trading Prototype projection suite.
+This total includes the 11-test TRADING-001 end-to-end regression suite.
 
 GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_54.md` for final MVP-1 details.
 
@@ -146,5 +147,5 @@ Then open `http://127.0.0.1:4173`. The new Trading Prototype panel shows both se
 `sim-core` remains deliberately independent from UI, database and networking code.
 
 The agreed MVP 0.1 implementation block is complete at GAME-025, MVP-1
-«Living Path» is complete at MVP1-001, and Trading Prototype is now in progress
-at UI-007. Tactical Combat and later stages remain gated.
+«Living Path» is complete at MVP1-001, and Trading Prototype is complete at
+TRADING-001. Tactical Combat and later stages remain gated by a new command.

@@ -13,6 +13,7 @@ import {
   createCityLibraryArchive,
   createCityEconomyState,
   createTradeCaravanState,
+  createTradingPrototypeScenario,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -87,7 +88,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 61 demo");
+console.log("Desert Caravan MMO — Checkpoint 62 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -943,6 +944,17 @@ console.log(
   `  libraries=${livingPath.playerView.originLibrary.entries.length}->${livingPath.playerView.destinationLibraryBeforeDelivery.entries.length}->${livingPath.playerView.destinationLibraryAfterDelivery.entries.length}; rumor=${livingPath.playerView.rumor.type}/${livingPath.playerView.rumor.quality}; coordinates=not-stored`,
 );
 
+const tradingPrototype = createTradingPrototypeScenario(
+  "checkpoint-62-trading-prototype",
+);
+console.log("\nTRADING-001 Trading Prototype:");
 console.log(
-  "\nCheckpoint 61 UI-007 Trading Prototype projection complete: npm run debug-map -> http://127.0.0.1:4173",
+  `  player=${tradingPrototype.playerView.route.originCityId}->${tradingPrototype.playerView.route.destinationCityId}; good=${tradingPrototype.playerView.playerTrade.goodId}×${tradingPrototype.playerView.playerTrade.units}; cargo=${tradingPrototype.playerView.playerTrade.loadedCargoUnits}/${tradingPrototype.playerView.playerTrade.capacityCargoUnits}; journal=${tradingPrototype.playerView.playerTrade.journal.length}; profit=${tradingPrototype.playerView.playerTrade.profitCredits} credits`,
+);
+console.log(
+  `  NPC bid=${tradingPrototype.playerView.npcImpact.playerBidBeforeSaleCredits}->${tradingPrototype.playerView.npcImpact.playerBidAfterSaleCredits}; information novel/copied/old/duplicate=${tradingPrototype.playerView.informationTrade.novelValueCredits}/${tradingPrototype.playerView.informationTrade.copiedValueCredits}/${tradingPrototype.playerView.informationTrade.oldValueCredits}/${tradingPrototype.playerView.informationTrade.duplicateValueCredits}; coordinates=not-exposed`,
+);
+
+console.log(
+  "\nCheckpoint 62 TRADING-001 Stage 3 complete; Tactical Combat gated: npm run debug-map -> http://127.0.0.1:4173",
 );

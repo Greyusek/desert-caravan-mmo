@@ -286,6 +286,7 @@ Production-time пока не фиксируем окончательно. Ра�
 - [x] `INFO-TRADE-001` — local physical-knowledge quote from novelty, accuracy, age, confirmation and strategic type.
 - [x] `INFO-TRADE-002` — three-entry/two-generation physical copy limits with medium, copy and fallen-archive fidelity degradation.
 - [x] `UI-007` — one deterministic debug-map projection of city markets, physical player/NPC trade and local information value.
+- [x] `TRADING-001` — one seeded end-to-end material trade, NPC market impact and physically delivered local information trade scenario.
 - [x] `GAME-017` — execute `RETURN_TO_ORIGIN | CONTINUE` when food or water reaches 50% during uninterrupted movement.
 - [x] `GAME-018` — compose the 50% emergency boundary with discovery-STOP idle consumption and depart from the exact stop coordinate.
 - [x] `GAME-019` — establish the first detected-danger boundary and its ordering relative to contact before adding `AVOID | CONTINUE` route replanning.
@@ -315,3 +316,19 @@ Production-time пока не фиксируем окончательно. Ра�
 
 Полная торговая экономика, tactical combat, multiplayer, production database,
 Magic/System 256 и neural agents остаются за пределами MVP-1.
+
+## 16. Definition of Done Trading Prototype
+
+- [x] два seeded города имеют семь конечных товаров, production/consumption и прозрачные локальные bid/ask;
+- [x] игрок покупает только в пределах wallet/stock/cargo capacity;
+- [x] товар физически проходит city-to-city `RoutePlan` и продаётся только после ETA;
+- [x] журнал сохраняет purchase/departure/arrival/sale и фактическую прибыль маршрута;
+- [x] NPC вызывает те же market/cargo/route операции и меняет следующую player quote;
+- [x] physical knowledge bundle достигает конкретной локальной библиотеки;
+- [x] novel, copied, old и already-known сведения получают различную локальную цену;
+- [x] одинаковый seed и fixed actions воспроизводят полный `TRADING-001` scenario;
+- [x] player view не содержит server coordinates;
+- [x] Checkpoint 62 quality gate: `521/521` PASS.
+
+Tactical Combat, multiplayer, production database, широкие production chains и
+полный Magic/System 256 остаются за пределами Trading Prototype.

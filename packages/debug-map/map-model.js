@@ -7,16 +7,8 @@ import {
   DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
   DEFAULT_PLAYER_POWER,
   DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
-  advanceCityEconomyToWorldTime,
-  arriveTradeJourney,
-  beginTradeJourney,
-  buyGoodFromCity,
-  copyPhysicalKnowledgeBundle,
-  copyPlayerKnowledgeToBundle,
-  createCityEconomyState,
-  createCityLibraryArchive,
   createRoutePlan,
-  createTradeCaravanState,
+  createTradingPrototypeScenario,
   createKnownObjectReturnNavigation,
   createRumorSearchScenario,
   destinationPoint,
@@ -24,7 +16,6 @@ import {
   evaluateDiscoveryStopLifecycle,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
-  executeNpcTradeOrder,
   expeditionTimeToRouteTime,
   findFirstCityArrival,
   findFirstExpeditionMonsterDangerDetection,
@@ -47,23 +38,16 @@ import {
   planEmergencySupplyReturnDuringIdleStop,
   projectCitySettlementAtTime,
   projectMixedActivitySupplies,
-  quoteCityMarketPrices,
-  quoteKnowledgeBundleForLibrary,
   resolveMonsterPowerContact,
   resumeStaticObjectDiscoveryDoctrine,
   routeTimeToExpeditionTime,
-  sellGoodToCity,
-  sellKnowledgeBundleToLibrary,
   timeToFirstDepletion,
-  usedCargoCapacity,
   wanderingMonsterPositionAtTime,
 } from "../sim-core/dist/src/index.js";
 
 /** @typedef {import("../sim-core/dist/src/index.js").WorldCoordinate} WorldCoordinate */
 /** @typedef {import("../sim-core/dist/src/index.js").SupplyStock} SupplyStock */
 /** @typedef {import("../sim-core/dist/src/index.js").ConsumptionProfile} ConsumptionProfile */
-/** @typedef {import("../sim-core/dist/src/index.js").PlayerWorldEvidenceEntry} PlayerWorldEvidenceEntry */
-/** @typedef {import("../sim-core/dist/src/index.js").CityEconomyState} CityEconomyState */
 
 /**
  * @typedef {object} DebugRouteCommand
@@ -336,241 +320,66 @@ export function createDebugMapSnapshot(
 }
 
 /**
- * UI-007 composes one compact, deterministic trading proof for the debug map.
- * The browser receives projections of authoritative sim-core results; it does
- * not own a second pricing, cargo, route, NPC or information-value model.
+ * UI-007 projects the final TRADING-001 player view without reproducing any
+ * pricing, cargo, route, NPC or information-value formula in the browser.
  * @param {string} seed
  */
 export function createTradingDebugSnapshot(seed) {
-  const world = generateSeededWorld(seed);
-  const originCity = world.cities[0];
-  const destinationCity = world.cities[1];
-  if (!originCity || !destinationCity) {
-    throw new Error("trading debug scenario requires two cities");
-  }
-  /** @param {string} cityId */
-  const economyFor = (cityId) => {
-    const stocks = world.cityStocks.find((item) => item.cityId === cityId);
-    const population = world.cityPopulations.find(
-      (item) => item.cityId === cityId,
-    );
-    if (!stocks || !population) {
-      throw new Error(`trading debug city resources missing for ${cityId}`);
-    }
-    return createCityEconomyState(world.seed, stocks, population);
-  };
-  /**
-   * @param {CityEconomyState} economy
-   * @param {number} stockUnits
-   * @returns {CityEconomyState}
-   */
-  const withOreProfile = (economy, stockUnits) => ({
-    ...economy,
-    goods: economy.goods.map((good) =>
-      good.goodId === "ore"
-        ? {
-            ...good,
-            stockUnits,
-            productionUnitsPerDay: 0,
-            consumptionUnitsPerDay: 1,
-          }
-        : good,
-    ),
-  });
-  const originInitial = withOreProfile(economyFor(originCity.id), 1_000);
-  const destinationInitial = withOreProfile(
-    economyFor(destinationCity.id),
-    0,
-  );
-  const distanceMeters = greatCircleDistance(
-    originCity.position,
-    destinationCity.position,
-  );
-  const route = createRoutePlan(
-    originCity.position,
-    [
-      {
-        bearingDeg: initialBearingDegrees(
-          originCity.position,
-          destinationCity.position,
-        ),
-        distanceMeters,
-      },
-    ],
-    1_000,
-  );
-
-  const playerInitial = createTradeCaravanState(
-    "debug-player",
-    originCity.id,
-    10_000,
-    10,
-  );
-  const purchase = buyGoodFromCity(
-    originInitial,
-    playerInitial,
-    "ore",
-    5,
-    0,
-  );
-  const playerInTransit = beginTradeJourney(
-    purchase.caravan,
-    originCity,
-    destinationCity,
-    route,
-    0,
-  );
-  const playerArrivalTime = route.totalDurationSeconds;
-  const destinationAtPlayerArrival = advanceCityEconomyToWorldTime(
-    destinationInitial,
-    playerArrivalTime,
-  );
-  const playerArrived = arriveTradeJourney(
-    playerInTransit,
-    playerArrivalTime,
-  );
-  const playerSale = sellGoodToCity(
-    destinationAtPlayerArrival,
-    playerArrived,
-    "ore",
-    5,
-    playerArrivalTime,
-  );
-
-  const npc = executeNpcTradeOrder(
-    purchase.cityEconomy,
-    playerSale.cityEconomy,
-    {
-      npcTraderId: "debug-npc-merchant",
-      goodId: "ore",
-      units: 10,
-      startingCredits: 10_000,
-      capacityCargoUnits: 20,
-      departsAtWorldTimeSeconds: playerArrivalTime,
-      originCity,
-      destinationCity,
-      route,
-    },
-  );
-
-  const informationCreatedAt = npc.npcTrader.journal.find(
-    (event) => event.kind === "arrival",
-  )?.atWorldTimeSeconds;
-  if (informationCreatedAt === undefined) {
-    throw new Error("trading debug NPC arrival invariant failed");
-  }
-  /** @type {PlayerWorldEvidenceEntry} */
-  const evidence = {
-    id: "knowledge-caravan-track-debug-npc-merchant",
-    evidenceKind: "caravan-track",
-    subjectId: "debug-npc-merchant-track",
-    firstObservedAtWorldTimeSeconds: informationCreatedAt,
-    latestObservedAtWorldTimeSeconds: informationCreatedAt,
-    confidence: "confirmed",
-    facts: {
-      kind: "caravan-track",
-      approximateAge: "fresh",
-      approximateDirection: "east",
-    },
-    provenance: [
-      {
-        source: "direct-track-observation",
-        sourceEvidenceId: "debug-npc-track-01",
-        observedAtWorldTimeSeconds: informationCreatedAt,
-        confidence: "confirmed",
-      },
-    ],
-  };
-  const bundle = copyPlayerKnowledgeToBundle(
-    { worldSeed: world.seed, entries: [evidence], journal: [] },
-    "debug-player",
-    [evidence.id],
-    informationCreatedAt,
-  );
-  const quoteTime = informationCreatedAt + 1;
-  const emptyLibrary = createCityLibraryArchive(
-    world.seed,
-    destinationCity.id,
-  );
-  const directInformation = sellKnowledgeBundleToLibrary(
-    emptyLibrary,
-    bundle,
-    quoteTime,
-  );
-  const duplicateInformation = quoteKnowledgeBundleForLibrary(
-    directInformation.deposit.library,
-    bundle,
-    quoteTime + 1,
-  );
-  const copiedBundle = copyPhysicalKnowledgeBundle(
-    bundle,
-    "debug-copy-carrier",
-    [evidence.id],
-    quoteTime + 1,
-  );
-  const copiedInformation = quoteKnowledgeBundleForLibrary(
-    createCityLibraryArchive(world.seed, `${destinationCity.id}-copy-qa`),
-    copiedBundle,
-    quoteTime + 2,
-  );
-  /** @param {CityEconomyState} economy */
-  const projectMarket = (economy) =>
-    quoteCityMarketPrices(economy).map((quote) => {
-      const good = economy.goods.find(
-        (candidate) => candidate.goodId === quote.goodId,
-      );
-      if (!good) throw new Error(`missing market good ${quote.goodId}`);
-      return { ...good, ...quote };
-    });
+  const view = createTradingPrototypeScenario(seed).playerView;
 
   return {
-    seed: world.seed,
+    seed: view.worldSeed,
     cities: [
       {
-        id: originCity.id,
-        name: originCity.name,
-        goods: projectMarket(originInitial),
+        id: view.markets.origin.cityId,
+        name: view.markets.origin.cityName,
+        goods: view.markets.origin.goods,
       },
       {
-        id: destinationCity.id,
-        name: destinationCity.name,
-        goods: projectMarket(destinationInitial),
+        id: view.markets.destination.cityId,
+        name: view.markets.destination.cityName,
+        goods: view.markets.destination.goods,
       },
     ],
     route: {
-      goodId: "ore",
-      units: 5,
-      distanceMeters,
-      durationSeconds: route.totalDurationSeconds,
-      originCityId: originCity.id,
-      destinationCityId: destinationCity.id,
+      goodId: view.playerTrade.goodId,
+      units: view.playerTrade.units,
+      distanceMeters: view.route.distanceMeters,
+      durationSeconds: view.route.durationSeconds,
+      originCityId: view.route.originCityId,
+      destinationCityId: view.route.destinationCityId,
     },
     player: {
-      startingCredits: playerInitial.credits,
-      endingCredits: playerSale.caravan.credits,
-      capacityCargoUnits: playerInitial.cargo.capacityCargoUnits,
-      loadedCargoUnits: usedCargoCapacity(purchase.caravan.cargo),
-      loadedStacks: purchase.caravan.cargo.stacks,
-      endingStacks: playerSale.caravan.cargo.stacks,
-      profitCredits: playerSale.profitCredits,
-      journal: playerSale.caravan.journal,
+      startingCredits: view.playerTrade.startingCredits,
+      endingCredits: view.playerTrade.endingCredits,
+      capacityCargoUnits: view.playerTrade.capacityCargoUnits,
+      loadedCargoUnits: view.playerTrade.loadedCargoUnits,
+      loadedStacks: view.playerTrade.loadedStacks,
+      endingStacks: view.playerTrade.endingStacks,
+      profitCredits: view.playerTrade.profitCredits,
+      journal: view.playerTrade.journal,
     },
     npc: {
-      traderId: npc.order.npcTraderId,
-      units: npc.order.units,
-      quoteBeforeSale: npc.destinationQuoteBeforeSale,
-      quoteAfterSale: npc.destinationQuoteAfterSale,
-      profitCredits: npc.profitCredits,
-      journalKinds: npc.npcTrader.journal.map((event) => event.kind),
+      traderId: view.npcImpact.traderId,
+      units: view.npcImpact.units,
+      quoteBeforeSale: {
+        stockUnits: view.npcImpact.stockBeforeSale,
+        cityBuyPriceCredits: view.npcImpact.playerBidBeforeSaleCredits,
+      },
+      quoteAfterSale: {
+        stockUnits: view.npcImpact.stockAfterSale,
+        cityBuyPriceCredits: view.npcImpact.playerBidAfterSaleCredits,
+      },
+      profitCredits: view.npcImpact.profitCredits,
+      journalKinds: view.npcImpact.journalKinds,
     },
     information: {
-      bundleId: bundle.id,
-      directValueCredits: directInformation.quote.totalValueCredits,
-      duplicateValueCredits: duplicateInformation.totalValueCredits,
-      copiedValueCredits: copiedInformation.totalValueCredits,
-      copiedFidelityFraction: copiedBundle.fidelityFraction,
-      copyGeneration: copiedBundle.copyGeneration,
-      directEntryQuote: directInformation.quote.entryQuotes[0],
+      bundleId: view.informationTrade.bundleId,
+      directValueCredits: view.informationTrade.novelValueCredits,
+      duplicateValueCredits: view.informationTrade.duplicateValueCredits,
+      copiedValueCredits: view.informationTrade.copiedValueCredits,
+      copiedFidelityFraction: view.informationTrade.copiedFidelityFraction,
+      copyGeneration: view.informationTrade.copyGeneration,
     },
   };
 }
