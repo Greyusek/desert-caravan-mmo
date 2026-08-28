@@ -8,7 +8,7 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-67 / version `0.0.67`. The user has explicitly opened Stage 4. Tactical Combat
+68 / version `0.0.68`. The user has explicitly opened Stage 4. Tactical Combat
 Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
 the final `COMBAT-001` proof. Stage 4.5 Player-facing UI Vertical Slice is now
 recorded in ROADMAP but remains gated until Stage 4 closes; its first action is
@@ -50,40 +50,31 @@ remain gated.
 
 ## Last known good main
 
-- `1f15dcfe96707b286943d43e305a3c309c2b2d0f` — merge of PR #81.
-- PR #81 is merged; GitHub `CI / verify` run #175 completed successfully on
-  exact functional head `b6cadeac887c4567753581ca2794d708b1f4b9ea`.
+- `904c68caa18abfae28108acda24d1bfc3a24a7b5` — merge of docs PR #83.
+- PR #83 is merged; GitHub `CI / verify` run #179 completed successfully on
+  exact head `36db073d01171afa7ed2cdadccb2d22e63c23ed3`.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `558/558` PASS, zero failures, compiled
-  Checkpoint 67 demo PASS.
-- Dedicated TACTICAL-005 suite: `8/8` PASS.
+- Full `npm run verify:local`: `565/565` PASS, zero failures, compiled
+  Checkpoint 68 demo PASS.
+- Dedicated TACTICAL-006 suite: `7/7` PASS.
 - User local acceptance of Checkpoint 66: `550/550` PASS; manual cargo scenarios
   all PASS on commit `f9340db`.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 67 / `TACTICAL-005` adds retreat only from the correct edge with safe
-enemy separation. Escaped living units preserve health and are not casualties.
-Checkpoint 66 manual acceptance passed: `550/550` and all cargo scenarios PASS.
-Checkpoint 67 is complete and no Stage 4 task is active.
-
-`RESOURCE LIMIT CHECKPOINT`: `TACTICAL-006` was not started. It requires one
-authoritative participant-state layer for caravan members, the existing trade
-caravan and persistent creature, plus idempotent battle-result application;
-that complete slice did not safely fit the remaining Work resource.
+Checkpoint 68 / `TACTICAL-006` applies tactical health, permanent casualties and
+conserved cargo exactly once to the existing trade caravan, caravan-member IDs
+and persistent creature identity. Stage 4.5 remains gated.
 
 ## Next action
 
-From updated `main`, start `TACTICAL-006`: define the minimal authoritative
-participant state composed from the existing trade caravan, caravan-member
-source IDs and existing `PersistentCreatureState`; apply tactical health,
-casualties and TACTICAL-004 cargo outcome exactly once by battle ID. Prove dead
-participants cannot reappear and repeated application is rejected. Do not add
-PvE contact migration or UI in this slice.
+Complete the `TACTICAL-006` PR, then start `TACTICAL-007` from updated `main`:
+route existing PvE monster contacts through the stable tactical core while
+retaining the Power resolver as an explicit legacy compatibility path.
 
 ## Scope boundary
 
@@ -94,6 +85,6 @@ production-chain simulation, Stage 4.5 implementation or Stage 5 work.
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_67.md`. Verify repository/PR/CI state. Continue with the first
+`docs/CHECKPOINT_68.md`. Verify repository/PR/CI state. Continue with the first
 unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
 explicit user command.

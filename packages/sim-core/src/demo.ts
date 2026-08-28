@@ -22,6 +22,8 @@ import {
   damageTacticalBaggage,
   resolveTacticalCargoOutcome,
   executeTacticalRetreat,
+  createTacticalWorldState,
+  applyTacticalBattleToWorld,
   createCreatureIntelligenceReport,
   createCreatureLegendHistory,
   createFallenCityLibrary,
@@ -96,7 +98,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 67 demo");
+console.log("Desert Caravan MMO — Checkpoint 68 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1051,6 +1053,35 @@ console.log(
   `  status=${retreat.status}; edge=${retreat.exitEdge}; separation=${retreat.minimumSeparationCells}/${retreat.requiredSeparationCells}; escaped=${retreat.escapedUnits.map((unit) => `${unit.id}:${unit.health}hp`).join(",")}; casualties=${retreat.casualties.length}; field-winner=${retreat.winningSide}`,
 );
 
+const worldMonster = world.wanderingMonsters[0];
+if (!worldMonster) throw new Error("demo world requires a monster");
+const worldCreature = createPersistentCreatureState(worldMonster, "demo-combat-species");
+const returnUnits = deployTacticalUnits(tacticalBattlefield, [
+  { id: "return-guard", side: "caravan", unitClass: "guard", source: { kind: "caravan-member", id: "return-member" } },
+  { id: "return-monster", side: "hostile", unitClass: "monster", source: { kind: "persistent-creature", id: worldCreature.id } },
+]);
+const returnCaravan = {
+  ...createTradeCaravanState("return-caravan", world.cities[0]?.id ?? "city-01", 100, 20),
+  cargo: demoCargo,
+};
+const returnBattleStart = createTacticalBattleState(tacticalBattlefield, returnUnits);
+const returnBattle = {
+  ...returnBattleStart,
+  units: returnUnits.map((unit) => unit.side === "hostile" ? { ...unit, health: 0 } : { ...unit, health: 7 }),
+  status: "complete" as const,
+  winner: "caravan" as const,
+};
+const returnedWorld = applyTacticalBattleToWorld(
+  createTacticalWorldState(returnCaravan, returnUnits, worldCreature),
+  "demo-battle-68",
+  returnBattle,
+  resolveTacticalCargoOutcome(deployTacticalCargo(tacticalBattlefield, demoCargo), "caravan"),
+);
+console.log("\nTACTICAL-006 authoritative world return:");
 console.log(
-  "\nCheckpoint 67 TACTICAL-005 complete; next TACTICAL-006: npm run debug-map -> http://127.0.0.1:4173",
+  `  applied=${returnedWorld.appliedBattleIds.join(",")}; members=${returnedWorld.members.map((member) => `${member.id}:${member.status}:${member.health}hp`).join(",")}; creature=${returnedWorld.creature.status}; cargo=${returnedWorld.caravan.cargo.stacks.map((stack) => `${stack.goodId}x${stack.units}`).join(",")}`,
+);
+
+console.log(
+  "\nCheckpoint 68 TACTICAL-006 complete; next TACTICAL-007: npm run debug-map -> http://127.0.0.1:4173",
 );
