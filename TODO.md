@@ -91,6 +91,10 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [ ] `UI-008`: project battlefield cells, sides, classes, baggage, commands, events, casualties, winner, cargo outcome and world return in the debug map without browser combat logic.
 - [ ] `COMBAT-001`: prove the complete deterministic global-contact → tactical battle → persistent world-consequence scenario and close Stage 4.
 
+## Player-facing UI Vertical Slice gate
+
+- [ ] `UI-VERTICAL-DECOMP`: after `COMBAT-001` closes Stage 4, create the docs-only decomposition of Stage 4.5 into player projection, Global Map/Caravan Command, City/Market/Library, Caravan Preparation/Formation, Battle controls/result, shared visual language and final seeded acceptance checkpoints. Do not start it before Stage 4 is complete.
+
 ## Future R&D anchors
 
 - [x] `DESIGN-AI-001`: integrate the autonomous «Искины» direction into GDD/ROADMAP as a future simulation layer. The accepted contract and experiments live in [`docs/AI_ISKINS_CONCEPT.md`](docs/AI_ISKINS_CONCEPT.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md); implementation remains behind the current MVP checkpoints and its dependency gate.
