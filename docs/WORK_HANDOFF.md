@@ -48,9 +48,9 @@ gated by a separate user command.
 
 ## Last known good main
 
-- `223ebb96cb06e33847c4c983a04fe16de92fd138` — merge of PR #76.
-- PR #76 is merged; GitHub `CI / verify` run #165 completed successfully on
-  exact functional head `da53173261b137334e0bd709336fe7e31e6f2e4a`.
+- `b77fcec24aa7b8fb1fbb3f59aaa5a7e046723542` — merge of PR #77.
+- PR #77 is merged; GitHub `CI / verify` run #167 completed successfully on
+  exact functional head `e6ad28d979d6c9ef0a4598617a227175a2d75a09`.
 
 ## Verification
 
@@ -63,13 +63,20 @@ gated by a separate user command.
 ## Current task
 
 Checkpoint 65 / `TACTICAL-003` adds immutable turn-based movement, attack,
-damage, defeat, winner and ordered combat events over physical units.
+damage, defeat, winner and ordered combat events over physical units. It is
+complete and no Stage 4 task is active.
+
+`RESOURCE LIMIT CHECKPOINT`: `TACTICAL-004` was not started because the
+remaining Work resource could not safely cover the physical cargo model, all
+three conserved outcomes, full regression, PR and CI. The repository is stable
+at the merge of PR #77.
 
 ## Next action
 
-Complete the `TACTICAL-003` PR, then start `TACTICAL-004` from updated `main`:
-physical baggage units backed by existing trade cargo and conserved
-survive/destroy/capture outcomes only.
+From updated `main`, start `TACTICAL-004`: create physical baggage units from
+existing `TradeCargoHold` stacks and resolve conserved survive/destroy/capture
+outcomes from battlefield state. Do not add retreat, global-state application,
+PvE migration or UI in that slice.
 
 ## Scope boundary
 
