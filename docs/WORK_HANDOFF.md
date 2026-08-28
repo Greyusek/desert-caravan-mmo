@@ -48,10 +48,12 @@ and every later roadmap stage remain gated by a separate user command.
 
 ## Last known good main
 
-- `c289a2aa280246be25676cf8a511016b119daa85` — merge of PR #70;
-  tree `ebaaaaa4f3c4511bfff76cddc2bc34311492c21a`.
-- `main` exactly matched `origin/main` before the TRADING-001 feature branch;
-  PR #70 is merged and its GitHub CI run #153 succeeded.
+- `8e5eac328839c90473ddbc36b3836d1ba1616404` — merge of PR #71;
+  functional head `ca186aa4145292d5f25b1a4d80ddb59d6725dc30`, tree
+  `a1460521bd840f90fec091ef4730fa38d76446bc`.
+- PR #71 is merged; GitHub `CI / verify` run #155 completed successfully on the
+  exact functional head. `main` matched `origin/main` when this final handoff
+  branch was created.
 
 ## Verification
 
@@ -63,13 +65,13 @@ and every later roadmap stage remain gated by a separate user command.
 
 ## Current task
 
-Complete the PR/CI/merge cycle for Checkpoint 62, then publish the final MAIN4
-handoff record with the exact merge commit, PR and green CI run.
+No active MAIN4 gameplay task. Checkpoint 62 / PR #71 / CI run #155 is complete
+and Trading Prototype Stage 3 is closed.
 
 ## Next action
 
-After stable `main`, make no gameplay changes. Finalize only the exact handoff
-metadata if needed, then stop. Tactical Combat requires a new user command.
+Await a new user command. Do not start Tactical Combat or another roadmap stage
+from this handoff automatically.
 
 ## Scope boundary
 
@@ -78,8 +80,7 @@ full Magic/System 256, neural agents or broad production-chain simulation.
 
 ## Resume instruction
 
-Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, Stage 3 of
-`docs/ROADMAP.md`, the relevant knowledge/economy parts of `docs/MVP_SPEC.md`,
-this file and the latest checkpoint only. Verify the active branch/PR/main
-state, finish any current quality gate, and resume at the first unchecked MAIN4
-queue item. Stop after `TRADING-001`; Tactical Combat requires a new command.
+Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
+`docs/CHECKPOINT_62.md`. Verify repository/PR/CI state. MAIN4 has no unchecked
+queue item; choose and decompose any next stage only after an explicit new user
+command.
