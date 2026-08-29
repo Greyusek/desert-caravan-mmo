@@ -97,7 +97,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 
 ## Player-facing UI Vertical Slice queue
 
-- [ ] `PLAYER-PROJECTION-001`: add a deterministic allow-listed player session projection/action contract with forbidden server-truth tests.
+- [x] `PLAYER-PROJECTION-001`: add a deterministic allow-listed player session projection/action contract with forbidden server-truth tests.
 - [ ] `PLAYER-SHELL-001`: add a standalone dependency-light Player UI application, navigation and shared desktop visual-language tokens while keeping Debug UI separate.
 - [ ] `PLAYER-GLOBAL-001`: implement known-world Global Map / Caravan Command, map layers, route controls, compact status and collapsible player journal.
 - [ ] `PLAYER-CITY-001`: implement a functional City view over the existing market and physical information/library operations.

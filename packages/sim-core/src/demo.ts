@@ -24,6 +24,7 @@ import {
   executeTacticalRetreat,
   createTacticalWorldState,
   createTacticalCombatScenario,
+  createPlayerSessionController,
   applyTacticalBattleToWorld,
   pveCaravanUnitId,
   pveCreatureUnitId,
@@ -102,7 +103,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 71 demo");
+console.log("Desert Caravan MMO — Checkpoint 72 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1144,4 +1145,23 @@ console.log(
 );
 console.log(
   "\nCheckpoint 71 COMBAT-001 complete; Tactical Combat Prototype Stage 4 closed.",
+);
+
+const playerSession = createPlayerSessionController(
+  "checkpoint-72-player-projection",
+);
+const playerReady = playerSession.dispatch({
+  kind: "SELECT_DESTINATION",
+  destinationRef: "place:north-camp",
+});
+const playerTravelling = playerReady.dispatch({ kind: "START_JOURNEY" });
+console.log("\nPLAYER-PROJECTION-001 safe player session:");
+console.log(
+  `  phases=${playerSession.getView().phase}->${playerReady.getView().phase}->${playerTravelling.getView().phase}; route=${playerReady.getView().map.route?.distanceMeters}m/${playerReady.getView().map.route?.etaSeconds}s`,
+);
+console.log(
+  `  controller=${JSON.stringify(playerSession)}; projected-journal=${playerTravelling.getView().journal.map((entry) => entry.kind).join("->")}`,
+);
+console.log(
+  "\nCheckpoint 72 PLAYER-PROJECTION-001 complete; safe Player UI boundary established.",
 );

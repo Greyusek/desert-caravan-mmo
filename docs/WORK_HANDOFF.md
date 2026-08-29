@@ -8,11 +8,12 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path», Trading Prototype Stage 3 and Tactical Combat Prototype
-Stage 4 are complete at Checkpoint 71 / version `0.0.71`. `TACTICAL-001` through
-`TACTICAL-007`, `UI-008` and the final `COMBAT-001` proof are closed. Stage 4.5
-Player-facing UI Vertical Slice is now decomposed by the separate
-`UI-VERTICAL-DECOMP` docs-only checkpoint. Multiplayer and later stages remain
-gated.
+Stage 4 are complete. Stage 4.5 has advanced to Checkpoint 72 / version `0.0.72`.
+`TACTICAL-001` through `TACTICAL-007`, `UI-008` and the final `COMBAT-001` proof
+are closed. The Stage 4.5 Player-facing UI Vertical Slice is decomposed by the
+separate `UI-VERTICAL-DECOMP` docs-only checkpoint, and `PLAYER-PROJECTION-001` now
+provides its safe player data/action boundary. Multiplayer and later stages
+remain gated.
 
 ## Completed
 
@@ -38,44 +39,47 @@ gated.
   route creates the contact, tactical resolution applies source health, deaths
   and cargo once, and the same journey resumes 300 m then arrives with every
   consequence intact. UI-008 now projects this scenario directly.
+- PLAYER-PROJECTION-001 keeps that server truth inside an immutable controller
+  and exposes only allow-listed screens, local known-map positions, caravan,
+  market, route, journal and validated player actions. Serialized views omit
+  exact coordinates, seed, hidden encounters, internal identities and formula
+  inputs.
 
 ## Last known good main
 
-- `f7a60193d7db0b831a332241e2063ae93e080fa6` — merge of PR #88 / COMBAT-001.
+- `a86bad6582eaa3e09def19d1b0d0567d0d4515c4` — merge of PR #89 / UI-VERTICAL-DECOMP.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `594/594` PASS, zero failures, compiled
-  Checkpoint 71 demo PASS.
-- Dedicated COMBAT-001 server-truth/UI additions: `12/12` PASS.
-- Debug-map, tooling and COMBAT-001 group: `154/154` PASS.
-- Local debug server asset/content-type smoke test: PASS.
+- Full `npm run verify:local`: `606/606` PASS, zero failures, compiled
+  Checkpoint 72 demo PASS.
+- Dedicated PLAYER-PROJECTION-001 additions: `12/12` PASS.
+- Manual safe-session runner: PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-`UI-VERTICAL-DECOMP` defines eight small Stage 4.5 implementation checkpoints,
-five player screens, the projection/action boundary and final seeded acceptance.
-No Stage 4.5 production code is included in the decomposition PR.
+`PLAYER-PROJECTION-001` implements the first of eight Stage 4.5 checkpoints:
+the private authoritative composition plus immutable allow-listed player view
+and action contract. It intentionally contains no Player UI markup.
 
 ## Next action
 
-After the docs-only PR merges, start `PLAYER-PROJECTION-001`: add one
-deterministic allow-listed player session projection/action contract and prove
-that forbidden server truth is absent. Do not create Player UI markup in that
-same functional PR.
+After this checkpoint merges, start `PLAYER-SHELL-001`: add a separate
+dependency-light Player UI application, navigation and shared desktop visual
+tokens over the player projection. Keep Debug UI separate.
 
 ## Scope boundary
 
-The current branch contains documentation-only decomposition. No real-player
-PvP, multiplayer, production
-database, player settlements, full Magic/System 256, neural agents, broad
+The current branch contains the safe Player UI contract but no visual Player UI.
+No real-player PvP, multiplayer, production database, player settlements, full
+Magic/System 256, neural agents, broad
 production-chain simulation or Stage 5 work.
 
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, the supplied Stage 4.5 prompt,
 `TODO.md`, this file, `docs/STAGE_4_5_UI_DECOMPOSITION.md` and
-`docs/CHECKPOINT_71.md`. Verify the decomposition PR is merged, then continue
-with the first unchecked Stage 4.5 queue item only.
+`docs/CHECKPOINT_72.md`. Verify the projection PR is merged, then continue with
+`PLAYER-SHELL-001` only.
