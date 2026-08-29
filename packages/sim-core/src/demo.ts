@@ -23,6 +23,7 @@ import {
   resolveTacticalCargoOutcome,
   executeTacticalRetreat,
   createTacticalWorldState,
+  createTacticalCombatScenario,
   applyTacticalBattleToWorld,
   pveCaravanUnitId,
   pveCreatureUnitId,
@@ -101,7 +102,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 70 demo");
+console.log("Desert Caravan MMO — Checkpoint 71 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1125,5 +1126,22 @@ console.log(
 );
 
 console.log(
-  "\nCheckpoint 70 UI-008 tactical projection complete; next COMBAT-001: npm run debug-map -> http://127.0.0.1:4173",
+  "\nTACTICAL-007 PvE migration remains regression-safe.",
+);
+
+const combatScenario = createTacticalCombatScenario(
+  "checkpoint-71-combat-001",
+);
+console.log("\nCOMBAT-001 global → tactical → global:");
+console.log(
+  `  contact=${combatScenario.contact.monsterId}@${combatScenario.contact.expeditionElapsedSeconds.toFixed(3)}s/${combatScenario.contact.separationMeters.toFixed(3)}m; commands=${combatScenario.commands.length}; winner=${combatScenario.resolution.battle.winner}`,
+);
+console.log(
+  `  casualties=${combatScenario.resolution.worldState.battleResults[0]?.casualtySourceIds.join(",")}; cargo-conserved=${combatScenario.resolution.cargoOutcome.conservation.every((entry) => entry.conserved)}; applied=${combatScenario.resolution.worldState.appliedBattleIds.length}`,
+);
+console.log(
+  `  resumed=+${combatScenario.continuation.progressedDistanceMeters}m; arrival=${combatScenario.continuation.worldState.caravan.currentCityId}; journal=${combatScenario.continuation.worldState.caravan.journal.map((event) => event.kind).join("->")}`,
+);
+console.log(
+  "\nCheckpoint 71 COMBAT-001 complete; Tactical Combat Prototype Stage 4 closed.",
 );

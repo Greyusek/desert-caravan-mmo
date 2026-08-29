@@ -1,17 +1,16 @@
 # Work handoff
 
-Updated: 28 August 2026
+Updated: 29 August 2026
 
-This is the short operational recovery point for the autonomous Stage 4 series.
+This is the short operational recovery point after the Stage 4 series.
 Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
 
-MVP-1 «Living Path» and Trading Prototype Stage 3 remain complete at Checkpoint
-70 / version `0.0.70`. The user has explicitly opened Stage 4. Tactical Combat
-Prototype is decomposed into `TACTICAL-001` through `TACTICAL-007`, `UI-008` and
-the final `COMBAT-001` proof. Stage 4.5 Player-facing UI Vertical Slice is
-recorded in ROADMAP but remains gated until Stage 4 closes; its first action is
+MVP-1 «Living Path», Trading Prototype Stage 3 and Tactical Combat Prototype
+Stage 4 are complete at Checkpoint 71 / version `0.0.71`. `TACTICAL-001` through
+`TACTICAL-007`, `UI-008` and the final `COMBAT-001` proof are closed. Stage 4.5
+Player-facing UI Vertical Slice is now unblocked, but its first action remains
 the separate `UI-VERTICAL-DECOMP` docs-only PR. Multiplayer and later stages
 remain gated.
 
@@ -35,46 +34,47 @@ remain gated.
   debug map: cells/zones, source-linked units, baggage, commands/events,
   casualties, winner, conserved cargo and exactly-once world return. Browser
   rendering contains no combat, cargo or world-return solver.
+- COMBAT-001 owns the final shared server-truth composition: an active physical
+  route creates the contact, tactical resolution applies source health, deaths
+  and cargo once, and the same journey resumes 300 m then arrives with every
+  consequence intact. UI-008 now projects this scenario directly.
 
 ## Last known good main
 
-- `306c18676f708ff70ff0153f5314428423a58713` — merge of PR #86.
-- PR #86 functional head `cde249f0e1354664b565172abce1cacc6ee853ef`
-  passed GitHub `CI / verify` run #185.
+- `27cd80ee82adb492d088f03194ade3aea475d40d` — merge of PR #87 / UI-008,
+  immediately before the COMBAT-001 feature branch.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core` and `debug-map`.
-- Full `npm run verify:local`: `582/582` PASS, zero failures, compiled
-  Checkpoint 70 demo PASS.
-- Dedicated UI-008 snapshot/browser-boundary additions: `8/8` PASS.
-- Debug-map plus tooling group: `142/142` PASS.
+- Full `npm run verify:local`: `594/594` PASS, zero failures, compiled
+  Checkpoint 71 demo PASS.
+- Dedicated COMBAT-001 server-truth/UI additions: `12/12` PASS.
+- Debug-map, tooling and COMBAT-001 group: `154/154` PASS.
 - Local debug server asset/content-type smoke test: PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-Checkpoint 70 / `UI-008` is complete. The existing debug map now projects the
-same tactical contact, physical state, command/event history, cargo outcome and
-world return without browser simulation rules. No Stage 4 task is active. Stage
-4.5 remains gated.
+Checkpoint 71 / `COMBAT-001` and Stage 4 are complete. No functional Stage 4
+task remains active. Stage 4.5 implementation has not started.
 
 ## Next action
 
-From updated `main`, start `COMBAT-001`: add one deterministic seeded end-to-end
-proof from a real global PvE contact through tactical battle and persistent
-world consequences into continued global simulation, then close Stage 4. Do
-not start Stage 4.5 in the same functional PR.
+After this checkpoint is accepted, start the separate docs-only
+`UI-VERTICAL-DECOMP` PR required by the supplied Stage 4.5 prompt. Decompose the
+Player-facing UI Vertical Slice before any implementation and do not mix code
+changes into that PR.
 
 ## Scope boundary
 
-Tactical Combat Prototype only. No real-player PvP, multiplayer, production
+The completed branch contains Tactical Combat Prototype only. The next PR is
+documentation-only decomposition. No real-player PvP, multiplayer, production
 database, player settlements, full Magic/System 256, neural agents, broad
-production-chain simulation, Stage 4.5 implementation or Stage 5 work.
+production-chain simulation or Stage 5 work.
 
 ## Resume instruction
 
-Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, `TODO.md`, this file and
-`docs/CHECKPOINT_70.md`. Verify repository/PR/CI state. Continue with the first
-unchecked Stage 4 queue item. Stop after `COMBAT-001`; Stage 5 requires an
-explicit user command.
+Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, the supplied Stage 4.5 prompt,
+`TODO.md`, this file and `docs/CHECKPOINT_71.md`. Verify the COMBAT-001 PR is
+merged and accepted, then create only the `UI-VERTICAL-DECOMP` docs-only PR.

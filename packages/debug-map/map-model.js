@@ -7,18 +7,14 @@ import {
   DEFAULT_FLEE_SAFE_SEPARATION_MULTIPLIER,
   DEFAULT_PLAYER_POWER,
   DEFAULT_VISIBLE_TARGET_RADIUS_METERS,
-  createPersistentCreatureState,
   createRoutePlan,
-  createTacticalBattlefield,
-  createTacticalWorldState,
-  createTradeCaravanState,
+  createTacticalCombatScenario,
   createTradingPrototypeScenario,
   createWorldCoordinate,
   createKnownObjectReturnNavigation,
   createRumorSearchScenario,
   destinationPoint,
   discoverStaticObjectsAlongRoute,
-  deployTacticalUnits,
   evaluateDiscoveryStopLifecycle,
   evaluateExpeditionOutcome,
   evaluateStaticObjectDiscoveryDoctrine,
@@ -44,8 +40,6 @@ import {
   planEmergencySupplyReturnDuringIdleStop,
   projectCitySettlementAtTime,
   projectMixedActivitySupplies,
-  pveCaravanUnitId,
-  pveCreatureUnitId,
   resolvePveMonsterContact,
   resumeStaticObjectDiscoveryDoctrine,
   routeTimeToExpeditionTime,
@@ -393,112 +387,14 @@ export function createTradingDebugSnapshot(seed) {
 }
 
 /**
- * UI-008 composes one fixed-action TACTICAL-007 result and exposes a pure debug
- * projection. The browser renderer receives resolved state only: it does not
- * reproduce movement, attack, cargo or world-return rules.
+ * UI-008 projects the shared fixed-action COMBAT-001 server-truth result. The
+ * browser renderer receives resolved state only: it does not reproduce global
+ * contact, movement, attack, cargo, world-return or journey-continuation rules.
  * @param {string} seed
  */
 export function createTacticalDebugSnapshot(seed) {
-  if (typeof seed !== "string" || seed.trim().length === 0) {
-    throw new TypeError("seed must be a non-empty string");
-  }
-  const crossing = createWorldCoordinate(0, 0);
-  const patrolStart = destinationPoint(crossing, 270, 1_000);
-  const caravanStart = destinationPoint(crossing, 180, 1_000);
-  const monster = {
-    id: "ui-tactical-monster",
-    kind: /** @type {const} */ ("wandering-monster"),
-    power: 90,
-    visionRadiusMeters: 300,
-    interactionRadiusMeters: 100,
-    patrolRoute: createRoutePlan(
-      patrolStart,
-      [
-        { bearingDeg: 90, distanceMeters: 2_000 },
-        { bearingDeg: 270, distanceMeters: 2_000 },
-      ],
-      10,
-    ),
-  };
-  const contact = findFirstExpeditionMonsterContact(
-    createRoutePlan(
-      caravanStart,
-      [{ bearingDeg: 0, distanceMeters: 2_000 }],
-      10,
-    ),
-    monster,
-  );
-  if (!contact) throw new Error("UI-008 debug scenario requires a real contact");
-
-  const creature = createPersistentCreatureState(monster, "ui-sand-beast");
-  const sourceField = createTacticalBattlefield(`ui-008-source:${seed}`);
-  const sourceUnits = deployTacticalUnits(sourceField, [
-    {
-      id: "ui-source-guard",
-      side: "caravan",
-      unitClass: "guard",
-      source: { kind: "caravan-member", id: "ui-member-guard" },
-    },
-    {
-      id: "ui-source-skirmisher",
-      side: "caravan",
-      unitClass: "skirmisher",
-      source: { kind: "caravan-member", id: "ui-member-skirmisher" },
-    },
-    {
-      id: "ui-source-monster",
-      side: "hostile",
-      unitClass: "monster",
-      source: { kind: "persistent-creature", id: creature.id },
-    },
-  ]);
-  const caravan = createTradeCaravanState("ui-tactical-caravan", "city-01", 250, 20);
-  const worldState = createTacticalWorldState(
-    {
-      ...caravan,
-      cargo: {
-        capacityCargoUnits: 20,
-        stacks: [
-          { goodId: "ore", units: 5, costBasisCredits: 110 },
-          { goodId: "medicine", units: 2, costBasisCredits: 80 },
-        ],
-      },
-    },
-    sourceUnits,
-    creature,
-  );
-  const guardId = pveCaravanUnitId("ui-member-guard");
-  const skirmisherId = pveCaravanUnitId("ui-member-skirmisher");
-  const monsterId = pveCreatureUnitId(creature.id);
-  const commands = [
-    { kind: /** @type {const} */ ("MOVE"), unitId: guardId, to: { x: 2, y: 0 } },
-    { kind: /** @type {const} */ ("MOVE"), unitId: monsterId, to: { x: 8, y: 0 } },
-    { kind: /** @type {const} */ ("MOVE"), unitId: skirmisherId, to: { x: 3, y: 1 } },
-    { kind: /** @type {const} */ ("MOVE"), unitId: monsterId, to: { x: 6, y: 0 } },
-    { kind: /** @type {const} */ ("MOVE"), unitId: skirmisherId, to: { x: 6, y: 1 } },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: skirmisherId },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: skirmisherId, targetUnitId: monsterId },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: skirmisherId },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: skirmisherId, targetUnitId: monsterId },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: skirmisherId },
-    { kind: /** @type {const} */ ("MOVE"), unitId: guardId, to: { x: 4, y: 0 } },
-    { kind: /** @type {const} */ ("WAIT"), unitId: monsterId },
-    { kind: /** @type {const} */ ("MOVE"), unitId: guardId, to: { x: 5, y: 0 } },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: guardId },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: guardId, targetUnitId: monsterId },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: monsterId, targetUnitId: guardId },
-    { kind: /** @type {const} */ ("ATTACK"), unitId: guardId, targetUnitId: monsterId },
-  ];
-  const resolution = resolvePveMonsterContact({
-    contact,
-    battleId: `ui-008-battle:${seed}`,
-    battlefieldSeed: `ui-008-battlefield:${seed}`,
-    worldState,
-    commands,
-  });
-  if (resolution.mode !== "TACTICAL") {
-    throw new Error("UI-008 debug scenario must use tactical resolution");
-  }
+  const scenario = createTacticalCombatScenario(seed);
+  const { commands, resolution } = scenario;
   const initialUnits = new Map(
     resolution.initialBattle.units.map((unit) => [unit.id, unit]),
   );
@@ -592,6 +488,31 @@ export function createTacticalDebugSnapshot(seed) {
         status: resolution.worldState.creature.status,
       },
       battleResults: resolution.worldState.battleResults,
+    },
+    continuation: {
+      resumedAtWorldTimeSeconds:
+        scenario.continuation.resumedAtWorldTimeSeconds,
+      evaluatedAtWorldTimeSeconds:
+        scenario.continuation.evaluatedAtWorldTimeSeconds,
+      arrivedAtWorldTimeSeconds:
+        scenario.continuation.arrivedAtWorldTimeSeconds,
+      progressedDistanceMeters:
+        scenario.continuation.progressedDistanceMeters,
+      evaluatedStatus: scenario.continuation.evaluatedPosition.status,
+      arrivalStatus: scenario.continuation.arrivalPosition.status,
+      destinationCityId:
+        scenario.continuation.worldState.caravan.currentCityId,
+      activeJourney:
+        scenario.continuation.worldState.caravan.activeJourney,
+      journalKinds:
+        scenario.continuation.worldState.caravan.journal.map(
+          (event) => event.kind,
+        ),
+      members: scenario.continuation.worldState.members,
+      creatureStatus: scenario.continuation.worldState.creature.status,
+      cargo: scenario.continuation.worldState.caravan.cargo,
+      appliedBattleIds:
+        scenario.continuation.worldState.appliedBattleIds,
     },
   };
 }

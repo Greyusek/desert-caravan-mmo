@@ -1408,6 +1408,9 @@ function renderTacticalCombat(snapshot) {
     ["Conservation", cargoConserved ? "PASS" : "FAIL"],
     ["World apply", snapshot.worldReturn.appliedBattleIds.join(", ")],
     ["Существо", `${snapshot.worldReturn.creature.status} · ${snapshot.worldReturn.creature.health}/${snapshot.worldReturn.creature.maxHealth} HP`],
+    ["Маршрут после боя", `${snapshot.continuation.evaluatedStatus} · +${formatNumber(snapshot.continuation.progressedDistanceMeters)} м`],
+    ["Прибытие", `${snapshot.continuation.arrivalStatus} · ${snapshot.continuation.destinationCityId}`],
+    ["Global journal", snapshot.continuation.journalKinds.join(" → ")],
   ]);
 }
 

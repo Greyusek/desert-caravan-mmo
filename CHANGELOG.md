@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.71 — Checkpoint 71
+
+- Added `COMBAT-001`: one deterministic active global journey produces a real
+  PvE contact and routes it through the tactical resolver to completion.
+- Returned survivor health, permanent casualties and only physically deployed
+  cargo exactly once, then resumed the same route and arrived at its city.
+- Moved UI-008 to a pure projection of the shared sim-core scenario, including
+  global continuation, and closed Tactical Combat Prototype Stage 4.
+- Added twelve COMBAT-001 core/UI regressions; verification now runs 594 tests.
+
 ## 0.0.70 — Checkpoint 70
 
 - Added `UI-008`: one dependency-free tactical panel projects the complete
