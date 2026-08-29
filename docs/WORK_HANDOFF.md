@@ -2,7 +2,7 @@
 
 Updated: 29 August 2026
 
-This is the short operational recovery point after the Stage 4 series.
+This is the short operational recovery point for the Stage 4.5 series.
 Repository history and checkpoint documents contain the full record.
 
 ## Current autonomous block
@@ -10,9 +10,9 @@ Repository history and checkpoint documents contain the full record.
 MVP-1 «Living Path», Trading Prototype Stage 3 and Tactical Combat Prototype
 Stage 4 are complete at Checkpoint 71 / version `0.0.71`. `TACTICAL-001` through
 `TACTICAL-007`, `UI-008` and the final `COMBAT-001` proof are closed. Stage 4.5
-Player-facing UI Vertical Slice is now unblocked, but its first action remains
-the separate `UI-VERTICAL-DECOMP` docs-only PR. Multiplayer and later stages
-remain gated.
+Player-facing UI Vertical Slice is now decomposed by the separate
+`UI-VERTICAL-DECOMP` docs-only checkpoint. Multiplayer and later stages remain
+gated.
 
 ## Completed
 
@@ -41,8 +41,7 @@ remain gated.
 
 ## Last known good main
 
-- `27cd80ee82adb492d088f03194ade3aea475d40d` — merge of PR #87 / UI-008,
-  immediately before the COMBAT-001 feature branch.
+- `f7a60193d7db0b831a332241e2063ae93e080fa6` — merge of PR #88 / COMBAT-001.
 
 ## Verification
 
@@ -56,25 +55,27 @@ remain gated.
 
 ## Current task
 
-Checkpoint 71 / `COMBAT-001` and Stage 4 are complete. No functional Stage 4
-task remains active. Stage 4.5 implementation has not started.
+`UI-VERTICAL-DECOMP` defines eight small Stage 4.5 implementation checkpoints,
+five player screens, the projection/action boundary and final seeded acceptance.
+No Stage 4.5 production code is included in the decomposition PR.
 
 ## Next action
 
-After this checkpoint is accepted, start the separate docs-only
-`UI-VERTICAL-DECOMP` PR required by the supplied Stage 4.5 prompt. Decompose the
-Player-facing UI Vertical Slice before any implementation and do not mix code
-changes into that PR.
+After the docs-only PR merges, start `PLAYER-PROJECTION-001`: add one
+deterministic allow-listed player session projection/action contract and prove
+that forbidden server truth is absent. Do not create Player UI markup in that
+same functional PR.
 
 ## Scope boundary
 
-The completed branch contains Tactical Combat Prototype only. The next PR is
-documentation-only decomposition. No real-player PvP, multiplayer, production
+The current branch contains documentation-only decomposition. No real-player
+PvP, multiplayer, production
 database, player settlements, full Magic/System 256, neural agents, broad
 production-chain simulation or Stage 5 work.
 
 ## Resume instruction
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, the supplied Stage 4.5 prompt,
-`TODO.md`, this file and `docs/CHECKPOINT_71.md`. Verify the COMBAT-001 PR is
-merged and accepted, then create only the `UI-VERTICAL-DECOMP` docs-only PR.
+`TODO.md`, this file, `docs/STAGE_4_5_UI_DECOMPOSITION.md` and
+`docs/CHECKPOINT_71.md`. Verify the decomposition PR is merged, then continue
+with the first unchecked Stage 4.5 queue item only.

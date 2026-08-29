@@ -419,9 +419,23 @@ seed, внутренние ID, точные координаты и breakdown ф
 desktop-first usability и базовая accessibility. Финальная графика, сложные
 анимации, WebGL/3D, mobile-complete UI и Multiplayer не входят.
 
-Перед реализацией Stage 4.5 выполняется отдельный docs-only decomposition PR:
-малые UI/projection checkpoints, automated acceptance и один стабильный seeded
-manual scenario от global map через encounter/battle/result до города и сделки.
+Декомпозиция Stage 4.5 зафиксирована в
+[`STAGE_4_5_UI_DECOMPOSITION.md`](STAGE_4_5_UI_DECOMPOSITION.md). Последовательность
+малых checkpoint/PR:
+
+- [x] `UI-VERTICAL-DECOMP` — docs-only границы, экраны, acceptance и очередь;
+- [ ] `PLAYER-PROJECTION-001` — allow-listed player session projection/actions;
+- [ ] `PLAYER-SHELL-001` — отдельное Player UI приложение и visual language;
+- [ ] `PLAYER-GLOBAL-001` — Global Map / Caravan Command, layers и journal;
+- [ ] `PLAYER-CITY-001` — City / Market / Information;
+- [ ] `PLAYER-PREP-001` — Caravan Preparation / Tactical Formation;
+- [ ] `PLAYER-BATTLE-001` — читаемое поле и authoritative manual actions;
+- [ ] `PLAYER-RESULT-001` — последствия боя и продолжение global journey;
+- [ ] `PLAYER-VERTICAL-001` — полный seeded UI loop и финальная приёмка.
+
+Каждая функциональная задача получает отдельную версию, checkpoint, ветку и PR.
+UI не рассчитывает economy, route, discovery, combat, cargo или последствия.
+Отдельный Debug UI сохраняется до и после закрытия этапа.
 
 **Exit criteria:** реальный игрок проходит через Player UI подготовку каравана,
 маршрут и путешествие, encounter и хотя бы одно ручное tactical action,
