@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.72 — Checkpoint 72
+
+- Added `PLAYER-PROJECTION-001`: an immutable allow-listed player session over
+  existing economy, trade-route and COMBAT-001 authoritative systems.
+- Added safe screen, known-map, caravan, market, journal and action projections
+  without seed, exact coordinates, hidden encounters or formula breakdowns.
+- Added validated destination/start actions, deterministic replay, deep
+  immutability and serialized forbidden-field regressions.
+- Added twelve PLAYER-PROJECTION-001 tests; verification now runs 606 tests.
+
 ## 0.0.71 — Checkpoint 71
 
 - Added `COMBAT-001`: one deterministic active global journey produces a real

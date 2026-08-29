@@ -424,7 +424,7 @@ desktop-first usability и базовая accessibility. Финальная гр
 малых checkpoint/PR:
 
 - [x] `UI-VERTICAL-DECOMP` — docs-only границы, экраны, acceptance и очередь;
-- [ ] `PLAYER-PROJECTION-001` — allow-listed player session projection/actions;
+- [x] `PLAYER-PROJECTION-001` — allow-listed player session projection/actions;
 - [ ] `PLAYER-SHELL-001` — отдельное Player UI приложение и visual language;
 - [ ] `PLAYER-GLOBAL-001` — Global Map / Caravan Command, layers и journal;
 - [ ] `PLAYER-CITY-001` — City / Market / Information;
