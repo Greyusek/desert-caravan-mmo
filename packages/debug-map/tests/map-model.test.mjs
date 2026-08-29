@@ -4454,15 +4454,33 @@ test("UI-008: result projects casualties, winner and one authoritative world ret
   assert.equal(snapshot.result.winner, "caravan");
   assert.equal(snapshot.result.status, "monster-defeated");
   assert.equal(snapshot.result.routeDisposition, "continue");
-  assert.deepEqual(snapshot.result.survivorSourceIds, ["ui-member-guard"]);
+  assert.deepEqual(snapshot.result.survivorSourceIds, ["combat-member-guard"]);
   assert.deepEqual(snapshot.result.casualtySourceIds, [
-    "ui-member-skirmisher",
-    "persistent-ui-tactical-monster",
+    "combat-member-skirmisher",
+    "persistent-combat-monster",
   ]);
-  assert.deepEqual(snapshot.worldReturn.appliedBattleIds, ["ui-008-battle:ui-008-world"]);
+  assert.deepEqual(snapshot.worldReturn.appliedBattleIds, ["combat-001-battle:ui-008-world"]);
   assert.equal(snapshot.worldReturn.members[0]?.status, "alive");
   assert.equal(snapshot.worldReturn.members[1]?.status, "dead");
   assert.equal(snapshot.worldReturn.creature.status, "dead");
+});
+
+test("COMBAT-001: tactical debug snapshot projects continued global simulation", () => {
+  const snapshot = createTacticalDebugSnapshot("ui-008-world");
+
+  assert.equal(snapshot.continuation.evaluatedStatus, "moving");
+  assert.equal(snapshot.continuation.progressedDistanceMeters, 300);
+  assert.equal(snapshot.continuation.arrivalStatus, "arrived");
+  assert.equal(snapshot.continuation.destinationCityId, "combat-destination");
+  assert.equal(snapshot.continuation.activeJourney, null);
+  assert.deepEqual(snapshot.continuation.journalKinds, ["departure", "arrival"]);
+  assert.equal(snapshot.continuation.members[1]?.status, "dead");
+  assert.equal(snapshot.continuation.creatureStatus, "dead");
+  assert.deepEqual(
+    snapshot.continuation.appliedBattleIds,
+    snapshot.worldReturn.appliedBattleIds,
+  );
+  assert.deepEqual(snapshot.continuation.cargo, snapshot.cargo.caravanCargo);
 });
 
 test("UI-008: identical seed reproduces the complete tactical projection", () => {

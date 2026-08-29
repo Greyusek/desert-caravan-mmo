@@ -89,7 +89,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `TACTICAL-006`: apply tactical survivors, casualties and conserved cargo exactly once to authoritative caravan and persistent-creature state.
 - [x] `TACTICAL-007`: route existing PvE monster contacts through the stable tactical core while retaining the Power resolver as an explicit legacy compatibility path.
 - [x] `UI-008`: project battlefield cells, sides, classes, baggage, commands, events, casualties, winner, cargo outcome and world return in the debug map without browser combat logic.
-- [ ] `COMBAT-001`: prove the complete deterministic global-contact → tactical battle → persistent world-consequence scenario and close Stage 4.
+- [x] `COMBAT-001`: prove the complete deterministic global-contact → tactical battle → persistent world-consequence scenario and close Stage 4.
 
 ## Player-facing UI Vertical Slice gate
 

@@ -1,6 +1,6 @@
 {
   "name": "desert-caravan-mmo",
-  "version": "0.0.70",
+  "version": "0.0.71",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,7 +16,8 @@
     "accept:main": "node scripts/accept-main.mjs",
     "debug-map": "npm run build && node scripts/serve-debug-map.mjs",
     "manual:tactical-cargo": "npm run build:sim && node scripts/manual-tactical-cargo.mjs",
-    "manual:tactical-pve": "npm run build:sim && node scripts/manual-tactical-pve.mjs"
+    "manual:tactical-pve": "npm run build:sim && node scripts/manual-tactical-pve.mjs",
+    "manual:combat": "npm run build:sim && node scripts/manual-combat-scenario.mjs"
   },
   "devDependencies": {
     "typescript": "5.8.3"

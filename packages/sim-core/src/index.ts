@@ -45,3 +45,4 @@ export * from "./tactical-cargo.js";
 export * from "./tactical-retreat.js";
 export * from "./tactical-world-return.js";
 export * from "./pve-contact-resolution.js";
+export * from "./tactical-combat-scenario.js";
