@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="Игровой интерфейс управления караваном в Desert Caravan MMO"
+    />
+    <title>Desert Caravan MMO — Caravan Command</title>
+    <link rel="stylesheet" href="/packages/player-ui/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#screen-title">Перейти к экрану</a>
+
+    <div class="application-frame">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Desert Caravan — главный экран">
+          <span class="brand__mark" aria-hidden="true">DC</span>
+          <span class="brand__copy">
+            <strong>Desert Caravan</strong>
+            <small>Caravan Command</small>
+          </span>
+        </a>
+
+        <div class="world-status" aria-label="Состояние мира">
+          <span class="world-status__signal" aria-hidden="true"></span>
+          <span>Связь с караваном</span>
+          <strong id="session-revision">Состояние 1</strong>
+        </div>
+      </header>
+
+      <div id="loading-state" class="system-state" role="status">
+        <span class="system-state__spinner" aria-hidden="true"></span>
+        Подготавливаем журнал каравана…
+      </div>
+
+      <div id="error-state" class="system-state system-state--error" role="alert" hidden>
+        Не удалось получить состояние каравана. Перезапустите локальный интерфейс.
+      </div>
+
+      <main id="workspace" class="workspace" hidden>
+        <aside class="sidebar" aria-label="Разделы игры">
+          <div class="sidebar__heading">
+            <p>Разделы</p>
+            <span>5 экранов</span>
+          </div>
+          <nav id="primary-navigation" class="primary-navigation"></nav>
+          <div class="sidebar__seal" aria-hidden="true">
+            <span>N</span>
+            <i></i>
+            <small>Север сверху</small>
+          </div>
+        </aside>
+
+        <section class="screen" aria-labelledby="screen-title">
+          <header class="screen-header">
+            <div>
+              <p id="screen-kicker" class="screen-kicker">Главный обзор</p>
+              <h1 id="screen-title">Карта и караван</h1>
+              <p id="screen-description" class="screen-description"></p>
+            </div>
+            <span id="screen-state" class="screen-state">В городе</span>
+          </header>
+
+          <div class="status-strip" aria-label="Краткое состояние каравана">
+            <article>
+              <small>Положение</small>
+              <strong id="location-value">—</strong>
+            </article>
+            <article>
+              <small>Караван</small>
+              <strong id="caravan-value">—</strong>
+            </article>
+            <article>
+              <small>Груз</small>
+              <strong><span id="cargo-value">—</span> ед.</strong>
+            </article>
+          </div>
+
+          <article class="foundation-card">
+            <div class="foundation-card__compass" aria-hidden="true">
+              <span>N</span>
+              <i></i>
+            </div>
+            <div>
+              <p class="foundation-card__eyebrow">Основа интерфейса готова</p>
+              <h2>Командный стол каравана</h2>
+              <p>
+                Навигация уже подчиняется текущему состоянию игры. Содержимое
+                каждого раздела будет добавляться отдельными небольшими этапами.
+              </p>
+            </div>
+            <dl class="foundation-card__legend">
+              <div><dt>Светлый</dt><dd>раздел доступен</dd></div>
+              <div><dt>Приглушённый</dt><dd>ещё не открыт</dd></div>
+              <div><dt>Медный</dt><dd>текущий раздел</dd></div>
+            </dl>
+          </article>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>PLAYER UI · CHECKPOINT 73</span>
+        <span>Север всегда сверху</span>
+      </footer>
+    </div>
+
+    <script type="module" src="/packages/player-ui/main.js"></script>
+  </body>
+</html>

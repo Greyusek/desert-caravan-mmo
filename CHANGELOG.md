@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.73 — Checkpoint 73
+
+- Added `PLAYER-SHELL-001`: a standalone dependency-free Player UI application
+  with five projection-driven top-level screens.
+- Added a separate local Player UI server and safe read-only session endpoint;
+  Debug UI and simulation source assets are not routable from it.
+- Established shared desktop visual tokens, selection/disabled/focus/critical
+  states, loading/error handling, accessibility and responsive fallbacks.
+- Added thirteen shell/model/server regressions; verification now runs 619 tests.
+
 ## 0.0.72 — Checkpoint 72
 
 - Added `PLAYER-PROJECTION-001`: an immutable allow-listed player session over

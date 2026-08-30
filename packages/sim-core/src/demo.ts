@@ -103,7 +103,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 72 demo");
+console.log("Desert Caravan MMO — Checkpoint 73 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1164,4 +1164,7 @@ console.log(
 );
 console.log(
   "\nCheckpoint 72 PLAYER-PROJECTION-001 complete; safe Player UI boundary established.",
+);
+console.log(
+  "\nCheckpoint 73 PLAYER-SHELL-001 complete; standalone Player UI shell established.",
 );
