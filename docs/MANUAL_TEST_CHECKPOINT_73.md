@@ -77,5 +77,5 @@ Stop both servers with `Ctrl+C`, then run:
 npm run accept:main
 ```
 
-Expected: `620/620` tests pass, the Checkpoint 73 demo ends successfully and the
+Expected: `621/621` tests pass, the Checkpoint 73 demo ends successfully and the
 working tree remains clean.

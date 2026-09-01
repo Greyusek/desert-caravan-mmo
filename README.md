@@ -121,12 +121,12 @@ npm.cmd run accept:main
 Expected for Checkpoint 73:
 
 ```text
-# tests 620
-# pass 620
+# tests 621
+# pass 621
 # fail 0
 ```
 
-This total includes fourteen PLAYER-SHELL-001 model, browser-source and local-server regressions.
+This total includes fifteen PLAYER-SHELL-001 model, browser-source and local-server regressions.
 
 GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_54.md` for final MVP-1 details.
 

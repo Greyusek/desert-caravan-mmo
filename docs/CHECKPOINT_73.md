@@ -27,8 +27,8 @@ Version: `0.0.73`
 
 ## Verification
 
-- Dedicated PLAYER-SHELL-001 model/tooling additions: `14/14` PASS.
-- Full `npm run verify:local`: `620/620` PASS.
+- Dedicated PLAYER-SHELL-001 model/tooling additions: `15/15` PASS.
+- Full `npm run verify:local`: `621/621` PASS.
 - Local HTTP smoke: root/CSS/bootstrap/main/model/API `200`, safe payload PASS.
 - `git diff --check`: PASS.
 

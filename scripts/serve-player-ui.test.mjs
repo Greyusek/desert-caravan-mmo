@@ -104,6 +104,38 @@ test("PLAYER-SHELL-001 tooling: bootstrap cannot leave loading active indefinite
   assert.match(main, /player-ui:error/);
 });
 
+test("PLAYER-SHELL-001 tooling: runtime element checks match the actual HTML tags", async () => {
+  const [html, main] = await Promise.all(
+    ["index.html", "main.js"].map((file) =>
+      readFile(path.join(playerUiRoot, file), "utf8"),
+    ),
+  );
+  const specializedTags = new Map([
+    ["HTMLHeadingElement", new Set(["h1", "h2", "h3", "h4", "h5", "h6"])],
+    ["HTMLParagraphElement", new Set(["p"])],
+    ["HTMLSpanElement", new Set(["span"])],
+  ]);
+  const requirements = [
+    ...main.matchAll(/requireElement\("([^"]+)", ([A-Za-z]+)\)/g),
+  ];
+
+  assert.ok(requirements.length > 0);
+  for (const [, id, constructorName] of requirements) {
+    const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tagMatch = html.match(
+      new RegExp(`<([a-z][a-z0-9-]*)\\b[^>]*\\bid="${escapedId}"`),
+    );
+    assert.ok(tagMatch, `missing HTML element: ${id}`);
+    const allowedTags = specializedTags.get(constructorName);
+    if (allowedTags) {
+      assert.ok(
+        allowedTags.has(tagMatch[1]),
+        `${id} is <${tagMatch[1]}> but requires ${constructorName}`,
+      );
+    }
+  }
+});
+
 test("PLAYER-SHELL-001 tooling: HTML exposes accessible navigation and state regions", async () => {
   const html = await readFile(path.join(playerUiRoot, "index.html"), "utf8");
 
