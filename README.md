@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 73 — PLAYER-SHELL-001: standalone Player UI shell established.**
+**Checkpoint 74 — PLAYER-GLOBAL-001: functional Global Map and Caravan Command.**
 
 Implemented and covered by the automated test suite:
 
@@ -80,6 +80,7 @@ Also implemented:
 - COMBAT-001 — one deterministic active global journey produces a real moving PvE contact, resolves the shared tactical battle, applies persistent losses and physical cargo exactly once, then resumes and arrives at its destination with those consequences intact.
 - PLAYER-PROJECTION-001 — one immutable allow-listed player session projects safe screens, known local map, caravan, market, route, journal and actions over existing authoritative systems without exposing seed, exact coordinates, hidden encounters, internal identities or formula breakdowns.
 - PLAYER-SHELL-001 — a separate dependency-free Caravan Command application renders five projection-driven top-level screens with a shared desktop visual language while Debug UI remains isolated.
+- PLAYER-GLOBAL-001 — the player-facing north-up map renders only known places, five honest layers, projected route geometry, caravan status, authoritative destination/departure actions and a collapsible event journal.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
@@ -118,15 +119,16 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 73:
+Expected for Checkpoint 74:
 
 ```text
-# tests 621
-# pass 621
+# tests 630
+# pass 630
 # fail 0
 ```
 
-This total includes fifteen PLAYER-SHELL-001 model, browser-source and local-server regressions.
+This total includes the PLAYER-SHELL-001 regressions plus nine dedicated
+PLAYER-GLOBAL-001 model and local-session action checks.
 
 GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_54.md` for final MVP-1 details.
 
@@ -138,11 +140,12 @@ Launch the standalone player application with:
 npm run player-ui
 ```
 
-Then open `http://127.0.0.1:4174`. Checkpoint 73 provides the visual shell,
-five projection-driven screen states and compact safe caravan summary. Global
-Map controls, City operations, formation, battle and result content remain
-separate upcoming checkpoints. See
-[`docs/MANUAL_TEST_CHECKPOINT_73.md`](docs/MANUAL_TEST_CHECKPOINT_73.md).
+Then open `http://127.0.0.1:4174`. Checkpoint 74 provides the functional Global
+Map / Caravan Command screen: known north-up geography, five layer toggles,
+route preparation and departure, projected caravan metrics, warnings and a
+collapsible journal. City operations, formation, battle and result content
+remain separate upcoming checkpoints. See
+[`docs/MANUAL_TEST_CHECKPOINT_74.md`](docs/MANUAL_TEST_CHECKPOINT_74.md).
 
 ## Developer debug map
 

@@ -63,6 +63,21 @@ export function createPlayerUiSessionPayload(worldSeed) {
   return JSON.stringify(createPlayerSessionController(worldSeed).getView());
 }
 
+/** @param {string} worldSeed */
+export function createPlayerUiSessionStore(worldSeed) {
+  let controller = createPlayerSessionController(worldSeed);
+  return Object.freeze({
+    getPayload() {
+      return JSON.stringify(controller.getView());
+    },
+    /** @param {unknown} input */
+    dispatch(input) {
+      controller = controller.dispatch(parsePlayerAction(input));
+      return JSON.stringify(controller.getView());
+    },
+  });
+}
+
 /**
  * @param {{ repositoryRoot?: string, port?: number, worldSeed?: string }} [options]
  */
@@ -71,7 +86,7 @@ export function startPlayerUiServer(options = {}) {
   const port = options.port ?? DEFAULT_PORT;
   const worldSeed = options.worldSeed ?? "player-shell-local-session";
   assertPort(port);
-  const sessionPayload = createPlayerUiSessionPayload(worldSeed);
+  const sessionStore = createPlayerUiSessionStore(worldSeed);
 
   const server = createServer(async (request, response) => {
     const requestUrl = new URL(request.url ?? "/", "http://localhost");
@@ -80,12 +95,21 @@ export function startPlayerUiServer(options = {}) {
         respondText(response, 405, "Method not allowed");
         return;
       }
-      response.writeHead(200, {
-        "Cache-Control": "no-store",
-        "Content-Length": Buffer.byteLength(sessionPayload),
-        "Content-Type": "application/json; charset=utf-8",
-      });
-      response.end(sessionPayload);
+      respondJson(response, 200, sessionStore.getPayload());
+      return;
+    }
+    if (requestUrl.pathname === "/api/player-session/actions") {
+      if (request.method !== "POST") {
+        respondText(response, 405, "Method not allowed");
+        return;
+      }
+      try {
+        const action = await readJsonRequest(request);
+        respondJson(response, 200, sessionStore.dispatch(action));
+      } catch (error) {
+        console.error("Player UI action rejected", error);
+        respondJson(response, 400, JSON.stringify({ error: "Action rejected." }));
+      }
       return;
     }
 
@@ -128,6 +152,57 @@ export function startPlayerUiServer(options = {}) {
     console.log("Press Ctrl+C to stop the local server.");
   });
   return server;
+}
+
+/** @param {unknown} input */
+function parsePlayerAction(input) {
+  if (!input || typeof input !== "object" || !("kind" in input)) {
+    throw new TypeError("player action must have a kind");
+  }
+  if (input.kind === "START_JOURNEY") {
+    return { kind: "START_JOURNEY" };
+  }
+  if (
+    input.kind === "SELECT_DESTINATION" &&
+    "destinationRef" in input &&
+    typeof input.destinationRef === "string"
+  ) {
+    return {
+      kind: "SELECT_DESTINATION",
+      destinationRef: input.destinationRef,
+    };
+  }
+  throw new RangeError("unsupported player action");
+}
+
+/** @param {import("node:http").IncomingMessage} request */
+function readJsonRequest(request) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 16_384) reject(new RangeError("request body is too large"));
+    });
+    request.on("end", () => {
+      try {
+        resolve(JSON.parse(body));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    request.on("error", reject);
+  });
+}
+
+/** @param {import("node:http").ServerResponse} response @param {number} statusCode @param {string} json */
+function respondJson(response, statusCode, json) {
+  response.writeHead(statusCode, {
+    "Cache-Control": "no-store",
+    "Content-Length": Buffer.byteLength(json),
+    "Content-Type": "application/json; charset=utf-8",
+  });
+  response.end(json);
 }
 
 /** @param {import("node:http").ServerResponse} response @param {number} statusCode @param {string} text */

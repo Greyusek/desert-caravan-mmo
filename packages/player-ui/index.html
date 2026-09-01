@@ -81,30 +81,104 @@
             </article>
           </div>
 
-          <article class="foundation-card">
+          <div id="global-view" class="global-dashboard">
+            <section class="map-panel" aria-labelledby="known-map-title">
+              <header class="panel-heading">
+                <div>
+                  <p class="panel-eyebrow">Известная местность</p>
+                  <h2 id="known-map-title">Северная карта</h2>
+                </div>
+                <span class="north-badge">N · север сверху</span>
+              </header>
+
+              <fieldset class="layer-controls">
+                <legend>Слои карты</legend>
+                <div id="layer-control-list" class="layer-control-list"></div>
+              </fieldset>
+
+              <div class="known-map-frame">
+                <svg
+                  id="known-map"
+                  class="known-map"
+                  viewBox="0 0 1000 620"
+                  role="img"
+                  aria-labelledby="known-map-title known-map-description"
+                >
+                  <desc id="known-map-description">
+                    Северная карта содержит только известные игроку города и маршрут.
+                  </desc>
+                  <defs>
+                    <pattern id="map-grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                      <path d="M 50 0 L 0 0 0 50" class="known-map__grid-line"></path>
+                    </pattern>
+                  </defs>
+                  <rect width="1000" height="620" class="known-map__background"></rect>
+                  <rect width="1000" height="620" fill="url(#map-grid)"></rect>
+                  <g id="map-layer-routes"></g>
+                  <g id="map-layer-cities"></g>
+                  <g id="map-layer-objects"></g>
+                  <g id="map-layer-intelligence"></g>
+                  <g id="map-layer-events"></g>
+                  <g id="map-layer-caravan"></g>
+                </svg>
+                <span class="known-map__north" aria-hidden="true">N</span>
+              </div>
+              <p id="map-caption" class="map-caption"></p>
+            </section>
+
+            <aside class="command-column" aria-label="Командная панель каравана">
+              <section class="command-card">
+                <p class="panel-eyebrow">Следующий приказ</p>
+                <h2>Маршрут</h2>
+                <label for="route-destination">Известное назначение</label>
+                <select id="route-destination"></select>
+                <button id="route-action" class="primary-action" type="button"></button>
+                <p id="route-action-status" class="action-status" role="status"></p>
+              </section>
+
+              <section class="command-card">
+                <p class="panel-eyebrow">Состояние в пути</p>
+                <h2>Караван</h2>
+                <dl class="caravan-metrics">
+                  <div><dt>Еда</dt><dd id="food-value">—</dd></div>
+                  <div><dt>Вода</dt><dd id="water-value">—</dd></div>
+                  <div><dt>Участники</dt><dd id="member-value">—</dd></div>
+                  <div><dt>Скорость</dt><dd id="speed-value">—</dd></div>
+                  <div><dt>До цели</dt><dd id="distance-value">—</dd></div>
+                  <div><dt>ETA</dt><dd id="eta-value">—</dd></div>
+                </dl>
+                <div id="warning-list" class="warning-list" role="status"></div>
+              </section>
+
+              <details id="journal-panel" class="journal-panel">
+                <summary>
+                  Журнал каравана
+                  <output id="journal-count">0</output>
+                </summary>
+                <ol id="journal-list" class="journal-list"></ol>
+              </details>
+            </aside>
+          </div>
+
+          <article id="placeholder-view" class="foundation-card" hidden>
             <div class="foundation-card__compass" aria-hidden="true">
               <span>N</span>
               <i></i>
             </div>
             <div>
-              <p class="foundation-card__eyebrow">Основа интерфейса готова</p>
+              <p class="foundation-card__eyebrow">Следующий этап интерфейса</p>
               <h2>Командный стол каравана</h2>
               <p>
-                Навигация уже подчиняется текущему состоянию игры. Содержимое
-                каждого раздела будет добавляться отдельными небольшими этапами.
+                Этот раздел уже доступен по состоянию игры. Его рабочие операции
+                будут добавлены отдельным checkpoint без скрытых DEV-данных.
               </p>
             </div>
-            <dl class="foundation-card__legend">
-              <div><dt>Светлый</dt><dd>раздел доступен</dd></div>
-              <div><dt>Приглушённый</dt><dd>ещё не открыт</dd></div>
-              <div><dt>Медный</dt><dd>текущий раздел</dd></div>
-            </dl>
           </article>
         </section>
       </main>
 
       <footer class="footer">
-        <span>PLAYER UI · CHECKPOINT 73</span>
+        <span>PLAYER UI · CHECKPOINT 74</span>
         <span>Север всегда сверху</span>
       </footer>
     </div>
