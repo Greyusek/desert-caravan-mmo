@@ -12,12 +12,18 @@ Open `http://127.0.0.1:4174`.
 
 Expected:
 
+- the loading message disappears within 10 seconds and does not remain as an
+  indefinite spinner;
 - the page title is **Desert Caravan MMO — Caravan Command**;
 - the first screen is **Карта и караван**;
 - header status shows connection and `Состояние 1`;
 - the summary shows South Camp, two members, 250 credits and cargo 10.2/20;
 - there is no seed field, world-time slider, hidden object, exact coordinate,
   development button or raw JSON.
+
+If startup fails, the page must replace the spinner with a short diagnostic and
+the **Повторить** button. Copy that diagnostic together with the first red line
+from the browser console for investigation.
 
 ## 2. Navigation availability
 
@@ -71,5 +77,5 @@ Stop both servers with `Ctrl+C`, then run:
 npm run accept:main
 ```
 
-Expected: `619/619` tests pass, the Checkpoint 73 demo ends successfully and the
+Expected: `620/620` tests pass, the Checkpoint 73 demo ends successfully and the
 working tree remains clean.
