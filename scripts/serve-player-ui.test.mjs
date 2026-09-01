@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   contentTypeForPlayerUi,
   createPlayerUiSessionPayload,
+  createPlayerUiSessionStore,
   resolvePlayerUiAsset,
 } from "./serve-player-ui.mjs";
 
@@ -64,7 +65,13 @@ test("PLAYER-SHELL-001 tooling: root document references only routable player as
 test("PLAYER-SHELL-001 tooling: browser source contains no privileged controls or fields", async () => {
   const source = (
     await Promise.all(
-      ["index.html", "bootstrap.js", "main.js", "shell-model.js"].map((file) =>
+      [
+        "index.html",
+        "bootstrap.js",
+        "main.js",
+        "shell-model.js",
+        "global-model.js",
+      ].map((file) =>
         readFile(path.join(playerUiRoot, file), "utf8"),
       ),
     )
@@ -164,4 +171,38 @@ test("PLAYER-SHELL-001 tooling: local API serializes only the safe player view",
   ]) {
     assert.equal(payload.includes(forbidden), false, forbidden);
   }
+});
+
+test("PLAYER-GLOBAL-001 tooling: local session store dispatches only projected actions", () => {
+  const store = createPlayerUiSessionStore("player-global-action-test");
+  const initial = JSON.parse(store.getPayload());
+  const ready = JSON.parse(
+    store.dispatch({
+      kind: "SELECT_DESTINATION",
+      destinationRef: "place:north-camp",
+    }),
+  );
+  const travelling = JSON.parse(store.dispatch({ kind: "START_JOURNEY" }));
+
+  assert.equal(initial.phase, "city");
+  assert.equal(ready.phase, "ready");
+  assert.equal(ready.map.route.status, "planned");
+  assert.equal(travelling.phase, "travelling");
+  assert.equal(travelling.map.route.status, "moving");
+  assert.equal(JSON.stringify(store), "{}");
+});
+
+test("PLAYER-GLOBAL-001 tooling: rejected actions cannot advance the session", () => {
+  const store = createPlayerUiSessionStore("player-global-rejection-test");
+
+  assert.throws(
+    () =>
+      store.dispatch({
+        kind: "SELECT_DESTINATION",
+        destinationRef: "place:unknown",
+      }),
+    /destination is not known/,
+  );
+  assert.throws(() => store.dispatch({ kind: "DELETE_WORLD" }), /unsupported/);
+  assert.equal(JSON.parse(store.getPayload()).revision, 0);
 });

@@ -7,7 +7,7 @@ export const PLAYER_SCREEN_DEFINITIONS = Object.freeze([
     title: "Карта и караван",
     kicker: "Главный обзор",
     description:
-      "Известный мир, состояние каравана и маршрут будут собраны здесь.",
+      "Известные места, маршрут, состояние каравана и последние события.",
   }),
   Object.freeze({
     id: "city",
