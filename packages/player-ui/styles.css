@@ -532,7 +532,33 @@ h1 {
 }
 
 .system-state--error {
+  flex-direction: column;
+  padding: var(--space-6);
   color: var(--color-critical);
+  text-align: center;
+}
+
+.system-state--error strong {
+  color: var(--color-ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+
+.system-state--error span {
+  max-width: 42rem;
+  color: var(--color-ink-muted);
+}
+
+.system-state--error button {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-small);
+  color: var(--color-accent-ink);
+  background: var(--color-accent-bright);
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .footer {

@@ -52,7 +52,7 @@ test("PLAYER-SHELL-001 tooling: root document references only routable player as
 
   assert.deepEqual(assets, [
     "/packages/player-ui/styles.css",
-    "/packages/player-ui/main.js",
+    "/packages/player-ui/bootstrap.js",
   ]);
   assert.ok(
     assets.every(
@@ -64,7 +64,7 @@ test("PLAYER-SHELL-001 tooling: root document references only routable player as
 test("PLAYER-SHELL-001 tooling: browser source contains no privileged controls or fields", async () => {
   const source = (
     await Promise.all(
-      ["index.html", "main.js", "shell-model.js"].map((file) =>
+      ["index.html", "bootstrap.js", "main.js", "shell-model.js"].map((file) =>
         readFile(path.join(playerUiRoot, file), "utf8"),
       ),
     )
@@ -84,6 +84,56 @@ test("PLAYER-SHELL-001 tooling: browser source contains no privileged controls o
     assert.equal(lower.includes(forbidden), false, forbidden);
   }
   assert.doesNotMatch(source, /PLAYER_UI_SEED/);
+});
+
+test("PLAYER-SHELL-001 tooling: bootstrap cannot leave loading active indefinitely", async () => {
+  const [html, bootstrap, main] = await Promise.all(
+    ["index.html", "bootstrap.js", "main.js"].map((file) =>
+      readFile(path.join(playerUiRoot, file), "utf8"),
+    ),
+  );
+
+  assert.match(html, /id="error-detail"/);
+  assert.match(html, /id="retry-button"/);
+  assert.match(bootstrap, /BOOTSTRAP_TIMEOUT_MS = 10_000/);
+  assert.match(bootstrap, /import\("\.\/main\.js"\)\.catch/);
+  assert.match(bootstrap, /loadingState\.hidden = true/);
+  assert.match(main, /PLAYER_SESSION_TIMEOUT_MS = 8_000/);
+  assert.match(main, /signal: abortController\.signal/);
+  assert.match(main, /player-ui:ready/);
+  assert.match(main, /player-ui:error/);
+});
+
+test("PLAYER-SHELL-001 tooling: runtime element checks match the actual HTML tags", async () => {
+  const [html, main] = await Promise.all(
+    ["index.html", "main.js"].map((file) =>
+      readFile(path.join(playerUiRoot, file), "utf8"),
+    ),
+  );
+  const specializedTags = new Map([
+    ["HTMLHeadingElement", new Set(["h1", "h2", "h3", "h4", "h5", "h6"])],
+    ["HTMLParagraphElement", new Set(["p"])],
+    ["HTMLSpanElement", new Set(["span"])],
+  ]);
+  const requirements = [
+    ...main.matchAll(/requireElement\("([^"]+)", ([A-Za-z]+)\)/g),
+  ];
+
+  assert.ok(requirements.length > 0);
+  for (const [, id, constructorName] of requirements) {
+    const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tagMatch = html.match(
+      new RegExp(`<([a-z][a-z0-9-]*)\\b[^>]*\\bid="${escapedId}"`),
+    );
+    assert.ok(tagMatch, `missing HTML element: ${id}`);
+    const allowedTags = specializedTags.get(constructorName);
+    if (allowedTags) {
+      assert.ok(
+        allowedTags.has(tagMatch[1]),
+        `${id} is <${tagMatch[1]}> but requires ${constructorName}`,
+      );
+    }
+  }
 });
 
 test("PLAYER-SHELL-001 tooling: HTML exposes accessible navigation and state regions", async () => {

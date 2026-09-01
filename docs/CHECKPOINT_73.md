@@ -19,14 +19,17 @@ Version: `0.0.73`
   reduced-motion behavior.
 - Adds accessible loading/error states, skip navigation, semantic landmarks,
   visible keyboard focus and responsive layout fallbacks.
+- Guards browser bootstrap and the local session request with finite timeouts,
+  catches module-loading failures and replaces an indefinite spinner with a
+  retryable diagnostic state.
 - Keeps functional map layers, market operations, formation and combat controls
   out of this shell checkpoint; those remain separate queued tasks.
 
 ## Verification
 
-- Dedicated PLAYER-SHELL-001 model/tooling additions: `13/13` PASS.
-- Full `npm run verify:local`: `619/619` PASS.
-- Local HTTP smoke: root/CSS/API `200`, Debug UI asset `404`, safe payload PASS.
+- Dedicated PLAYER-SHELL-001 model/tooling additions: `15/15` PASS.
+- Full `npm run verify:local`: `621/621` PASS.
+- Local HTTP smoke: root/CSS/bootstrap/main/model/API `200`, safe payload PASS.
 - `git diff --check`: PASS.
 
 ## Manual review

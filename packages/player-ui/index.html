@@ -37,7 +37,9 @@
       </div>
 
       <div id="error-state" class="system-state system-state--error" role="alert" hidden>
-        Не удалось получить состояние каравана. Перезапустите локальный интерфейс.
+        <strong>Не удалось открыть журнал каравана.</strong>
+        <span id="error-detail">Локальный интерфейс не завершил запуск.</span>
+        <button id="retry-button" type="button">Повторить</button>
       </div>
 
       <main id="workspace" class="workspace" hidden>
@@ -107,6 +109,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/packages/player-ui/main.js"></script>
+    <script src="/packages/player-ui/bootstrap.js"></script>
   </body>
 </html>
