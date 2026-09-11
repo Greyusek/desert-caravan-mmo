@@ -18,6 +18,7 @@ import {
   createTacticalCombatScenario,
   type TacticalCombatScenario,
 } from "./tactical-combat-scenario.js";
+import { deployTacticalCargo } from "./tactical-cargo.js";
 import {
   beginTradeJourney,
   buyGoodFromCity,
@@ -164,6 +165,39 @@ export interface PlayerSessionView {
         readonly confidence: "probable" | "confirmed";
         readonly fidelityPercent: number;
         readonly localValueCredits: number;
+      }[];
+    };
+  };
+  readonly preparation: null | {
+    readonly formation: {
+      readonly mode: "fixed";
+      readonly accepted: true;
+      readonly reason: string;
+      readonly columns: number;
+      readonly rows: number;
+      readonly combatants: readonly {
+        readonly memberRef: string;
+        readonly role: "guard" | "skirmisher";
+        readonly position: {
+          readonly column: number;
+          readonly row: number;
+        };
+        readonly health: number;
+        readonly maxHealth: number;
+        readonly movementCells: number;
+        readonly attackRangeCells: number;
+        readonly attackDamage: number;
+      }[];
+      readonly baggage: readonly {
+        readonly ref: string;
+        readonly goodId: TradeGoodId;
+        readonly units: number;
+        readonly position: {
+          readonly column: number;
+          readonly row: number;
+        };
+        readonly durability: number;
+        readonly maxDurability: number;
       }[];
     };
   };
@@ -451,6 +485,7 @@ function projectPlayerSession(
     });
   const inCity = state.phase !== "travelling";
   const city = inCity ? projectCity(state) : null;
+  const preparation = inCity ? projectPreparation(state) : null;
   const view: PlayerSessionView = {
     revision: state.revision,
     phase: state.phase,
@@ -505,10 +540,65 @@ function projectPlayerSession(
       members,
     },
     city,
+    preparation,
     journal: state.journal.map((entry) => ({ ...entry })),
     availableActions: projectAvailableActions(state),
   };
   return deepFreeze(view);
+}
+
+function projectPreparation(
+  state: PrivatePlayerSessionState,
+): NonNullable<PlayerSessionView["preparation"]> {
+  const field = state.scenario.resolution.battlefield;
+  const caravanZone = field.deploymentZones.caravan;
+  const combatants = state.scenario.resolution.initialBattle.units.filter(
+    (unit) => unit.side === "caravan",
+  );
+  const cargoDeployment = deployTacticalCargo(
+    field,
+    state.caravan.cargo,
+    combatants,
+  );
+  return {
+    formation: {
+      mode: "fixed",
+      accepted: true,
+      reason:
+        "The tactical core has validated this formation; repositioning is not available yet.",
+      columns: caravanZone.maxX - caravanZone.minX + 1,
+      rows: field.height,
+      combatants: combatants.map((unit) => {
+        if (unit.unitClass !== "guard" && unit.unitClass !== "skirmisher") {
+          throw new Error("player preparation supports caravan combatants only");
+        }
+        return {
+          memberRef: `member:${unit.unitClass}`,
+          role: unit.unitClass,
+          position: {
+            column: unit.position.x - caravanZone.minX,
+            row: unit.position.y,
+          },
+          health: unit.health,
+          maxHealth: unit.stats.maxHealth,
+          movementCells: unit.stats.movementCells,
+          attackRangeCells: unit.stats.attackRangeCells,
+          attackDamage: unit.stats.attackDamage,
+        };
+      }),
+      baggage: cargoDeployment.baggageUnits.map((unit, index) => ({
+        ref: `baggage:${index + 1}`,
+        goodId: unit.cargoStack.goodId,
+        units: unit.cargoStack.units,
+        position: {
+          column: unit.position.x - caravanZone.minX,
+          row: unit.position.y,
+        },
+        durability: unit.durability,
+        maxDurability: unit.maxDurability,
+      })),
+    },
+  };
 }
 
 function projectCity(

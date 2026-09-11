@@ -4,7 +4,7 @@ Hardcore browser MMO prototype about travel, exploration and survival on a close
 
 ## Current checkpoint
 
-**Checkpoint 75 — PLAYER-CITY-001: functional City market and library.**
+**Checkpoint 76 — PLAYER-PREP-001: caravan preparation and fixed tactical formation.**
 
 Implemented and covered by the automated test suite:
 
@@ -82,6 +82,7 @@ Also implemented:
 - PLAYER-SHELL-001 — a separate dependency-free Caravan Command application renders five projection-driven top-level screens with a shared desktop visual language while Debug UI remains isolated.
 - PLAYER-GLOBAL-001 — the player-facing north-up map renders only known places, five honest layers, projected route geometry, caravan status, authoritative destination/departure actions and a collapsible event journal.
 - PLAYER-CITY-001 — the City screen displays seven local market quotes, owned cargo, wallet/capacity, one-unit authoritative buy/sell actions and one physical information bundle that can be valued and deposited in the local library exactly once.
+- PLAYER-PREP-001 — the Caravan screen presents members, combat roles and stats, supplies, current physical cargo/capacity and the fixed caravan deployment already validated by the tactical core.
 - UI-005 — deterministic play/pause simulation clock with x1, x10, x100 and x1000 development speeds, exact pause state and automatic stopping at the first authoritative expedition boundary.
 - UI-006 — deterministic north-up contact inset with ±1/±5/±25 km spatial zoom and ±5 min/±30 min/±3 h time windows for caravan and cyclic-patrol traces.
 
@@ -120,16 +121,16 @@ cd D:\dev\newWorld
 npm.cmd run accept:main
 ```
 
-Expected for Checkpoint 75:
+Expected for Checkpoint 76:
 
 ```text
-# tests 640
-# pass 640
+# tests 649
+# pass 649
 # fail 0
 ```
 
-This total includes the PLAYER-GLOBAL-001 regressions plus ten dedicated
-PLAYER-CITY-001 projection, presentation and local-session action checks.
+This total includes every earlier Player UI regression plus nine dedicated
+PLAYER-PREP-001 projection and presentation checks.
 
 GitHub Actions installs exact dependencies, compiles `sim-core`, type-checks the browser UI, and runs all tests for every pull request to `main`. See `docs/DEVELOPMENT_WORKFLOW.md` for the pre-MVP process and rollback rules, and `docs/CHECKPOINT_54.md` for final MVP-1 details.
 
@@ -141,12 +142,13 @@ Launch the standalone player application with:
 npm run player-ui
 ```
 
-Then open `http://127.0.0.1:4174`. Checkpoint 75 keeps the functional Global Map
-and adds the City screen: seven real local quotes, owned cargo, one-unit buy and
-sell controls, projected transaction totals and a physical information bundle
-that the local library values and accepts once. Formation, battle and result
-content remain separate upcoming checkpoints. See
-[`docs/MANUAL_TEST_CHECKPOINT_75.md`](docs/MANUAL_TEST_CHECKPOINT_75.md).
+Then open `http://127.0.0.1:4174`. Checkpoint 76 keeps the functional Global Map
+and City operations, and replaces the Caravan placeholder with members, combat
+stats, supplies, cargo capacity, physical baggage and the exact fixed deployment
+accepted by the tactical core. The City market and Caravan manifest use the same
+authoritative cargo state. Battle and result content remain separate upcoming
+checkpoints. See
+[`docs/MANUAL_TEST_CHECKPOINT_76.md`](docs/MANUAL_TEST_CHECKPOINT_76.md).
 
 ## Developer debug map
 
@@ -175,5 +177,6 @@ Then open `http://127.0.0.1:4173`. The Trading Prototype panel shows both seven-
 The agreed MVP 0.1 implementation block is complete at GAME-025, MVP-1
 «Living Path» is complete at MVP1-001, Trading Prototype is complete at
 TRADING-001, and Tactical Combat Prototype is complete at COMBAT-001. Stage 4.5
-now includes the safe player projection, standalone shell, Global Map and City
-operations; the next checkpoint is Caravan Preparation / Tactical Formation.
+now includes the safe player projection, standalone shell, Global Map, City
+operations and Caravan Preparation; the next checkpoint is the readable battle
+scene and authoritative manual actions.

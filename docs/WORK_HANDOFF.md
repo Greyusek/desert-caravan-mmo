@@ -8,14 +8,16 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path», Trading Prototype Stage 3 and Tactical Combat Prototype
-Stage 4 are complete. Stage 4.5 has advanced to Checkpoint 75 / version `0.0.75`.
+Stage 4 are complete. Stage 4.5 has advanced to Checkpoint 76 / version `0.0.76`.
 `TACTICAL-001` through `TACTICAL-007`, `UI-008` and the final `COMBAT-001` proof
 are closed. The Stage 4.5 Player-facing UI Vertical Slice is decomposed by the
 separate `UI-VERTICAL-DECOMP` docs-only checkpoint, and `PLAYER-PROJECTION-001` now
 provides its safe player data/action boundary. `PLAYER-SHELL-001` now supplies a
 separate visual application over that boundary. `PLAYER-GLOBAL-001` supplies the
-functional global command screen, and `PLAYER-CITY-001` now exposes the existing
-market and physical information operations without widening the safe projection.
+functional global command screen, `PLAYER-CITY-001` exposes the existing market
+and physical information operations, and `PLAYER-PREP-001` now presents the
+authoritative caravan manifest and fixed tactical deployment without widening
+the safe projection.
 Multiplayer and later stages remain gated.
 
 ## Completed
@@ -59,35 +61,38 @@ Multiplayer and later stages remain gated.
   server-authorized one-unit transactions. The local library values and accepts
   one physical field-notes bundle exactly once; wallet, stock, cargo, archive,
   actions and journal update from the same immutable controller.
+- PLAYER-PREP-001 renders members, tactical stats, supplies, capacity and the
+  current physical cargo in the two-column caravan deployment zone. It reuses
+  tactical cargo deployment, hides hostile truth and deliberately exposes no
+  reposition control because the core does not yet validate one.
 
 ## Last known good main
 
-- `21217a7b9f09240af1055c6fdb9931bc7a36218d` — merge of PR #93 / PLAYER-GLOBAL-001.
+- `afbb241f1e5f140bad55343e6020f952ce3d866f` — merge of PR #94 / PLAYER-CITY-001.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core`, `debug-map` and `player-ui`.
-- Full `npm run verify:local`: `640/640` PASS, zero failures, compiled
-  Checkpoint 75 demo PASS.
-- Dedicated PLAYER-CITY-001 additions: `10/10` PASS.
-- Player UI market/information HTTP transitions and rejected-action checks: PASS.
+- Full `npm run verify:local`: `649/649` PASS, zero failures, compiled
+  Checkpoint 76 demo PASS.
+- Dedicated PLAYER-PREP-001 additions: `9/9` PASS.
+- Player/Debug HTTP smoke and Player UI preparation projection smoke: PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-`PLAYER-CITY-001` implements the fourth of eight Stage 4.5 checkpoints: the
-functional City market and local library driven only by projected quotes and
-authoritative actions.
+`PLAYER-PREP-001` implements the fifth of eight Stage 4.5 checkpoints: caravan
+members, supplies, physical cargo and the existing validated fixed formation.
 
 ## Next action
 
-After this checkpoint merges, start `PLAYER-PREP-001`: expose caravan members,
-supplies, cargo capacity and the existing validated tactical deployment.
+After this checkpoint merges, start `PLAYER-BATTLE-001`: expose the readable 2D
+battle scene and only authoritative legal manual actions.
 
 ## Scope boundary
 
-The current branch contains Global Map and City operations but no formation or
-combat controls. No real-player PvP, multiplayer, production
+The current branch contains Global Map, City operations and fixed formation but
+no battle commands or result flow. No real-player PvP, multiplayer, production
 database, player settlements, full
 Magic/System 256, neural agents, broad
 production-chain simulation or Stage 5 work.
@@ -96,5 +101,5 @@ production-chain simulation or Stage 5 work.
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, the supplied Stage 4.5 prompt,
 `TODO.md`, this file, `docs/STAGE_4_5_UI_DECOMPOSITION.md` and
-`docs/CHECKPOINT_75.md`. Verify the City-screen PR is merged, then continue with
-`PLAYER-PREP-001` only.
+`docs/CHECKPOINT_76.md`. Verify the Caravan-screen PR is merged, then continue with
+`PLAYER-BATTLE-001` only.

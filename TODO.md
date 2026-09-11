@@ -101,7 +101,7 @@ This file tracks the next concrete, reviewable tasks. The longer-term direction 
 - [x] `PLAYER-SHELL-001`: add a standalone dependency-light Player UI application, navigation and shared desktop visual-language tokens while keeping Debug UI separate.
 - [x] `PLAYER-GLOBAL-001`: implement known-world Global Map / Caravan Command, map layers, route controls, compact status and collapsible player journal.
 - [x] `PLAYER-CITY-001`: implement a functional City view over the existing market and physical information/library operations.
-- [ ] `PLAYER-PREP-001`: implement caravan preparation and the tactical formation view using existing cargo and validated deployment capabilities.
+- [x] `PLAYER-PREP-001`: implement caravan preparation and the tactical formation view using existing cargo and validated deployment capabilities.
 - [ ] `PLAYER-BATTLE-001`: implement the readable 2D battle scene, projected legal actions, authoritative manual commands and minimal supported auto/manual control.
 - [ ] `PLAYER-RESULT-001`: implement the battle result, exactly-once consequences and explicit return to continued global travel.
 - [ ] `PLAYER-VERTICAL-001`: compose and accept one complete seeded Player UI loop from city preparation through battle, arrival and destination operation.

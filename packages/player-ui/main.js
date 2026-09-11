@@ -2,6 +2,7 @@
 
 import { createPlayerShellState } from "./shell-model.js";
 import { createCityScreenState } from "./city-model.js";
+import { createPreparationScreenState } from "./preparation-model.js";
 import {
   GLOBAL_LAYER_DEFINITIONS,
   createGlobalScreenState,
@@ -22,6 +23,7 @@ const errorState = requireElement("error-state", HTMLElement);
 const errorDetail = requireElement("error-detail", HTMLElement);
 const globalView = requireElement("global-view", HTMLElement);
 const cityView = requireElement("city-view", HTMLElement);
+const preparationView = requireElement("preparation-view", HTMLElement);
 const placeholderView = requireElement("placeholder-view", HTMLElement);
 const layerControlList = requireElement("layer-control-list", HTMLElement);
 const knownMap = requireElement("known-map", SVGSVGElement);
@@ -52,6 +54,14 @@ const cityLibraryValue = requireElement("city-library-value", HTMLElement);
 const cityMarketList = requireElement("city-market-list", HTMLTableSectionElement);
 const cityActionStatus = requireElement("city-action-status", HTMLParagraphElement);
 const cityBundleList = requireElement("city-bundle-list", HTMLElement);
+const preparationMemberCount = requireElement("preparation-member-count", HTMLElement);
+const preparationFoodValue = requireElement("preparation-food-value", HTMLElement);
+const preparationWaterValue = requireElement("preparation-water-value", HTMLElement);
+const preparationCapacityValue = requireElement("preparation-capacity-value", HTMLElement);
+const formationNote = requireElement("formation-note", HTMLParagraphElement);
+const formationGrid = requireElement("formation-grid", HTMLElement);
+const preparationMemberList = requireElement("preparation-member-list", HTMLElement);
+const preparationBaggageList = requireElement("preparation-baggage-list", HTMLElement);
 
 const PLAYER_SESSION_TIMEOUT_MS = 8_000;
 
@@ -148,17 +158,112 @@ function render() {
   if (shell.activeScreenId === "global") {
     globalView.hidden = false;
     cityView.hidden = true;
+    preparationView.hidden = true;
     placeholderView.hidden = true;
     renderGlobalView(playerView);
   } else if (shell.activeScreenId === "city") {
     globalView.hidden = true;
     cityView.hidden = false;
+    preparationView.hidden = true;
     placeholderView.hidden = true;
     renderCityView(playerView);
+  } else if (shell.activeScreenId === "preparation") {
+    globalView.hidden = true;
+    cityView.hidden = true;
+    preparationView.hidden = false;
+    placeholderView.hidden = true;
+    renderPreparationView(playerView);
   } else {
     globalView.hidden = true;
     cityView.hidden = true;
+    preparationView.hidden = true;
     placeholderView.hidden = false;
+  }
+}
+
+/** @param {import("../sim-core/dist/src/index.js").PlayerSessionView} view */
+function renderPreparationView(view) {
+  const state = createPreparationScreenState(view);
+  preparationMemberCount.textContent = String(state.members.length);
+  preparationFoodValue.textContent = `${formatNumber(state.supplies.foodUnits)} ед.`;
+  preparationWaterValue.textContent = `${formatNumber(state.supplies.waterUnits)} ед.`;
+  preparationCapacityValue.textContent = `${formatNumber(state.cargo.usedCargoUnits)} / ${formatNumber(state.cargo.capacityCargoUnits)} ед.`;
+  formationNote.textContent =
+    "Построение проверено тактическим ядром и будет передано в бой без изменений. Перестроение пока недоступно.";
+  formationGrid.style.setProperty("--formation-columns", String(state.columns));
+  formationGrid.replaceChildren(
+    ...state.cells.map((cell) => {
+      const element = document.createElement("div");
+      element.className = "formation-cell";
+      element.dataset.column = String(cell.column + 1);
+      element.dataset.row = String(cell.row + 1);
+      if (!cell.occupant) {
+        element.setAttribute(
+          "aria-label",
+          `Свободная клетка: колонна ${cell.column + 1}, ряд ${cell.row + 1}`,
+        );
+        return element;
+      }
+      element.classList.add(`formation-cell--${cell.occupant.kind}`);
+      const marker = document.createElement("strong");
+      marker.textContent =
+        cell.occupant.kind === "baggage"
+          ? "ГР"
+          : cell.occupant.label === "Страж"
+            ? "СТ"
+            : "ЗС";
+      const label = document.createElement("span");
+      label.textContent = cell.occupant.label;
+      element.append(marker, label);
+      element.setAttribute(
+        "aria-label",
+        `${cell.occupant.label}: колонна ${cell.column + 1}, ряд ${cell.row + 1}`,
+      );
+      return element;
+    }),
+  );
+
+  preparationMemberList.replaceChildren(
+    ...state.members.map((member) => {
+      const card = document.createElement("article");
+      card.className = "member-card";
+      const heading = document.createElement("div");
+      const role = document.createElement("h3");
+      role.textContent = member.label;
+      const health = document.createElement("strong");
+      health.textContent = `${member.health} / ${member.maxHealth} ОЗ`;
+      heading.append(role, health);
+      const facts = document.createElement("dl");
+      facts.replaceChildren(
+        createFact("Ход", `${member.movementCells} кл.`),
+        createFact("Дальность", `${member.attackRangeCells} кл.`),
+        createFact("Урон", String(member.attackDamage)),
+      );
+      card.append(heading, facts);
+      return card;
+    }),
+  );
+
+  if (state.baggage.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "bundle-empty";
+    empty.textContent = "Физический груз отсутствует.";
+    preparationBaggageList.replaceChildren(empty);
+  } else {
+    preparationBaggageList.replaceChildren(
+      ...state.baggage.map((unit) => {
+        const card = document.createElement("article");
+        card.className = "baggage-card";
+        const name = document.createElement("h3");
+        name.textContent = unit.label;
+        const units = document.createElement("strong");
+        units.textContent = `${formatNumber(unit.units)} ед.`;
+        const durability = document.createElement("span");
+        durability.textContent = `Прочность ${unit.durability} / ${unit.maxDurability}`;
+        card.append(name, units, durability);
+        return card;
+      }),
+    );
   }
 }
 

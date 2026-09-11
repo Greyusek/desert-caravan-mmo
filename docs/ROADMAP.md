@@ -428,7 +428,7 @@ desktop-first usability и базовая accessibility. Финальная гр
 - [x] `PLAYER-SHELL-001` — отдельное Player UI приложение и visual language;
 - [x] `PLAYER-GLOBAL-001` — Global Map / Caravan Command, layers и journal;
 - [x] `PLAYER-CITY-001` — City / Market / Information;
-- [ ] `PLAYER-PREP-001` — Caravan Preparation / Tactical Formation;
+- [x] `PLAYER-PREP-001` — Caravan Preparation / Tactical Formation;
 - [ ] `PLAYER-BATTLE-001` — читаемое поле и authoritative manual actions;
 - [ ] `PLAYER-RESULT-001` — последствия боя и продолжение global journey;
 - [ ] `PLAYER-VERTICAL-001` — полный seeded UI loop и финальная приёмка.

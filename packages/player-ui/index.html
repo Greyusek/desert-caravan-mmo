@@ -218,6 +218,70 @@
             </div>
           </div>
 
+          <div id="preparation-view" class="preparation-dashboard" hidden>
+            <section class="preparation-overview" aria-labelledby="preparation-summary-title">
+              <div>
+                <p class="panel-eyebrow">Готовность к выходу</p>
+                <h2 id="preparation-summary-title">Состав каравана</h2>
+                <p>
+                  Здесь показано всё, что отправится в путь и войдёт в бой.
+                </p>
+              </div>
+              <dl class="preparation-overview__metrics">
+                <div><dt>Бойцы</dt><dd id="preparation-member-count">—</dd></div>
+                <div><dt>Еда</dt><dd id="preparation-food-value">—</dd></div>
+                <div><dt>Вода</dt><dd id="preparation-water-value">—</dd></div>
+                <div><dt>Груз</dt><dd id="preparation-capacity-value">—</dd></div>
+              </dl>
+            </section>
+
+            <div class="preparation-columns">
+              <section class="formation-panel" aria-labelledby="formation-title">
+                <header class="panel-heading">
+                  <div>
+                    <p class="panel-eyebrow">Зона каравана</p>
+                    <h2 id="formation-title">Тактическое построение</h2>
+                  </div>
+                  <span class="formation-badge">Принято ядром</span>
+                </header>
+                <p id="formation-note" class="formation-note"></p>
+                <div class="formation-stage">
+                  <div class="formation-axis" aria-hidden="true">
+                    <span>Тыл</span><span>Передовая →</span>
+                  </div>
+                  <div
+                    id="formation-grid"
+                    class="formation-grid"
+                    role="img"
+                    aria-label="Фиксированная зона построения каравана"
+                  ></div>
+                </div>
+                <div class="formation-legend" aria-label="Обозначения построения">
+                  <span><i class="formation-legend__mark formation-legend__mark--combatant"></i>Боец</span>
+                  <span><i class="formation-legend__mark formation-legend__mark--baggage"></i>Багаж</span>
+                  <span><i class="formation-legend__mark"></i>Свободная клетка</span>
+                </div>
+              </section>
+
+              <aside class="preparation-roster" aria-label="Состав и груз каравана">
+                <section class="roster-panel" aria-labelledby="roster-title">
+                  <header>
+                    <p class="panel-eyebrow">Боевые роли</p>
+                    <h2 id="roster-title">Участники</h2>
+                  </header>
+                  <div id="preparation-member-list" class="member-list"></div>
+                </section>
+                <section class="roster-panel" aria-labelledby="baggage-title">
+                  <header>
+                    <p class="panel-eyebrow">Физический багаж</p>
+                    <h2 id="baggage-title">Груз в построении</h2>
+                  </header>
+                  <div id="preparation-baggage-list" class="baggage-list"></div>
+                </section>
+              </aside>
+            </div>
+          </div>
+
           <article id="placeholder-view" class="foundation-card" hidden>
             <div class="foundation-card__compass" aria-hidden="true">
               <span>N</span>
@@ -236,7 +300,7 @@
       </main>
 
       <footer class="footer">
-        <span>PLAYER UI · CHECKPOINT 75</span>
+        <span>PLAYER UI · CHECKPOINT 76</span>
         <span>Север всегда сверху</span>
       </footer>
     </div>
