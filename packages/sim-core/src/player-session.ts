@@ -1,18 +1,32 @@
 import {
   createCityEconomyState,
+  type CityEconomyState,
   type TradeGoodId,
 } from "./city-economy.js";
+import {
+  copyPlayerKnowledgeToBundle,
+  createCityLibraryArchive,
+  type CityLibraryArchive,
+  type PhysicalKnowledgeBundle,
+} from "./city-library.js";
 import { quoteCityMarketPrices } from "./city-market.js";
+import {
+  quoteKnowledgeBundleForLibrary,
+  sellKnowledgeBundleToLibrary,
+} from "./information-market.js";
 import {
   createTacticalCombatScenario,
   type TacticalCombatScenario,
 } from "./tactical-combat-scenario.js";
 import {
   beginTradeJourney,
+  buyGoodFromCity,
   createTradeCaravanState,
+  sellGoodToCity,
   usedCargoCapacity,
   type TradeCaravanState,
 } from "./trade-route.js";
+import type { PlayerWorldEvidenceEntry } from "./world-evidence.js";
 import { generateSeededWorld } from "./world.js";
 
 export type PlayerScreenId =
@@ -29,7 +43,21 @@ export type PlayerSessionAction =
       readonly kind: "SELECT_DESTINATION";
       readonly destinationRef: string;
     }
-  | { readonly kind: "START_JOURNEY" };
+  | { readonly kind: "START_JOURNEY" }
+  | {
+      readonly kind: "BUY_GOOD";
+      readonly goodId: TradeGoodId;
+      readonly units: number;
+    }
+  | {
+      readonly kind: "SELL_GOOD";
+      readonly goodId: TradeGoodId;
+      readonly units: number;
+    }
+  | {
+      readonly kind: "SELL_INFORMATION";
+      readonly bundleRef: string;
+    };
 
 export type PlayerAvailableAction =
   | {
@@ -40,6 +68,26 @@ export type PlayerAvailableAction =
   | {
       readonly kind: "START_JOURNEY";
       readonly label: string;
+    }
+  | {
+      readonly kind: "BUY_GOOD";
+      readonly label: string;
+      readonly goodId: TradeGoodId;
+      readonly units: 1;
+      readonly totalCredits: number;
+    }
+  | {
+      readonly kind: "SELL_GOOD";
+      readonly label: string;
+      readonly goodId: TradeGoodId;
+      readonly units: 1;
+      readonly totalCredits: number;
+    }
+  | {
+      readonly kind: "SELL_INFORMATION";
+      readonly label: string;
+      readonly bundleRef: string;
+      readonly totalCredits: number;
     };
 
 export interface PlayerSessionView {
@@ -100,13 +148,34 @@ export interface PlayerSessionView {
     readonly market: readonly {
       readonly goodId: TradeGoodId;
       readonly stockUnits: number;
+      readonly ownedUnits: number;
       readonly cityBuyPriceCredits: number;
       readonly citySellPriceCredits: number;
     }[];
+    readonly library: {
+      readonly archiveEntryCount: number;
+      readonly acceptedBundleCount: number;
+      readonly carriedBundles: readonly {
+        readonly ref: string;
+        readonly title: string;
+        readonly entryCount: number;
+        readonly evidenceKind: "caravan-track" | "caravan-remains";
+        readonly provenance: "direct-observation";
+        readonly confidence: "probable" | "confirmed";
+        readonly fidelityPercent: number;
+        readonly localValueCredits: number;
+      }[];
+    };
   };
   readonly journal: readonly {
     readonly sequence: number;
-    readonly kind: "session-ready" | "route-planned" | "departure";
+    readonly kind:
+      | "session-ready"
+      | "route-planned"
+      | "departure"
+      | "market-purchase"
+      | "market-sale"
+      | "information-sale";
     readonly message: string;
   }[];
   readonly availableActions: readonly PlayerAvailableAction[];
@@ -126,12 +195,16 @@ interface PrivatePlayerSessionState {
     readonly foodUnits: number;
     readonly waterUnits: number;
   };
-  readonly cityMarket: NonNullable<PlayerSessionView["city"]>;
+  readonly cityEconomy: CityEconomyState;
+  readonly cityLibrary: CityLibraryArchive;
+  readonly knowledgeBundles: readonly PhysicalKnowledgeBundle[];
   readonly journal: PlayerSessionView["journal"];
 }
 
 const ORIGIN_REF = "place:south-camp";
 const DESTINATION_REF = "place:north-camp";
+const FIELD_NOTES_REF = "bundle:field-notes";
+const SESSION_WORLD_TIME_SECONDS = 0;
 
 /**
  * PLAYER-PROJECTION-001 — composes existing authoritative systems behind an
@@ -159,16 +232,13 @@ export function createPlayerSessionController(
     { ...stocks, cityId: scenario.originCity.id },
     { ...population, cityId: scenario.originCity.id },
   );
-  const cityMarket: NonNullable<PlayerSessionView["city"]> = {
-    placeRef: ORIGIN_REF,
-    name: scenario.originCity.name,
-    market: quoteCityMarketPrices(economy).map((quote) => ({
-      goodId: quote.goodId,
-      stockUnits: quote.stockUnits,
-      cityBuyPriceCredits: quote.cityBuyPriceCredits,
-      citySellPriceCredits: quote.citySellPriceCredits,
-    })),
-  };
+  const knowledgeEntry = createInitialKnowledgeEntry();
+  const knowledgeBundle = copyPlayerKnowledgeToBundle(
+    { worldSeed, entries: [knowledgeEntry], journal: [] },
+    "player-session-caravan",
+    [knowledgeEntry.id],
+    SESSION_WORLD_TIME_SECONDS,
+  );
   const cargo = {
     capacityCargoUnits:
       scenario.resolution.cargoDeployment.sourceCapacityCargoUnits,
@@ -192,7 +262,9 @@ export function createPlayerSessionController(
     scenario,
     caravan,
     supplies: { foodUnits: 100, waterUnits: 100 },
-    cityMarket,
+    cityEconomy: economy,
+    cityLibrary: createCityLibraryArchive(worldSeed, scenario.originCity.id),
+    knowledgeBundles: [knowledgeBundle],
     journal: [
       {
         sequence: 1,
@@ -267,6 +339,78 @@ function reducePlayerAction(
       ],
     };
   }
+  if (action.kind === "BUY_GOOD") {
+    assertCityOperation(state);
+    const purchase = buyGoodFromCity(
+      state.cityEconomy,
+      state.caravan,
+      action.goodId,
+      action.units,
+      SESSION_WORLD_TIME_SECONDS,
+    );
+    return {
+      ...state,
+      revision: state.revision + 1,
+      cityEconomy: purchase.cityEconomy,
+      caravan: purchase.caravan,
+      journal: appendJournal(
+        state,
+        "market-purchase",
+        `Purchased ${action.units} ${action.goodId} for ${purchase.totalCostCredits} credits.`,
+      ),
+    };
+  }
+  if (action.kind === "SELL_GOOD") {
+    assertCityOperation(state);
+    const sale = sellGoodToCity(
+      state.cityEconomy,
+      state.caravan,
+      action.goodId,
+      action.units,
+      SESSION_WORLD_TIME_SECONDS,
+    );
+    return {
+      ...state,
+      revision: state.revision + 1,
+      cityEconomy: sale.cityEconomy,
+      caravan: sale.caravan,
+      journal: appendJournal(
+        state,
+        "market-sale",
+        `Sold ${action.units} ${action.goodId} for ${sale.revenueCredits} credits.`,
+      ),
+    };
+  }
+  if (action.kind === "SELL_INFORMATION") {
+    assertCityOperation(state);
+    if (action.bundleRef !== FIELD_NOTES_REF) {
+      throw new RangeError(`information bundle is not carried: ${action.bundleRef}`);
+    }
+    const bundle = state.knowledgeBundles[0];
+    if (!bundle) {
+      throw new RangeError(`information bundle is not carried: ${action.bundleRef}`);
+    }
+    const sale = sellKnowledgeBundleToLibrary(
+      state.cityLibrary,
+      bundle,
+      SESSION_WORLD_TIME_SECONDS,
+    );
+    return {
+      ...state,
+      revision: state.revision + 1,
+      cityLibrary: sale.deposit.library,
+      knowledgeBundles: state.knowledgeBundles.slice(1),
+      caravan: {
+        ...state.caravan,
+        credits: state.caravan.credits + sale.payoutCredits,
+      },
+      journal: appendJournal(
+        state,
+        "information-sale",
+        `Field notes deposited for ${sale.payoutCredits} credits.`,
+      ),
+    };
+  }
   throw new RangeError("unsupported player action");
 }
 
@@ -306,6 +450,7 @@ function projectPlayerSession(
       };
     });
   const inCity = state.phase !== "travelling";
+  const city = inCity ? projectCity(state) : null;
   const view: PlayerSessionView = {
     revision: state.revision,
     phase: state.phase,
@@ -359,22 +504,177 @@ function projectPlayerSession(
       },
       members,
     },
-    city: inCity ? state.cityMarket : null,
+    city,
     journal: state.journal.map((entry) => ({ ...entry })),
-    availableActions:
-      state.phase === "city"
-        ? [
-            {
-              kind: "SELECT_DESTINATION",
-              label: "Plan route to North Camp",
-              destinationRefs: [DESTINATION_REF],
-            },
-          ]
-        : state.phase === "ready"
-          ? [{ kind: "START_JOURNEY", label: "Start journey" }]
-          : [],
+    availableActions: projectAvailableActions(state),
   };
   return deepFreeze(view);
+}
+
+function projectCity(
+  state: PrivatePlayerSessionState,
+): NonNullable<PlayerSessionView["city"]> {
+  const bundle = state.knowledgeBundles[0];
+  const informationQuote = bundle
+    ? quoteKnowledgeBundleForLibrary(
+        state.cityLibrary,
+        bundle,
+        SESSION_WORLD_TIME_SECONDS,
+      )
+    : null;
+  return {
+    placeRef: ORIGIN_REF,
+    name: state.scenario.originCity.name,
+    market: quoteCityMarketPrices(state.cityEconomy).map((quote) => ({
+      goodId: quote.goodId,
+      stockUnits: quote.stockUnits,
+      ownedUnits:
+        state.caravan.cargo.stacks.find(
+          (stack) => stack.goodId === quote.goodId,
+        )?.units ?? 0,
+      cityBuyPriceCredits: quote.cityBuyPriceCredits,
+      citySellPriceCredits: quote.citySellPriceCredits,
+    })),
+    library: {
+      archiveEntryCount: state.cityLibrary.entries.length,
+      acceptedBundleCount: state.cityLibrary.acceptedBundleIds.length,
+      carriedBundles:
+        bundle && informationQuote
+          ? [
+              {
+                ref: FIELD_NOTES_REF,
+                title: "Caravan trail field notes",
+                entryCount: bundle.entries.length,
+                evidenceKind: bundle.entries[0]?.evidenceKind ?? "caravan-track",
+                provenance: "direct-observation",
+                confidence: bundle.entries[0]?.confidence ?? "probable",
+                fidelityPercent: Math.round(bundle.fidelityFraction * 100),
+                localValueCredits: informationQuote.totalValueCredits,
+              },
+            ]
+          : [],
+    },
+  };
+}
+
+function projectAvailableActions(
+  state: PrivatePlayerSessionState,
+): PlayerSessionView["availableActions"] {
+  if (state.phase === "travelling") return [];
+  const actions: PlayerAvailableAction[] = [];
+  if (state.phase === "city") {
+    actions.push({
+      kind: "SELECT_DESTINATION",
+      label: "Plan route to North Camp",
+      destinationRefs: [DESTINATION_REF],
+    });
+  } else {
+    actions.push({ kind: "START_JOURNEY", label: "Start journey" });
+  }
+  for (const quote of quoteCityMarketPrices(state.cityEconomy)) {
+    if (
+      canExecute(() =>
+        buyGoodFromCity(
+          state.cityEconomy,
+          state.caravan,
+          quote.goodId,
+          1,
+          SESSION_WORLD_TIME_SECONDS,
+        ),
+      )
+    ) {
+      actions.push({
+        kind: "BUY_GOOD",
+        label: `Buy 1 ${quote.goodId}`,
+        goodId: quote.goodId,
+        units: 1,
+        totalCredits: quote.citySellPriceCredits,
+      });
+    }
+    if (
+      canExecute(() =>
+        sellGoodToCity(
+          state.cityEconomy,
+          state.caravan,
+          quote.goodId,
+          1,
+          SESSION_WORLD_TIME_SECONDS,
+        ),
+      )
+    ) {
+      actions.push({
+        kind: "SELL_GOOD",
+        label: `Sell 1 ${quote.goodId}`,
+        goodId: quote.goodId,
+        units: 1,
+        totalCredits: quote.cityBuyPriceCredits,
+      });
+    }
+  }
+  const bundle = state.knowledgeBundles[0];
+  if (bundle) {
+    actions.push({
+      kind: "SELL_INFORMATION",
+      label: "Deposit field notes",
+      bundleRef: FIELD_NOTES_REF,
+      totalCredits: quoteKnowledgeBundleForLibrary(
+        state.cityLibrary,
+        bundle,
+        SESSION_WORLD_TIME_SECONDS,
+      ).totalValueCredits,
+    });
+  }
+  return actions;
+}
+
+function assertCityOperation(state: PrivatePlayerSessionState): void {
+  if (state.phase === "travelling" || state.caravan.currentCityId === null) {
+    throw new RangeError("city operation requires a caravan in the city");
+  }
+}
+
+function appendJournal(
+  state: PrivatePlayerSessionState,
+  kind: PlayerSessionView["journal"][number]["kind"],
+  message: string,
+): PlayerSessionView["journal"] {
+  return [
+    ...state.journal,
+    { sequence: state.journal.length + 1, kind, message },
+  ];
+}
+
+function canExecute(operation: () => unknown): boolean {
+  try {
+    operation();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createInitialKnowledgeEntry(): PlayerWorldEvidenceEntry {
+  return {
+    id: "knowledge-caravan-track-player-session",
+    evidenceKind: "caravan-track",
+    subjectId: "player-session-trail",
+    firstObservedAtWorldTimeSeconds: SESSION_WORLD_TIME_SECONDS,
+    latestObservedAtWorldTimeSeconds: SESSION_WORLD_TIME_SECONDS,
+    confidence: "confirmed",
+    facts: {
+      kind: "caravan-track",
+      approximateAge: "fresh",
+      approximateDirection: "north",
+    },
+    provenance: [
+      {
+        source: "direct-track-observation",
+        sourceEvidenceId: "player-session-trail-observation",
+        observedAtWorldTimeSeconds: SESSION_WORLD_TIME_SECONDS,
+        confidence: "confirmed",
+      },
+    ],
+  };
 }
 
 function deepFreeze<T>(value: T): T {

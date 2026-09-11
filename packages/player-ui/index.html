@@ -160,6 +160,64 @@
             </aside>
           </div>
 
+          <div id="city-view" class="city-dashboard" hidden>
+            <section class="city-overview" aria-labelledby="city-name">
+              <div>
+                <p class="panel-eyebrow">Текущая стоянка</p>
+                <h2 id="city-name">Город</h2>
+                <p>
+                  Все цены и доступные операции подтверждены местными службами.
+                </p>
+              </div>
+              <dl class="city-overview__metrics">
+                <div><dt>Кошелёк</dt><dd id="city-credits-value">—</dd></div>
+                <div><dt>Свободно</dt><dd id="city-capacity-value">—</dd></div>
+                <div><dt>Архив</dt><dd id="city-library-value">—</dd></div>
+              </dl>
+            </section>
+
+            <div class="city-columns">
+              <section class="city-panel" aria-labelledby="city-market-title">
+                <header class="panel-heading">
+                  <div>
+                    <p class="panel-eyebrow">Материальные товары</p>
+                    <h2 id="city-market-title">Городской рынок</h2>
+                  </div>
+                  <span class="transaction-badge">Сделка · 1 ед.</span>
+                </header>
+                <div class="market-table-wrap">
+                  <table class="market-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Товар</th>
+                        <th scope="col">В городе</th>
+                        <th scope="col">В караване</th>
+                        <th scope="col">Купить</th>
+                        <th scope="col">Продать</th>
+                      </tr>
+                    </thead>
+                    <tbody id="city-market-list"></tbody>
+                  </table>
+                </div>
+                <p id="city-action-status" class="action-status" role="status"></p>
+              </section>
+
+              <aside class="city-panel library-panel" aria-labelledby="city-library-title">
+                <header class="panel-heading">
+                  <div>
+                    <p class="panel-eyebrow">Физические сведения</p>
+                    <h2 id="city-library-title">Библиотека</h2>
+                  </div>
+                </header>
+                <p class="library-intro">
+                  Архив платит только за доставленные сведения, которых ещё нет в
+                  его локальной коллекции.
+                </p>
+                <div id="city-bundle-list" class="bundle-list"></div>
+              </aside>
+            </div>
+          </div>
+
           <article id="placeholder-view" class="foundation-card" hidden>
             <div class="foundation-card__compass" aria-hidden="true">
               <span>N</span>
@@ -178,7 +236,7 @@
       </main>
 
       <footer class="footer">
-        <span>PLAYER UI · CHECKPOINT 74</span>
+        <span>PLAYER UI · CHECKPOINT 75</span>
         <span>Север всегда сверху</span>
       </footer>
     </div>

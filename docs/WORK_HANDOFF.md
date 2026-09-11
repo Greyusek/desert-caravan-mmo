@@ -1,6 +1,6 @@
 # Work handoff
 
-Updated: 1 September 2026
+Updated: 11 September 2026
 
 This is the short operational recovery point for the Stage 4.5 series.
 Repository history and checkpoint documents contain the full record.
@@ -8,14 +8,15 @@ Repository history and checkpoint documents contain the full record.
 ## Current autonomous block
 
 MVP-1 «Living Path», Trading Prototype Stage 3 and Tactical Combat Prototype
-Stage 4 are complete. Stage 4.5 has advanced to Checkpoint 74 / version `0.0.74`.
+Stage 4 are complete. Stage 4.5 has advanced to Checkpoint 75 / version `0.0.75`.
 `TACTICAL-001` through `TACTICAL-007`, `UI-008` and the final `COMBAT-001` proof
 are closed. The Stage 4.5 Player-facing UI Vertical Slice is decomposed by the
 separate `UI-VERTICAL-DECOMP` docs-only checkpoint, and `PLAYER-PROJECTION-001` now
 provides its safe player data/action boundary. `PLAYER-SHELL-001` now supplies a
-separate visual application over that boundary. `PLAYER-GLOBAL-001` adds the
-first functional player screen without widening the safe projection. Multiplayer
-and later stages remain gated.
+separate visual application over that boundary. `PLAYER-GLOBAL-001` supplies the
+functional global command screen, and `PLAYER-CITY-001` now exposes the existing
+market and physical information operations without widening the safe projection.
+Multiplayer and later stages remain gated.
 
 ## Completed
 
@@ -54,35 +55,39 @@ and later stages remain gated.
   honest layer toggles, projected caravan metrics, destination/departure actions
   and a collapsible journal. Its local server retains session state and rejects
   every action outside the player projection contract.
+- PLAYER-CITY-001 renders seven projected market quotes with owned cargo and
+  server-authorized one-unit transactions. The local library values and accepts
+  one physical field-notes bundle exactly once; wallet, stock, cargo, archive,
+  actions and journal update from the same immutable controller.
 
 ## Last known good main
 
-- `8d55d369e5055cbe0b9c751f5e890bff1b696d2e` — merge of PR #92 / Player UI bootstrap fix.
+- `21217a7b9f09240af1055c6fdb9931bc7a36218d` — merge of PR #93 / PLAYER-GLOBAL-001.
 
 ## Verification
 
 - TypeScript build: PASS for `sim-core`, `debug-map` and `player-ui`.
-- Full `npm run verify:local`: `630/630` PASS, zero failures, compiled
-  Checkpoint 74 demo PASS.
-- Dedicated PLAYER-GLOBAL-001 additions: `9/9` PASS.
-- Player UI route-action HTTP smoke and rejected-action check: PASS.
+- Full `npm run verify:local`: `640/640` PASS, zero failures, compiled
+  Checkpoint 75 demo PASS.
+- Dedicated PLAYER-CITY-001 additions: `10/10` PASS.
+- Player UI market/information HTTP transitions and rejected-action checks: PASS.
 - `git diff --check`: PASS.
 
 ## Current task
 
-`PLAYER-GLOBAL-001` implements the third of eight Stage 4.5 checkpoints: the
-functional known-world map, command summary, route actions, layers and player
-journal driven only by the safe player projection.
+`PLAYER-CITY-001` implements the fourth of eight Stage 4.5 checkpoints: the
+functional City market and local library driven only by projected quotes and
+authoritative actions.
 
 ## Next action
 
-After this checkpoint merges, start `PLAYER-CITY-001`: expose the existing
-market and physical information/library operations through the City screen.
+After this checkpoint merges, start `PLAYER-PREP-001`: expose caravan members,
+supplies, cargo capacity and the existing validated tactical deployment.
 
 ## Scope boundary
 
-The current branch contains the functional global screen but no City market,
-formation or combat controls. No real-player PvP, multiplayer, production
+The current branch contains Global Map and City operations but no formation or
+combat controls. No real-player PvP, multiplayer, production
 database, player settlements, full
 Magic/System 256, neural agents, broad
 production-chain simulation or Stage 5 work.
@@ -91,5 +96,5 @@ production-chain simulation or Stage 5 work.
 
 Read `AGENTS.md`, `docs/DEVELOPMENT_WORKFLOW.md`, the supplied Stage 4.5 prompt,
 `TODO.md`, this file, `docs/STAGE_4_5_UI_DECOMPOSITION.md` and
-`docs/CHECKPOINT_74.md`. Verify the global-screen PR is merged, then continue with
-`PLAYER-CITY-001` only.
+`docs/CHECKPOINT_75.md`. Verify the City-screen PR is merged, then continue with
+`PLAYER-PREP-001` only.

@@ -1,6 +1,7 @@
 // @ts-check
 
 import { createPlayerShellState } from "./shell-model.js";
+import { createCityScreenState } from "./city-model.js";
 import {
   GLOBAL_LAYER_DEFINITIONS,
   createGlobalScreenState,
@@ -20,6 +21,7 @@ const workspace = requireElement("workspace", HTMLElement);
 const errorState = requireElement("error-state", HTMLElement);
 const errorDetail = requireElement("error-detail", HTMLElement);
 const globalView = requireElement("global-view", HTMLElement);
+const cityView = requireElement("city-view", HTMLElement);
 const placeholderView = requireElement("placeholder-view", HTMLElement);
 const layerControlList = requireElement("layer-control-list", HTMLElement);
 const knownMap = requireElement("known-map", SVGSVGElement);
@@ -43,6 +45,13 @@ const mapLayerObjects = requireElement("map-layer-objects", SVGElement);
 const mapLayerIntelligence = requireElement("map-layer-intelligence", SVGElement);
 const mapLayerEvents = requireElement("map-layer-events", SVGElement);
 const mapLayerCaravan = requireElement("map-layer-caravan", SVGElement);
+const cityName = requireElement("city-name", HTMLHeadingElement);
+const cityCreditsValue = requireElement("city-credits-value", HTMLElement);
+const cityCapacityValue = requireElement("city-capacity-value", HTMLElement);
+const cityLibraryValue = requireElement("city-library-value", HTMLElement);
+const cityMarketList = requireElement("city-market-list", HTMLTableSectionElement);
+const cityActionStatus = requireElement("city-action-status", HTMLParagraphElement);
+const cityBundleList = requireElement("city-bundle-list", HTMLElement);
 
 const PLAYER_SESSION_TIMEOUT_MS = 8_000;
 
@@ -138,12 +147,168 @@ function render() {
 
   if (shell.activeScreenId === "global") {
     globalView.hidden = false;
+    cityView.hidden = true;
     placeholderView.hidden = true;
     renderGlobalView(playerView);
+  } else if (shell.activeScreenId === "city") {
+    globalView.hidden = true;
+    cityView.hidden = false;
+    placeholderView.hidden = true;
+    renderCityView(playerView);
   } else {
     globalView.hidden = true;
+    cityView.hidden = true;
     placeholderView.hidden = false;
   }
+}
+
+/** @param {import("../sim-core/dist/src/index.js").PlayerSessionView} view */
+function renderCityView(view) {
+  const state = createCityScreenState(view);
+  cityName.textContent = state.name;
+  cityCreditsValue.textContent = `${formatNumber(state.credits)} кр.`;
+  cityCapacityValue.textContent = `${formatNumber(state.cargo.freeCargoUnits)} ед.`;
+  cityLibraryValue.textContent = formatArchiveEntryCount(
+    state.library.archiveEntryCount,
+  );
+  cityActionStatus.textContent = "";
+
+  cityMarketList.replaceChildren(
+    ...state.market.map((good) => {
+      const row = document.createElement("tr");
+      const name = document.createElement("th");
+      name.scope = "row";
+      name.textContent = good.label;
+      const stock = document.createElement("td");
+      stock.textContent = formatNumber(good.stockUnits);
+      const owned = document.createElement("td");
+      owned.textContent = formatNumber(good.ownedUnits);
+      const buy = document.createElement("td");
+      buy.append(
+        createTransactionButton(
+          good.buyAction,
+          good.citySellPriceCredits,
+          "Купить",
+          `Покупаем 1 ед. товара «${good.label}»…`,
+          `Куплена 1 ед. товара «${good.label}».`,
+        ),
+      );
+      const sell = document.createElement("td");
+      sell.append(
+        createTransactionButton(
+          good.sellAction,
+          good.cityBuyPriceCredits,
+          "Продать",
+          `Продаём 1 ед. товара «${good.label}»…`,
+          `Продана 1 ед. товара «${good.label}».`,
+        ),
+      );
+      row.append(name, stock, owned, buy, sell);
+      return row;
+    }),
+  );
+
+  if (state.library.bundles.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "bundle-empty";
+    empty.textContent = state.library.acceptedBundleCount
+      ? "Все принесённые сведения уже переданы в местный архив."
+      : "В караване нет физических свитков со сведениями.";
+    cityBundleList.replaceChildren(empty);
+    return;
+  }
+  cityBundleList.replaceChildren(
+    ...state.library.bundles.map((bundle) => {
+      const card = document.createElement("article");
+      card.className = "bundle-card";
+      const heading = document.createElement("h3");
+      heading.textContent = informationKindLabel(bundle.evidenceKind);
+      const title = document.createElement("p");
+      title.textContent = bundle.title;
+      const facts = document.createElement("dl");
+      facts.replaceChildren(
+        createFact("Источник", "Личное наблюдение"),
+        createFact("Доверие", confidenceLabel(bundle.confidence)),
+        createFact("Сохранность", `${bundle.fidelityPercent}%`),
+        createFact("Оценка", `${bundle.localValueCredits} кр.`),
+      );
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "primary-action";
+      button.textContent = `Передать в архив · +${bundle.localValueCredits} кр.`;
+      button.disabled = !bundle.action;
+      if (bundle.action?.kind === "SELL_INFORMATION") {
+        const action = {
+          kind: bundle.action.kind,
+          bundleRef: bundle.action.bundleRef,
+        };
+        button.addEventListener("click", () => {
+          button.disabled = true;
+          dispatchPlayerAction(
+            action,
+            cityActionStatus,
+            "Передаём физический свиток библиотеке…",
+            `Сведения приняты. Получено ${bundle.localValueCredits} кр.`,
+          );
+        });
+      }
+      card.append(heading, title, facts, button);
+      return card;
+    }),
+  );
+}
+
+/**
+ * @param {import("../sim-core/dist/src/index.js").PlayerAvailableAction | null} action
+ * @param {number} fallbackPrice
+ * @param {string} verb
+ * @param {string} pendingMessage
+ * @param {string} successMessage
+ */
+function createTransactionButton(
+  action,
+  fallbackPrice,
+  verb,
+  pendingMessage,
+  successMessage,
+) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "market-action";
+  const marketAction =
+    action?.kind === "BUY_GOOD" || action?.kind === "SELL_GOOD"
+      ? action
+      : null;
+  button.textContent = `${verb} · ${marketAction?.totalCredits ?? fallbackPrice} кр.`;
+  button.disabled = marketAction === null;
+  if (marketAction) {
+    const playerAction = {
+      kind: marketAction.kind,
+      goodId: marketAction.goodId,
+      units: marketAction.units,
+    };
+    button.addEventListener("click", () => {
+      button.disabled = true;
+      dispatchPlayerAction(
+        playerAction,
+        cityActionStatus,
+        pendingMessage,
+        successMessage,
+      );
+    });
+  }
+  return button;
+}
+
+/** @param {string} label @param {string} value */
+function createFact(label, value) {
+  const wrapper = document.createElement("div");
+  const term = document.createElement("dt");
+  term.textContent = label;
+  const description = document.createElement("dd");
+  description.textContent = value;
+  wrapper.append(term, description);
+  return wrapper;
 }
 
 /** @param {import("../sim-core/dist/src/index.js").PlayerSessionView} view */
@@ -286,10 +451,15 @@ function renderRouteCommand(view, state) {
     routeAction.disabled = false;
     routeAction.textContent = "Проложить маршрут";
     routeAction.onclick = () =>
-      dispatchPlayerAction({
-        kind: "SELECT_DESTINATION",
-        destinationRef: routeDestination.value,
-      });
+      dispatchPlayerAction(
+        {
+          kind: "SELECT_DESTINATION",
+          destinationRef: routeDestination.value,
+        },
+        routeActionStatus,
+        "Передаём приказ каравану…",
+        "Маршрут подтверждён. Караван готов к выходу.",
+      );
     return;
   }
 
@@ -305,7 +475,13 @@ function renderRouteCommand(view, state) {
     ? "Отправить караван"
     : "Караван в пути";
   if (state.routeCommand.canStartJourney) {
-    routeAction.onclick = () => dispatchPlayerAction({ kind: "START_JOURNEY" });
+    routeAction.onclick = () =>
+      dispatchPlayerAction(
+        { kind: "START_JOURNEY" },
+        routeActionStatus,
+        "Передаём приказ каравану…",
+        "Караван вышел из города.",
+      );
   }
 }
 
@@ -356,10 +532,19 @@ function renderJournal(view) {
   if (view.journal.length > 1) journalPanel.open = true;
 }
 
-/** @param {import("../sim-core/dist/src/index.js").PlayerSessionAction} action */
-async function dispatchPlayerAction(action) {
-  routeAction.disabled = true;
-  routeActionStatus.textContent = "Передаём приказ каравану…";
+/**
+ * @param {import("../sim-core/dist/src/index.js").PlayerSessionAction} action
+ * @param {HTMLElement} statusElement
+ * @param {string} pendingMessage
+ * @param {string} successMessage
+ */
+async function dispatchPlayerAction(
+  action,
+  statusElement,
+  pendingMessage,
+  successMessage,
+) {
+  statusElement.textContent = pendingMessage;
   try {
     const response = await fetch("/api/player-session/actions", {
       method: "POST",
@@ -371,17 +556,13 @@ async function dispatchPlayerAction(action) {
     });
     if (!response.ok) throw new Error(`player action failed: ${response.status}`);
     playerView = await response.json();
-    const completedKind = action.kind;
     render();
-    routeActionStatus.textContent =
-      completedKind === "SELECT_DESTINATION"
-        ? "Маршрут подтверждён. Караван готов к выходу."
-        : "Караван вышел из города.";
+    statusElement.textContent = successMessage;
   } catch (error) {
     console.error(error);
-    if (playerView) renderRouteCommand(playerView, createGlobalScreenState(playerView, visibleLayerIds));
-    routeActionStatus.textContent =
-      "Приказ не принят. Проверьте локальный сервер и повторите.";
+    if (playerView) render();
+    statusElement.textContent =
+      "Операция не принята. Проверьте состояние и повторите.";
   }
 }
 
@@ -442,7 +623,33 @@ function formatDuration(seconds) {
 function journalKindLabel(kind) {
   if (kind === "session-ready") return "Караван готов";
   if (kind === "route-planned") return "Маршрут подготовлен";
-  return "Отправление";
+  if (kind === "departure") return "Отправление";
+  if (kind === "market-purchase") return "Покупка";
+  if (kind === "market-sale") return "Продажа";
+  return "Библиотека";
+}
+
+/** @param {"caravan-track" | "caravan-remains"} kind */
+function informationKindLabel(kind) {
+  return kind === "caravan-track" ? "След каравана" : "Остатки каравана";
+}
+
+/** @param {"probable" | "confirmed"} confidence */
+function confidenceLabel(confidence) {
+  return confidence === "confirmed" ? "Подтверждено" : "Вероятно";
+}
+
+/** @param {number} count */
+function formatArchiveEntryCount(count) {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  const noun =
+    last === 1 && lastTwo !== 11
+      ? "запись"
+      : last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)
+        ? "записи"
+        : "записей";
+  return `${count} ${noun}`;
 }
 
 /** @param {number} value */
