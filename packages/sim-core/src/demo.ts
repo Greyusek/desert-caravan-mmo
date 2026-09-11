@@ -103,7 +103,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 75 demo");
+console.log("Desert Caravan MMO — Checkpoint 76 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1197,4 +1197,11 @@ const cityAfterInformation = cityAfterPurchase.dispatch({
 });
 console.log(
   `\nCheckpoint 75 PLAYER-CITY-001 complete; credits=${cityView.caravan.credits}->${cityAfterPurchase.getView().caravan.credits}->${cityAfterInformation.getView().caravan.credits}, archive=${cityAfterInformation.getView().city?.library.archiveEntryCount}.`,
+);
+const preparation = cityAfterPurchase.getView().preparation?.formation;
+if (!preparation || !preparation.accepted || preparation.mode !== "fixed") {
+  throw new Error("Checkpoint 76 requires an accepted fixed formation");
+}
+console.log(
+  `\nCheckpoint 76 PLAYER-PREP-001 complete; zone=${preparation.columns}x${preparation.rows}; combatants=${preparation.combatants.length}; baggage=${preparation.baggage.map((unit) => `${unit.goodId}x${unit.units}`).join(",")}; editable=false.`,
 );
