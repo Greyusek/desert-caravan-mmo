@@ -20,13 +20,22 @@ test("PLAYER-PROJECTION-001: initial view exposes only available player screens 
       ["result", false],
     ],
   );
-  assert.deepEqual(view.availableActions, [
-    {
-      kind: "SELECT_DESTINATION",
-      label: "Plan route to North Camp",
-      destinationRefs: ["place:north-camp"],
-    },
-  ]);
+  assert.deepEqual(view.availableActions[0], {
+    kind: "SELECT_DESTINATION",
+    label: "Plan route to North Camp",
+    destinationRefs: ["place:north-camp"],
+  });
+  assert.ok(
+    view.availableActions.some((action) => action.kind === "BUY_GOOD"),
+  );
+  assert.ok(
+    view.availableActions.some((action) => action.kind === "SELL_GOOD"),
+  );
+  assert.ok(
+    view.availableActions.some(
+      (action) => action.kind === "SELL_INFORMATION",
+    ),
+  );
 });
 
 test("PLAYER-PROJECTION-001: known map is north-up and uses relative player coordinates", () => {
@@ -62,6 +71,7 @@ test("PLAYER-PROJECTION-001: city market exposes quotes without economy formula 
     "cityBuyPriceCredits",
     "citySellPriceCredits",
     "goodId",
+    "ownedUnits",
     "stockUnits",
   ]);
   assert.ok(
@@ -112,9 +122,13 @@ test("PLAYER-PROJECTION-001: destination selection creates an authoritative plan
     progressFraction: 0,
     etaSeconds: 200,
   });
-  assert.deepEqual(ready.availableActions, [
-    { kind: "START_JOURNEY", label: "Start journey" },
-  ]);
+  assert.deepEqual(ready.availableActions[0], {
+    kind: "START_JOURNEY",
+    label: "Start journey",
+  });
+  assert.ok(
+    ready.availableActions.some((action) => action.kind === "BUY_GOOD"),
+  );
   assert.deepEqual(
     ready.journal.map((entry) => entry.kind),
     ["session-ready", "route-planned"],

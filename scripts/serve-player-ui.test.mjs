@@ -71,6 +71,7 @@ test("PLAYER-SHELL-001 tooling: browser source contains no privileged controls o
         "main.js",
         "shell-model.js",
         "global-model.js",
+        "city-model.js",
       ].map((file) =>
         readFile(path.join(playerUiRoot, file), "utf8"),
       ),
@@ -205,4 +206,28 @@ test("PLAYER-GLOBAL-001 tooling: rejected actions cannot advance the session", (
   );
   assert.throws(() => store.dispatch({ kind: "DELETE_WORLD" }), /unsupported/);
   assert.equal(JSON.parse(store.getPayload()).revision, 0);
+});
+
+test("PLAYER-CITY-001 tooling: local session store executes market and library actions", () => {
+  const store = createPlayerUiSessionStore("player-city-action-test");
+  const initial = JSON.parse(store.getPayload());
+  const ore = initial.city.market.find((good) => good.goodId === "ore");
+  const purchase = initial.availableActions.find(
+    (action) => action.kind === "BUY_GOOD" && action.goodId === "food",
+  );
+  const information = initial.availableActions.find(
+    (action) => action.kind === "SELL_INFORMATION",
+  );
+  assert.ok(ore);
+  assert.ok(purchase);
+  assert.ok(information);
+
+  const afterPurchase = JSON.parse(store.dispatch(purchase));
+  assert.equal(afterPurchase.revision, 1);
+  assert.equal(afterPurchase.caravan.credits, initial.caravan.credits - purchase.totalCredits);
+
+  const afterInformation = JSON.parse(store.dispatch(information));
+  assert.equal(afterInformation.revision, 2);
+  assert.equal(afterInformation.city.library.archiveEntryCount, 1);
+  assert.equal(afterInformation.city.library.carriedBundles.length, 0);
 });

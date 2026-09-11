@@ -172,6 +172,26 @@ function parsePlayerAction(input) {
       destinationRef: input.destinationRef,
     };
   }
+  if (
+    (input.kind === "BUY_GOOD" || input.kind === "SELL_GOOD") &&
+    "goodId" in input &&
+    typeof input.goodId === "string" &&
+    "units" in input &&
+    typeof input.units === "number"
+  ) {
+    return {
+      kind: input.kind,
+      goodId: input.goodId,
+      units: input.units,
+    };
+  }
+  if (
+    input.kind === "SELL_INFORMATION" &&
+    "bundleRef" in input &&
+    typeof input.bundleRef === "string"
+  ) {
+    return { kind: "SELL_INFORMATION", bundleRef: input.bundleRef };
+  }
   throw new RangeError("unsupported player action");
 }
 

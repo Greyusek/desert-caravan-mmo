@@ -15,7 +15,7 @@ export const PLAYER_SCREEN_DEFINITIONS = Object.freeze([
     title: "Город",
     kicker: "Местные службы",
     description:
-      "Рынок, библиотека и городские операции появятся в отдельном экране.",
+      "Рынок принимает товары, а библиотека оценивает физически доставленные сведения.",
   }),
   Object.freeze({
     id: "preparation",

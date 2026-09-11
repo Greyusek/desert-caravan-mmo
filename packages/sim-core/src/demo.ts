@@ -103,7 +103,7 @@ const route = createRoutePlan(
   speedMetersPerSecond,
 );
 
-console.log("Desert Caravan MMO — Checkpoint 74 demo");
+console.log("Desert Caravan MMO — Checkpoint 75 demo");
 console.log("Start:", start);
 console.log("Speed: 5 km/h");
 console.log("Segments:");
@@ -1170,4 +1170,31 @@ console.log(
 );
 console.log(
   `\nCheckpoint 74 PLAYER-GLOBAL-001 complete; player route=${playerReady.getView().map.route?.status}->${playerTravelling.getView().map.route?.status}, journal=${playerTravelling.getView().journal.length}.`,
+);
+const cityView = playerSession.getView();
+const cityPurchase = cityView.availableActions.find(
+  (action) => action.kind === "BUY_GOOD" && action.goodId === "food",
+);
+const informationSale = cityView.availableActions.find(
+  (action) => action.kind === "SELL_INFORMATION",
+);
+if (
+  !cityPurchase ||
+  cityPurchase.kind !== "BUY_GOOD" ||
+  !informationSale ||
+  informationSale.kind !== "SELL_INFORMATION"
+) {
+  throw new Error("Checkpoint 75 requires city purchase and information actions");
+}
+const cityAfterPurchase = playerSession.dispatch({
+  kind: cityPurchase.kind,
+  goodId: cityPurchase.goodId,
+  units: cityPurchase.units,
+});
+const cityAfterInformation = cityAfterPurchase.dispatch({
+  kind: informationSale.kind,
+  bundleRef: informationSale.bundleRef,
+});
+console.log(
+  `\nCheckpoint 75 PLAYER-CITY-001 complete; credits=${cityView.caravan.credits}->${cityAfterPurchase.getView().caravan.credits}->${cityAfterInformation.getView().caravan.credits}, archive=${cityAfterInformation.getView().city?.library.archiveEntryCount}.`,
 );
